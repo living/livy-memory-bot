@@ -87,6 +87,75 @@ def feedback_buttons(sep, filename):
         ]]
     }
 
+def read_learned_rules():
+    """Lê learned-rules.md e retorna regras de feedback."""
+    rules_path = MEMORY_DIR / "learned-rules.md"
+    if not rules_path.exists():
+        return {}
+    try:
+        content = rules_path.read_text()
+        rules = {"positive": [], "negative": [], "neutral": []}
+        current_section = None
+        for line in content.split("\n"):
+            if "score positivo" in line:
+                current_section = "positive"
+            elif "score negativo" in line:
+                current_section = "negative"
+            elif "score 0" in line or "neutras" in line:
+                current_section = "neutral"
+            elif current_section and line.strip().startswith("- `") and "`" in line:
+                # Extract action name and note
+                action = line.split("`")[1] if "`" in line else ""
+                note = ""
+                if "Notas:" in line:
+                    note = line.split("Notas:")[1].strip()
+                if action:
+                    rules[current_section].append({"action": action, "note": note})
+        return rules
+    except Exception as e:
+        log(f"⚠️ Failed to read learned-rules: {e}")
+        return {}
+
+def search_memory_context(query, max_results=3):
+    """Busca contexto relevante via openclaw memory search."""
+    try:
+        result = subprocess.run(
+            ["openclaw", "memory", "search", "--max-results", str(max_results), "--json", query],
+            capture_output=True, text=True, timeout=10
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            return json.loads(result.stdout.strip())
+    except Exception as e:
+        log(f"⚠️ Memory search failed: {e}")
+    return []
+
+def get_context_for_file(file_path):
+    """Busca contexto relevante para um arquivo."""
+    # Remove .md extension for cleaner search
+    query_base = file_path.stem.replace("-", " ").replace("_", " ")
+    results = search_memory_context(query_base, max_results=2)
+    rules = read_learned_rules()
+
+    context_parts = []
+
+    # Add rule feedback for this file
+    filename = file_path.name
+    for section, rule_list in [("positive", rules.get("positive", [])), ("negative", rules.get("negative", []))]:
+        for rule in rule_list:
+            if filename in rule.get("action", "") or rule.get("action", "").endswith(filename):
+                if rule.get("note"):
+                    context_parts.append(f"[{section.upper()}] {rule['note']}")
+
+    # Add memory search context
+    if results and isinstance(results, list):
+        for r in results[:2]:
+            if isinstance(r, dict) and r.get("text"):
+                # Truncate long context
+                text = r["text"][:200] + "..." if len(r.get("text", "")) > 200 else r.get("text", "")
+                context_parts.append(f"[MEMORY] {text}")
+
+    return " | ".join(context_parts) if context_parts else None
+
 # ── Metrics ─────────────────────────────────────────────────────────────────
 
 def run_metrics():
@@ -220,9 +289,13 @@ def main():
         )
         if ok:
             sent_files.append(f.name)
-            # Message 2: summary + feedback buttons
+            # Message 2: summary + feedback + context + buttons
             summary = summarize_file(f)
-            msg = f"Resumo: {summary}\n\n"
+            context = get_context_for_file(f)
+            msg = f"Resumo: {summary}"
+            if context:
+                msg += f"\n\n💡 {context}"
+            msg += "\n\n"
             send_message(
                 CHAT_ID, msg,
                 reply_markup=feedback_buttons(action_id, f.name)
