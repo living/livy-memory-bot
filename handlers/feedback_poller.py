@@ -1,34 +1,30 @@
 #!/usr/bin/env python3
 """
-Feedback Poller — polling Telegram for callback queries from 👍/👎 buttons.
+Feedback Webhook Server — receives Telegram callback queries from 👍/👎 buttons.
 
 Usage: python3 handlers/feedback_poller.py
 
-Runs once per invocation (cron-friendly). Designed to be called every 1 minute.
+Starts an HTTP server that receives Telegram webhook callbacks.
+Telegram sends POST to https://srv1405423.hstgr.cloud/telegram-feedback/
+This server parses the callback, writes to feedback-log.jsonl, and answers the callback.
+
+To register webhook:
+  curl -X POST "https://api.telegram.org/bot{BOT_TOKEN}/setWebhook" \
+    -d "url=https://srv1405423.hstgr.cloud/telegram-feedback/"
 """
 
-import json
-import requests
-from datetime import datetime
+import json, os, sys
 from pathlib import Path
+from datetime import datetime
+from http.server import HTTPServer, BaseHTTPRequestHandler
+import requests
 
 BOT_TOKEN = "8738927361:AAFIG5E9-ND9hwb2onxbLLBi03aQZzofuoE"
 BASE_URL = f"https://api.telegram.org/bot{BOT_TOKEN}"
 USER_ID = 7426291192  # Lincoln
 
-STATE_FILE = Path("/home/lincoln/.openclaw/workspace-livy-memory/memory/.feedback_poller_state")
 FEEDBACK_LOG = Path("/home/lincoln/.openclaw/workspace-livy-memory/memory/feedback-log.jsonl")
-
-
-def get_state():
-    if STATE_FILE.exists():
-        return json.loads(STATE_FILE.read_text())
-    return {"last_update_id": 0}
-
-
-def save_state(state):
-    STATE_FILE.write_text(json.dumps(state))
-
+PORT = int(os.environ.get("FEEDBACK_WEBHOOK_PORT", "8080"))
 
 def log_feedback(action, target, rating):
     entry = {
@@ -41,31 +37,49 @@ def log_feedback(action, target, rating):
     with FEEDBACK_LOG.open("a") as f:
         f.write(json.dumps(entry, ensure_ascii=False) + "\n")
 
-
-def poll():
-    state = get_state()
-    last_id = state["last_update_id"]
-    url = f"{BASE_URL}/getUpdates"
-    params = {"timeout": 5, "offset": last_id + 1, "limit": 10}
-
+def answer_callback(callback_id, text=None):
+    """Tell Telegram to dismiss the loading spinner."""
+    payload = {"callback_query_id": callback_id}
+    if text:
+        payload["text"] = text
     try:
-        resp = requests.get(url, params=params, timeout=10)
-        resp.raise_for_status()
-        updates = resp.json().get("result", [])
+        requests.post(f"{BASE_URL}/answerCallbackQuery", json=payload, timeout=5)
     except Exception as e:
-        print(f"Erro ao buscar updates: {e}", flush=True)
-        return
+        print(f"answerCallbackQuery error: {e}", flush=True)
 
-    for update in updates:
-        update_id = update.get("update_id", 0)
+class WebhookHandler(BaseHTTPRequestHandler):
+    def do_POST(self):
+        if self.path != "/telegram-feedback/":
+            self.send_response(404)
+            self.end_headers()
+            return
+
+        content_length = int(self.headers.get("Content-Length", 0))
+        body = self.rfile.read(content_length).decode("utf-8")
+
+        try:
+            update = json.loads(body)
+        except json.JSONDecodeError:
+            self.send_response(400)
+            self.end_headers()
+            return
+
         callback = update.get("callback_query", {})
         if not callback:
-            continue
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(b'{"ok":true}')
+            return
 
-        # Only process callbacks from Lincoln's DM
+        # Filter: only Lincoln's DMs
         user = callback.get("from", {})
         if user.get("id") != USER_ID:
-            continue
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(b'{"ok":true}')
+            return
 
         data = callback.get("data", "")
         parts = data.split(":")
@@ -73,25 +87,26 @@ def poll():
             action, target, rating = parts[0], parts[1], parts[2]
             if rating in ("up", "down"):
                 log_feedback(action, target, rating)
-                print(f"Feedback: {action} {target} {rating}", flush=True)
+                print(f"Feedback logged: {action} {target} {rating}", flush=True)
+                answer_callback(callback.get("id"), f"👍" if rating == "up" else "👎")
+            else:
+                answer_callback(callback.get("id"))
+        else:
+            answer_callback(callback.get("id"))
 
-        # Answer callback to remove loading state
-        callback_id = callback.get("id")
-        if callback_id:
-            requests.post(
-                f"{BASE_URL}/answerCallbackQuery",
-                json={"callback_query_id": callback_id},
-            )
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.end_headers()
+        self.wfile.write(b'{"ok":true}')
 
-        if update_id > last_id:
-            last_id = update_id
-
-    save_state({"last_update_id": last_id})
-
+    def log_message(self, format, *args):
+        # Suppress default HTTP logging
+        pass
 
 def main():
-    poll()
-
+    server = HTTPServer(("0.0.0.0", PORT), WebhookHandler)
+    print(f"Feedback webhook server listening on port {PORT}", flush=True)
+    server.serve_forever()
 
 if __name__ == "__main__":
     main()
