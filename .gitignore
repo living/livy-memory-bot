@@ -1,1 +1,13 @@
 .worktrees/
+
+# Feedback data (sensitive user input)
+memory/feedback-log.jsonl
+memory/feedback-archive.jsonl
+
+# Temp/processing files
+memory/dream-signal.json
+
+# Python cache
+__pycache__/
+*/__pycache__/
+*.pyc

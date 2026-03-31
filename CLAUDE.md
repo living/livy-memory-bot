@@ -74,6 +74,8 @@ Topic files in `memory/curated/` contain detailed project/agent context. They ar
 **Test feedback:** Send test message via API, click button, verify with `tail memory/feedback-log.jsonl`
 **Telegram getUpdates:** Calling via curl consumes pending updates from Telegram — use for testing only, not in production polling code
 **Systemd user services:** `~/.config/systemd/user/<name>.service` — control with `systemctl --user <start|stop|status>`
-**Feedback poller:** `python3 handlers/feedback_poller.py` — polling only, no webhook, port 8080
+**Feedback poller:** Managed by `feedback-webhook.service` (systemd). Use `systemctl --user restart feedback-webhook.service` — do NOT run manually (creates duplicate processes causing 409 Conflict)
+**Feedback context:** `learned-rules.md` + `openclaw memory search` enrich each file summary before sending — negative rules shown as warnings in summary message
+**Consolidation output:** "DRY RUN" + "mudanças pendentes" messages are informational only — changes ARE applied if pending count > 0
 **Autoresearch script:** `python3 scripts/autoresearch_cron.py` — sends files via Telegram Direct API with feedback buttons, processes feedback at start
 **Dream:** `python3 skills/memoria-consolidation/dream_all.py` — processes sessions from main (Livy Deep) and both memory workspaces
