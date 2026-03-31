@@ -1,4 +1,4 @@
-# AGENTS.md — Dee Memory Agent
+# AGENTS.md — Livy Memory Agent
 
 ## Contexto de Execução
 

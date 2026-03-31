@@ -1,4 +1,4 @@
-# Napkin — Dee Memory Agent
+# Napkin — Livy Memory Agent
 
 Runbook de decisões técnicas deste workspace.
 
