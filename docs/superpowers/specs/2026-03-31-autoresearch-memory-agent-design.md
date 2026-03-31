@@ -93,7 +93,9 @@ Contagem de links `[nome](path)` que apontam para outros topic files em `memory/
 ```jsonl
 {"ts":"2026-03-31T10:00:00Z","action":"add_frontmatter","target":"memory/curated/forge-platform.md","rating":"up","note":null}
 {"ts":"2026-03-31T10:05:00Z","action":"consolidate_stale","target":"memory/curated/tldv-pipeline.md","rating":"down","note":"arquivou cedo demais"}
+{"ts":"2026-03-31T10:10:00Z","action":"add_crossref","target":"memory/curated/bat-conectabot.md","rating":null}
 ```
+> Nota: `rating: null` significa que o usuário não respondeu (inconclusivo). Ações com `null` não afetam o score.
 
 ### Tipos de Acao
 
@@ -130,21 +132,25 @@ Ao final de cada dia, um script processa o feedback-log.jsonl e gera `memory/lea
 
 ### Inline Keyboard Buttons
 
-Quando o agente reporta uma ação:
+Cada ação reportada individualmente no Telegram:
 
 ```
-🧠 [Livy Memory] Autoresearch — Iteration 3/10
+🧠 [Livy Memory] Iteration 3 — 10:00 BRT
 
 📝 add_frontmatter: forge-platform.md
-   Score atual: +3 (3👍 0👎)
-   → Mantendo padrão
+   → Adicionei frontmatter name/description/type
+   [👍] [👎]
 
 📝 add_crossref: forge-platform.md → bat-conectabot-observability.md
-   Score: 0 (1👍 1👎)
-   → Abordagem instável, vou variar
+   → Linkei projetos relacionados
+   [👍] [👎]
 
-[👍 Melhorou]  [👎 Piorou]
+📝 archive_file: livy-evo.md
+   → Movi para .archive/ (stale, >60d)
+   [👍] [👎]
 ```
+
+> ⚠️ Itens sem resposta em 1 hora são marcados como inconclusivos no log.
 
 ### Mensagens de Resumo (cron)
 
@@ -209,8 +215,16 @@ O bot `@livy_agentic_memory_bot` precisa de um handler que:
 
 | Cron | Horario | Acao |
 |---|---|---|
-| dream-memory-consolidation | 07h BRT | Metrics + autoresearch loop |
+| dream-memory-consolidation | A cada 1 hora | Metrics + autoresearch loop (ate estabilizar) |
 | memory-feedback-learn | 23h BRT | Processa feedback do dia, gera learned-rules.md |
+
+**Nota:** Frequencia inicial de 1 hora ate o sistema estabilizar. Depois aumentar para 4h, depois 8h, ate chegar em nightly (07h BRT).
+
+## Feedback Inconclusivo
+
+Ações sem feedback do usuário são tratadas como **inconclusivas** (score não afetado, não entra na contagem). Apenas ações com 👍 ou 👎 explícito são usadas para aprendizado.
+
+Feedback inconclusivo não é坏事 — significa que o agente está funcionando bem o suficiente para não precisar correção.
 
 ## Dependências
 
