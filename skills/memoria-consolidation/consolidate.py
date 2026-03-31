@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Auto Dream Adaptado — Consolidação de Memória Living
+Auto Dream Adaptado — Consolidação de Memória (workspace-livy-memory)
 
 4 fases:
   1. Orientation — escanear MEMORY.md + topic files
@@ -20,9 +20,9 @@ import os, re, json, sys
 from datetime import datetime
 from pathlib import Path
 
-MEMORY_DIR  = Path("/home/lincoln/.openclaw/workspace/memory")
+MEMORY_DIR  = Path("/home/lincoln/.openclaw/workspace-livy-memory/memory")
 ARCHIVE_DIR = MEMORY_DIR / ".archive"
-MEMORY_INDEX = MEMORY_DIR.parent / "MEMORY.md"
+MEMORY_INDEX = Path("/home/lincoln/.openclaw/workspace-livy-memory/MEMORY.md")
 LOG_FILE   = MEMORY_DIR / "consolidation-log.md"
 LOCK_FILE  = MEMORY_DIR / ".consolidation.lock"
 
