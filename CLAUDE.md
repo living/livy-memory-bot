@@ -49,3 +49,21 @@ Topic files in `memory/curated/` contain detailed project/agent context. They ar
 - When encountering technical decisions: update the relevant topic file
 - When encountering stale entries: register for consolidation
 - `HEARTBEAT.md` is the operational dashboard — keep it current
+
+## OpenClaw Automation
+
+**Cron jobs:** `openclaw cron list` / `openclaw cron add` / `openclaw cron run <id>` / `openclaw cron edit <id>`
+**Cron timeout flag:** `--timeout-seconds` (not `--timeout`)
+**Cron DM delivery:** `--announce --to tg:7426291192` for user DM
+
+**Bot:** `@livy_agentic_memory_bot` (feedback) — DM to report actions with 👍/👎 buttons
+**Autoresearch cron ID:** `0c388629-3465-4825-a791-16c46c9d1300` (every 1h, memory-agent)
+**Learn cron ID:** `f5969901-00ba-449f-989b-b2b972b70a79` (23h BRT, memory-agent)
+
+## Infrastructure
+
+**Telegram bot tokens:** OpenClaw gateway (`8738927361:AAE2COOt...`) conflicts with manual getUpdates — use separate bot `8725269523:AAFqAFEF...` for webhooks/polling
+**Telegram webhook:** register via `curl -X POST "https://api.telegram.org/bot<TOKEN>/setWebhook" -d "url=<url>"`
+**Caddyfile:** `/home/lincoln/.local/etc/caddy/Caddyfile` — reload with `caddy reload --config <path> --adapter caddyfile`
+**Systemd user services:** `~/.config/systemd/user/<name>.service` — control with `systemctl --user <start|stop|status>`
+**Feedback webhook:** runs on port 8080, endpoint `https://srv1405423.hstgr.cloud/telegram-feedback/`
