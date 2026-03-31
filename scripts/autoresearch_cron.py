@@ -28,21 +28,39 @@ CURATED_DIR = MEMORY_DIR / "curated"
 def log(msg):
     print(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}", flush=True)
 
-def send_document(chat_id, file_path, caption=None, reply_markup=None):
-    """Send a document via Telegram Bot API."""
+def send_document(chat_id, file_path, caption=None):
+    """Send a document via Telegram Bot API (no buttons in caption)."""
     url = f"{BASE_URL}/sendDocument"
     with open(file_path, "rb") as f:
         data = {"chat_id": chat_id}
         if caption:
             data["caption"] = caption
-        if reply_markup:
-            data["reply_markup"] = json.dumps(reply_markup)
         files = {"document": (file_path.name, f)}
         resp = requests.post(url, data=data, files=files, timeout=30)
         result = resp.json()
         if not result.get("ok"):
             log(f"  ⚠️ sendDocument failed: {result.get('description', result)}")
         return result.get("ok")
+
+def summarize_file(file_path, max_lines=7):
+    """Gera resumo do arquivo (primeiras linhas / frontmatter)."""
+    try:
+        content = file_path.read_text()
+        lines = content.split("\n")[:max_lines]
+        summary_lines = []
+        for line in lines:
+            line = line.strip()
+            if not line or line.startswith("#+"):
+                continue
+            summary_lines.append(line)
+            if len(summary_lines) >= 5:
+                break
+        summary = " | ".join(summary_lines[:5])
+        if len(summary) > 150:
+            summary = summary[:147] + "..."
+        return summary if summary else "arquivo de memória"
+    except:
+        return "arquivo de memória"
 
 def send_message(chat_id, text, reply_markup=None):
     """Send a text message via Telegram Bot API."""
@@ -191,17 +209,24 @@ def main():
 
     send_message(CHAT_ID, intro, reply_markup=intro_keyboard)
 
-    # 6. Send each file as document with feedback button
+    # 6. Send each file as document (no buttons) + summary message with buttons
     sent_files = []
     for f in files:
         log(f"Sending {f.name}...")
+        # Message 1: document only
         ok = send_document(
             CHAT_ID, f,
-            caption=f"📄 {f.name}",
-            reply_markup=feedback_buttons(f"{action_id}:{f.name}")
+            caption=f"📄 {f.name}"
         )
         if ok:
             sent_files.append(f.name)
+            # Message 2: summary + feedback buttons
+            summary = summarize_file(f)
+            msg = f"Resumo: {summary}\n\n"
+            send_message(
+                CHAT_ID, msg,
+                reply_markup=feedback_buttons(f"{action_id}:{f.name}")
+            )
 
     # 7. Send summary with feedback button
     if metrics_before and metrics_after:
