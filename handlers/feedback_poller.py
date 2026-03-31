@@ -19,7 +19,7 @@ from datetime import datetime
 from http.server import HTTPServer, BaseHTTPRequestHandler
 import requests
 
-BOT_TOKEN = "8738927361:AAFIG5E9-ND9hwb2onxbLLBi03aQZzofuoE"
+BOT_TOKEN = "8725269523:AAFqAFEFcbAa6daClbUiVH9qBLfzu46SMOQ"
 BASE_URL = f"https://api.telegram.org/bot{BOT_TOKEN}"
 USER_ID = 7426291192  # Lincoln
 
