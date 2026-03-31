@@ -14,8 +14,9 @@ import collections
 from datetime import date
 from pathlib import Path
 
-FEEDBACK_LOG  = Path("/home/lincoln/.openclaw/workspace-livy-memory/memory/feedback-log.jsonl")
-LEARNED_RULES = Path("/home/lincoln/.openclaw/workspace-livy-memory/memory/learned-rules.md")
+FEEDBACK_LOG   = Path("/home/lincoln/.openclaw/workspace-livy-memory/memory/feedback-log.jsonl")
+FEEDBACK_ARCHIVE = Path("/home/lincoln/.openclaw/workspace-livy-memory/memory/feedback-archive.jsonl")
+LEARNED_RULES  = Path("/home/lincoln/.openclaw/workspace-livy-memory/memory/learned-rules.md")
 
 
 def load_feedback(path: Path) -> list[dict]:
@@ -148,6 +149,14 @@ def main():
     if not entries:
         print("Nenhum feedback para processar.")
         return
+
+    # Archive feedback before processing
+    with FEEDBACK_ARCHIVE.open("a") as arch:
+        for entry in entries:
+            arch.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    # Clear the feedback log
+    FEEDBACK_LOG.write_text("")
+    print(f"Feedback arquivado ({len(entries)} entradas) e log limpo.")
 
     stats = compute_scores(entries)
 

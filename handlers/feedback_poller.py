@@ -57,11 +57,11 @@ def process_callback(callback):
         return
 
     data = callback.get("data", "")
-    parts = data.split(":")
-    if len(parts) >= 3:
-        action, target, rating = parts[0], parts[1], parts[2]
+    parts = data.split("|")
+    if len(parts) >= 4 and parts[0] == "feedback":
+        action, action_id, target, rating = parts[0], parts[1], parts[2], parts[3]
         if rating in ("up", "down"):
-            log_feedback(action, target, rating)
+            log_feedback(f"{action_id}:{target}", target, rating)
             answer_callback(callback_id, f"👍" if rating == "up" else "👎")
         else:
             answer_callback(callback_id)
