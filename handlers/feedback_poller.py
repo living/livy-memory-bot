@@ -1,22 +1,16 @@
 #!/usr/bin/env python3
 """
-Feedback Webhook Server — receives Telegram callback queries from 👍/👎 buttons.
+Feedback Poller — polls Telegram for callback queries from 👍/👎 buttons.
 
 Usage: python3 handlers/feedback_poller.py
 
-Starts an HTTP server that receives Telegram webhook callbacks.
-Telegram sends POST to https://srv1405423.hstgr.cloud/telegram-feedback/
-This server parses the callback, writes to feedback-log.jsonl, and answers the callback.
-
-To register webhook:
-  curl -X POST "https://api.telegram.org/bot{BOT_TOKEN}/setWebhook" \
-    -d "url=https://srv1405423.hstgr.cloud/telegram-feedback/"
+Polling interval: 5 seconds
+Stores feedback in memory/feedback-log.jsonl
 """
 
-import json, os, sys
+import json, os, time
 from pathlib import Path
 from datetime import datetime
-from http.server import HTTPServer, BaseHTTPRequestHandler
 import requests
 
 BOT_TOKEN = "8725269523:AAFqAFEFcbAa6daClbUiVH9qBLfzu46SMOQ"
@@ -24,7 +18,10 @@ BASE_URL = f"https://api.telegram.org/bot{BOT_TOKEN}"
 USER_ID = 7426291192  # Lincoln
 
 FEEDBACK_LOG = Path("/home/lincoln/.openclaw/workspace-livy-memory/memory/feedback-log.jsonl")
-PORT = int(os.environ.get("FEEDBACK_WEBHOOK_PORT", "8080"))
+POLL_INTERVAL = 5  # seconds between polls
+
+# Track processed callback IDs to avoid duplicates
+processed_callbacks = set()
 
 def log_feedback(action, target, rating):
     entry = {
@@ -36,6 +33,7 @@ def log_feedback(action, target, rating):
     }
     with FEEDBACK_LOG.open("a") as f:
         f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    print(f"[{datetime.now().strftime('%H:%M:%S')}] Feedback logged: {action}:{target}:{rating}", flush=True)
 
 def answer_callback(callback_id, text=None):
     """Tell Telegram to dismiss the loading spinner."""
@@ -47,66 +45,52 @@ def answer_callback(callback_id, text=None):
     except Exception as e:
         print(f"answerCallbackQuery error: {e}", flush=True)
 
-class WebhookHandler(BaseHTTPRequestHandler):
-    def do_POST(self):
-        if self.path != "/telegram-feedback/":
-            self.send_response(404)
-            self.end_headers()
-            return
+def process_callback(callback):
+    """Process a single callback query."""
+    callback_id = callback.get("id")
+    if callback_id in processed_callbacks:
+        return
+    processed_callbacks.add(callback_id)
 
-        content_length = int(self.headers.get("Content-Length", 0))
-        body = self.rfile.read(content_length).decode("utf-8")
+    user = callback.get("from", {})
+    if user.get("id") != USER_ID:
+        return
 
-        try:
-            update = json.loads(body)
-        except json.JSONDecodeError:
-            self.send_response(400)
-            self.end_headers()
-            return
-
-        callback = update.get("callback_query", {})
-        if not callback:
-            self.send_response(200)
-            self.send_header("Content-Type", "application/json")
-            self.end_headers()
-            self.wfile.write(b'{"ok":true}')
-            return
-
-        # Filter: only Lincoln's DMs
-        user = callback.get("from", {})
-        if user.get("id") != USER_ID:
-            self.send_response(200)
-            self.send_header("Content-Type", "application/json")
-            self.end_headers()
-            self.wfile.write(b'{"ok":true}')
-            return
-
-        data = callback.get("data", "")
-        parts = data.split(":")
-        if len(parts) >= 3:
-            action, target, rating = parts[0], parts[1], parts[2]
-            if rating in ("up", "down"):
-                log_feedback(action, target, rating)
-                print(f"Feedback logged: {action} {target} {rating}", flush=True)
-                answer_callback(callback.get("id"), f"👍" if rating == "up" else "👎")
-            else:
-                answer_callback(callback.get("id"))
+    data = callback.get("data", "")
+    parts = data.split(":")
+    if len(parts) >= 3:
+        action, target, rating = parts[0], parts[1], parts[2]
+        if rating in ("up", "down"):
+            log_feedback(action, target, rating)
+            answer_callback(callback_id, f"👍" if rating == "up" else "👎")
         else:
-            answer_callback(callback.get("id"))
+            answer_callback(callback_id)
+    else:
+        answer_callback(callback_id)
 
-        self.send_response(200)
-        self.send_header("Content-Type", "application/json")
-        self.end_headers()
-        self.wfile.write(b'{"ok":true}')
-
-    def log_message(self, format, *args):
-        # Suppress default HTTP logging
-        pass
-
-def main():
-    server = HTTPServer(("0.0.0.0", PORT), WebhookHandler)
-    print(f"Feedback webhook server listening on port {PORT}", flush=True)
-    server.serve_forever()
+def poll_callbacks():
+    """Poll for callback queries continuously."""
+    offset = None
+    print(f"[{datetime.now().strftime('%H:%M:%S')}] Polling started (interval: {POLL_INTERVAL}s)", flush=True)
+    while True:
+        try:
+            params = {"timeout": POLL_INTERVAL}
+            if offset:
+                params["offset"] = offset
+            resp = requests.get(f"{BASE_URL}/getUpdates", params=params, timeout=POLL_INTERVAL + 5)
+            data = resp.json()
+            if data.get("ok"):
+                for update in data.get("result", []):
+                    offset = update.get("update_id", 0) + 1
+                    callback = update.get("callback_query")
+                    if callback:
+                        process_callback(callback)
+        except Exception as e:
+            print(f"Polling error: {e}", flush=True)
+        time.sleep(POLL_INTERVAL)
 
 if __name__ == "__main__":
-    main()
+    print(f"[{datetime.now().strftime('%H:%M:%S')}] Feedback poller starting", flush=True)
+    print(f"[{datetime.now().strftime('%H:%M:%S')}] Bot token: {BOT_TOKEN[:20]}...", flush=True)
+    print(f"[{datetime.now().strftime('%H:%M:%S')}] Feedback log: {FEEDBACK_LOG}", flush=True)
+    poll_callbacks()

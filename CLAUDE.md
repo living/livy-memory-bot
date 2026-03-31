@@ -12,6 +12,10 @@ This is the **Livy Memory Agent** workspace — an agentic memory system for Liv
 | Curated | `MEMORY.md` + `memory/curated/*.md` | Markdown |
 | Operational | `HEARTBEAT.md` + `memory/consolidation-log.md` | Markdown |
 
+## Feedback Learning
+
+`learn_from_feedback.py` runs at START of autoresearch_cron.py, reads `memory/feedback-log.jsonl`, generates `memory/learned-rules.md`. No separate cron needed — feedback accumulates between autoresearch runs.
+
 ## Memory Consolidation
 
 Run the 4-phase consolidation script:
@@ -22,6 +26,7 @@ python3 skills/memoria-consolidation/consolidate.py
 
 Phases: Orientation → Gather Signal → Consolidation → Prune & Index
 Log output: `memory/consolidation-log.md`
+**Mente Coletiva:** consolidation processes BOTH workspaces: memory-agent + Livy Deep (main). Both MEMORY.md indexes are validated (<200 lines).
 
 ## File Structure
 
@@ -54,16 +59,21 @@ Topic files in `memory/curated/` contain detailed project/agent context. They ar
 
 **Cron jobs:** `openclaw cron list` / `openclaw cron add` / `openclaw cron run <id>` / `openclaw cron edit <id>`
 **Cron timeout flag:** `--timeout-seconds` (not `--timeout`)
+**Cron run:** `openclaw cron run <id>` (no --force flag — it runs immediately)
 **Cron DM delivery:** `--announce --to tg:7426291192` for user DM
 
 **Bot:** `@livy_agentic_memory_bot` (feedback) — DM to report actions with 👍/👎 buttons
 **Autoresearch cron ID:** `0c388629-3465-4825-a791-16c46c9d1300` (every 1h, memory-agent)
-**Learn cron ID:** `f5969901-00ba-449f-989b-b2b972b70a79` (23h BRT, memory-agent)
+**Feedback cron:** memory-agent-feedback-learn (cron ID aa5cd560, at :45) — processes accumulated feedback before each autoresearch run
 
 ## Infrastructure
 
-**Telegram bot tokens:** OpenClaw gateway (`8738927361:AAE2COOt...`) conflicts with manual getUpdates — use separate bot `8725269523:AAFqAFEF...` for webhooks/polling
-**Telegram webhook:** register via `curl -X POST "https://api.telegram.org/bot<TOKEN>/setWebhook" -d "url=<url>"`
-**Caddyfile:** `/home/lincoln/.local/etc/caddy/Caddyfile` — reload with `caddy reload --config <path> --adapter caddyfile`
+**Telegram bot tokens:** OpenClaw gateway (`8738927361:AAE2COOt...`) conflicts with manual getUpdates — use separate bot `8725269523:AAFqAFEF...` for polling only
+**Telegram polling:** Use `getUpdates` polling only — webhook conflicts with getUpdates (409 Conflict) and is blocked by DNS issues on this server
+**Caddyfile:** `/home/lincoln/.local/etc/caddy/Caddyfile` — `/memory-callback/` active; `/telegram-feedback/` route removed (was unused)
+**Test feedback:** Send test message via API, click button, verify with `tail memory/feedback-log.jsonl`
+**Telegram getUpdates:** Calling via curl consumes pending updates from Telegram — use for testing only, not in production polling code
 **Systemd user services:** `~/.config/systemd/user/<name>.service` — control with `systemctl --user <start|stop|status>`
-**Feedback webhook:** runs on port 8080, endpoint `https://srv1405423.hstgr.cloud/telegram-feedback/`
+**Feedback poller:** `python3 handlers/feedback_poller.py` — polling only, no webhook, port 8080
+**Autoresearch script:** `python3 scripts/autoresearch_cron.py` — sends files via Telegram Direct API with feedback buttons, processes feedback at start
+**Dream:** `python3 skills/memoria-consolidation/dream_all.py` — processes sessions from main (Livy Deep) and both memory workspaces

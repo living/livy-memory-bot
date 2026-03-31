@@ -2,11 +2,17 @@
 """
 Auto Dream Adaptado — Consolidação de Memória (workspace-livy-memory)
 
+Este script consolida TODAS as memórias da Living num único fluxo:
+1. Memória do memory-agent: workspace-livy-memory/memory/
+2. Memória do main (Livy Deep): workspace/memory/
+
+A memória é uma mente coletiva — o memory-agent curatea tudo.
+
 4 fases:
-  1. Orientation — escanear MEMORY.md + topic files
+  1. Orientation — escanear índices + topic files de TODOS
   2. Gather Signal — detectar relative dates, stale, contradictions
   3. Consolidation — converter datas, arquivar stale, resolver conflitos
-  4. Prune & Index — reescrever MEMORY.md, gerar consolidation-log.md
+  4. Prune & Index — reescrever índices, gerar consolidation-log.md
 
 RESILIÊNCIA:
 - Lock file impede execuções concorrentes
@@ -20,11 +26,25 @@ import os, re, json, sys
 from datetime import datetime
 from pathlib import Path
 
-MEMORY_DIR  = Path("/home/lincoln/.openclaw/workspace-livy-memory/memory")
-ARCHIVE_DIR = MEMORY_DIR / ".archive"
-MEMORY_INDEX = Path("/home/lincoln/.openclaw/workspace-livy-memory/MEMORY.md")
-LOG_FILE   = MEMORY_DIR / "consolidation-log.md"
-LOCK_FILE  = MEMORY_DIR / ".consolidation.lock"
+# ── Mente Coletiva — TODAS as memórias ────────────────────────────────────────
+MEMORY_SPACES = [
+    {
+        "name": "memory-agent",
+        "memory_dir": Path("/home/lincoln/.openclaw/workspace-livy-memory/memory"),
+        "index_file": Path("/home/lincoln/.openclaw/workspace-livy-memory/MEMORY.md"),
+        "curated_dir": Path("/home/lincoln/.openclaw/workspace-livy-memory/memory/curated"),
+    },
+    {
+        "name": "main (Livy Deep)",
+        "memory_dir": Path("/home/lincoln/.openclaw/workspace/memory"),
+        "index_file": Path("/home/lincoln/.openclaw/workspace/MEMORY.md"),
+        "curated_dir": Path("/home/lincoln/.openclaw/workspace/memory/curated"),
+    },
+]
+
+ARCHIVE_DIR = Path("/home/lincoln/.openclaw/workspace-livy-memory/memory/.archive")
+LOG_FILE   = Path("/home/lincoln/.openclaw/workspace-livy-memory/memory/consolidation-log.md")
+LOCK_FILE  = Path("/home/lincoln/.openclaw/workspace-livy-memory/memory/.consolidation.lock")
 
 def log(msg, level="INFO"):
     print(f"[{datetime.now().strftime('%H:%M:%S')}] [{level}] {msg}", flush=True)
@@ -33,7 +53,7 @@ def fail(msg):
     log(msg, "ERROR")
     sys.exit(1)
 
-# ── LOCK FILE (concurrency guard) ──────────────────────────────────────────
+# ── LOCK FILE (concurrency guard) ──────────────────────────────────────────────
 
 def acquire_lock():
     """Cria lock file com PID. Falha se já existir."""
@@ -51,121 +71,144 @@ def release_lock():
         LOCK_FILE.unlink()
         log("Lock released")
 
-# ── PHASE 1: ORIENTATION ──────────────────────────────────────────────────
+# ── PHASE 1: ORIENTATION (TODOS OS ESPAÇOS) ──────────────────────────────────
 
-def load_memory_index():
-    """Lê MEMORY.md e extrai topic files referenciados."""
-    if not MEMORY_INDEX.exists():
-        return "", set()
-    content = MEMORY_INDEX.read_text()
-    refs = re.findall(r'\[([^\]]+)\]\(memory/([^\)]+)\)', content)
-    referenced = {r[1] for r in refs}
-    return content, referenced
+def load_memory_indexes():
+    """Lê todos os MEMORY.md e extrai topic files referenciados."""
+    indexes = {}
+    for space in MEMORY_SPACES:
+        idx_file = space["index_file"]
+        if idx_file.exists():
+            content = idx_file.read_text()
+            refs = re.findall(r'\[([^\]]+)\]\(memory/([^\)]+)\)', content)
+            referenced = {r[1] for r in refs}
+            indexes[space["name"]] = {
+                "content": content,
+                "referenced": referenced,
+                "index_file": idx_file,
+            }
+        else:
+            indexes[space["name"]] = {
+                "content": "",
+                "referenced": set(),
+                "index_file": idx_file,
+            }
+    return indexes
 
-# ── PHASE 2: GATHER SIGNAL ───────────────────────────────────────────────
+# ── PHASE 2: GATHER SIGNAL (TODOS OS ESPAÇOS) ────────────────────────────────
 
-def gather_signal(referenced_topic_files):
+def gather_signal_all(indexes):
     """
-    Coleta sinais em curated/*.md e topic files level-root.
-
+    Coleta sinais em TODOS os curated/*.md e topic files.
     Lógica orphan: APENAS curated/*.md são topic files.
-    daily logs (YYYY-MM-DD*.md) nunca são orphans.
-    consolidation-log.md é excluído (não é topic file).
     """
-    curated_files = list((MEMORY_DIR / "curated").glob("*.md")) \
-        if (MEMORY_DIR / "curated").exists() else []
-    top_level = [
-        f for f in MEMORY_DIR.glob("*.md")
-        if f.name not in ("heartbeat-state.json",
-                          "consolidation-log.md",
-                          ".consolidation.lock")
-        and not f.name.startswith(".")
-        and f.name not in [p.name for p in curated_files]
-    ]
-    all_topic_files = set(f.name for f in curated_files + top_level)
+    all_signals = {}
 
-    orphaned = list(all_topic_files - referenced_topic_files)
+    for space in MEMORY_SPACES:
+        mem_dir = space["memory_dir"]
+        curated_dir = space["curated_dir"]
+        referenced = indexes.get(space["name"], {}).get("referenced", set())
 
-    signals = {
-        "relative_dates": [],
-        "stale":          [],
-        "orphaned":       orphaned,
-        "multi_date":     [],
-    }
+        curated_files = list(curated_dir.glob("*.md")) if curated_dir.exists() else []
+        top_level = [
+            f for f in mem_dir.glob("*.md")
+            if f.name not in ("heartbeat-state.json",
+                              "consolidation-log.md",
+                              ".consolidation.lock")
+            and not f.name.startswith(".")
+            and f.name not in [p.name for p in curated_files]
+        ]
 
-    for f in curated_files + top_level:
-        try:
-            content = f.read_text()
-        except Exception as e:
-            log(f"  Erro lendo {f.name}: {e}", "WARN")
-            continue
+        all_topic_files = set(f.name for f in curated_files + top_level)
+        orphaned = list(all_topic_files - referenced)
 
-        # Relative dates
-        for pattern, label in [
-            (r"\bontem\b",      "ontem"),
-            (r"\banteontem\b",  "anteontem"),
-            (r"\bhá (\d+) dias\b", "há X dias"),
-        ]:
-            matches = re.findall(pattern, content, re.IGNORECASE)
-            if len(matches) > 1:
-                signals["multi_date"].append((f.name, len(matches), label))
-            elif len(matches) == 1:
-                signals["relative_dates"].append((f.name, label, pattern))
+        signals = {
+            "space": space["name"],
+            "curated_dir": curated_dir,
+            "memory_dir": mem_dir,
+            "relative_dates": [],
+            "stale": [],
+            "orphaned": orphaned,
+            "multi_date": [],
+        }
 
-        # Stale
-        for ind in ["TODO", "TODO:", "FIXME", "pendente", "bug", "em andamento"]:
-            if ind.lower() in content.lower():
-                signals["stale"].append((f.name, ind))
-                break
+        for f in curated_files + top_level:
+            try:
+                content = f.read_text()
+            except Exception as e:
+                log(f"  Erro lendo {f.name}: {e}", "WARN")
+                continue
 
-    return signals
+            # Relative dates
+            for pattern, label in [
+                (r"\bontem\b",      "ontem"),
+                (r"\banteontem\b",  "anteontem"),
+                (r"\bhá (\d+) dias\b", "há X dias"),
+            ]:
+                matches = re.findall(pattern, content, re.IGNORECASE)
+                if len(matches) > 1:
+                    signals["multi_date"].append((f.name, len(matches), label))
+                elif len(matches) == 1:
+                    signals["relative_dates"].append((f.name, label, pattern))
 
-# ── PHASE 3: CONSOLIDATION ───────────────────────────────────────────────
+            # Stale
+            for ind in ["TODO", "TODO:", "FIXME", "pendente", "bug", "em andamento"]:
+                if ind.lower() in content.lower():
+                    signals["stale"].append((f.name, ind))
+                    break
 
-def consolidate(signals, dry_run=True):
+        all_signals[space["name"]] = signals
+
+    return all_signals
+
+# ── PHASE 3: CONSOLIDATION (TODOS OS ESPAÇOS) ───────────────────────────────
+
+def consolidate_all(all_signals, dry_run=True):
     """
     Dry-run primeiro, depois apply.
-    Renames não são atômicos entre diretórios — por isso o 2-pass.
     """
-    changes  = []
-    staged   = []
+    changes = []
+    staged = []
 
-    for fname, label, pattern in signals["relative_dates"]:
-        fpath = MEMORY_DIR / fname
-        if not fpath.exists():
-            continue
-        date_match = re.match(r"(\d{4}-\d{2}-\d{2})", fname)
-        file_date = date_match.group(1) if date_match else "data-desconhecida"
-        try:
-            content = fpath.read_text()
-            new_content = re.sub(pattern, file_date, content,
-                                 count=1, flags=re.IGNORECASE)
-            if new_content != content:
-                changes.append(f"  - {fname}: '{label}' → '{file_date}'")
-                staged.append((fpath, new_content, "replace"))
-        except Exception as e:
-            log(f"  Erro processando {fname}: {e}", "WARN")
+    for space_name, signals in all_signals.items():
+        mem_dir = signals["memory_dir"]
 
-    for fname, count, label in signals["multi_date"]:
-        log(f"  ⚠️ {fname}: {count}x '{label}' — requer revisão manual", "WARN")
-        changes.append(f"  - ⚠️ {fname}: {count}x '{label}' — requer revisão manual")
+        for fname, label, pattern in signals["relative_dates"]:
+            fpath = mem_dir / fname
+            if not fpath.exists():
+                continue
+            date_match = re.match(r"(\d{4}-\d{2}-\d{2})", fname)
+            file_date = date_match.group(1) if date_match else "data-desconhecida"
+            try:
+                content = fpath.read_text()
+                new_content = re.sub(pattern, file_date, content,
+                                     count=1, flags=re.IGNORECASE)
+                if new_content != content:
+                    changes.append(f"  - [{space_name}] {fname}: '{label}' → '{file_date}'")
+                    staged.append((fpath, new_content, "replace"))
+            except Exception as e:
+                log(f"  Erro processando {fname}: {e}", "WARN")
 
-    # Duplo threshold: >60d archiva, 30-60d monitora, <30d ignora
-    cutoff_30 = datetime.now().timestamp() - 30 * 86400
-    cutoff_60 = datetime.now().timestamp() - 60 * 86400
+        for fname, count, label in signals["multi_date"]:
+            log(f"  ⚠️ [{space_name}] {fname}: {count}x '{label}' — requer revisão manual", "WARN")
+            changes.append(f"  - ⚠️ [{space_name}] {fname}: {count}x '{label}' — requer revisão manual")
 
-    for fname, indicator in signals["stale"]:
-        fpath = MEMORY_DIR / fname
-        if not fpath.exists():
-            continue
-        mtime = fpath.stat().st_mtime
-        if mtime < cutoff_60:
-            ARCHIVE_DIR.mkdir(exist_ok=True)
-            dst = ARCHIVE_DIR / f"{fname.replace('.md','')}-stale.md"
-            changes.append(f"  - {fname} → .archive/ (stale:{indicator}, >60d)")
-            staged.append((fpath, dst, "rename"))
-        elif mtime < cutoff_30:
-            changes.append(f"  - {fname}: stale:{indicator} (30-60d) — monitorar")
+        # Duplo threshold: >60d archiva, 30-60d monitora, <30d ignora
+        cutoff_30 = datetime.now().timestamp() - 30 * 86400
+        cutoff_60 = datetime.now().timestamp() - 60 * 86400
+
+        for fname, indicator in signals["stale"]:
+            fpath = mem_dir / fname
+            if not fpath.exists():
+                continue
+            mtime = fpath.stat().st_mtime
+            if mtime < cutoff_60:
+                ARCHIVE_DIR.mkdir(exist_ok=True)
+                dst = ARCHIVE_DIR / f"{fname.replace('.md','')}-stale.md"
+                changes.append(f"  - [{space_name}] {fname} → .archive/ (stale:{indicator}, >60d)")
+                staged.append((fpath, dst, "rename"))
+            elif mtime < cutoff_30:
+                changes.append(f"  - [{space_name}] {fname}: stale:{indicator} (30-60d) — monitorar")
 
     if not dry_run:
         for item in staged:
@@ -176,68 +219,86 @@ def consolidate(signals, dry_run=True):
 
     return changes
 
-# ── PHASE 4: PRUNE & INDEX ───────────────────────────────────────────────
+# ── PHASE 4: PRUNE & INDEX (TODOS OS ESPAÇOS) ──────────────────────────────
 
-def prune_and_index(changes, dry_run=True):
-    """Gera consolidation-log.md e valida MEMORY.md <200 linhas."""
+def prune_and_index_all(all_signals, changes, dry_run=True):
+    """Gera consolidation-log.md e valida cada MEMORY.md <200 linhas."""
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M BRT")
     log_lines = [
         f"# Consolidation Log — {timestamp}",
         "",
+        f"**Mente Coletiva:** memory-agent + Livy Deep (main)",
         f"**Dry run:** {'Yes' if dry_run else 'No'}",
         "",
     ]
+
+    index_status = {}
+    for space in MEMORY_SPACES:
+        idx_file = space["index_file"]
+        if idx_file.exists():
+            lines = idx_file.read_text().split("\n")
+            status = "✅" if len(lines) <= 200 else "❌ EXCEEDED"
+            log(f"[{space['name']}] MEMORY.md: {len(lines)} linhas {status}")
+            index_status[space["name"]] = len(lines)
+            if len(lines) > 200 and not dry_run:
+                fail(f"[{space['name']}] MEMORY.md tem {len(lines)} linhas (>200). Corrigir.")
+        else:
+            log(f"[{space['name']}] MEMORY.md não existe — pulando", "WARN")
+            index_status[space["name"]] = 0
+
     if changes:
         log_lines.append("## Mudanças aplicadas/propostas")
         log_lines.extend(changes)
     else:
         log_lines.append("Nenhuma mudança necessária.")
+
+    total_changes = len(changes)
     log_lines.append("")
-    log_lines.append(f"**Total:** {len(changes)} mudanças")
+    log_lines.append(f"**Total:** {total_changes} mudanças")
+
+    # Status por espaço
+    for space_name, count in index_status.items():
+        log_lines.append(f"- {space_name}: {count} linhas no índice")
 
     if not dry_run:
         LOG_FILE.write_text("\n".join(log_lines))
         log(f"Log gerado em {LOG_FILE}")
 
-    if MEMORY_INDEX.exists():
-        lines = MEMORY_INDEX.read_text().split("\n")
-        status = "✅" if len(lines) <= 200 else "❌ EXCEEDED"
-        log(f"MEMORY.md: {len(lines)} linhas {status}")
-        if len(lines) > 200 and not dry_run:
-            fail(f"MEMORY.md tem {len(lines)} linhas (>200). Corrigir.")
-    else:
-        log("MEMORY.md não existe — pulando validação", "WARN")
-
-    return len(changes)
+    return total_changes
 
 # ── MAIN ─────────────────────────────────────────────────────────────────
 
 def main():
-    log("=== Auto Dream Adaptado — Starting ===")
+    log("=== Auto Dream Adaptado — Mente Coletiva ===")
+    log("Processando: memory-agent + Livy Deep (main)")
+
     acquire_lock()
     try:
-        log("Fase 1: Orientation")
-        content, referenced = load_memory_index()
-        log(f"  MEMORY.md lido, {len(referenced)} topic files referenciados")
+        log("Fase 1: Orientation (todos os espaços)")
+        indexes = load_memory_indexes()
+        total_referenced = sum(len(v["referenced"]) for v in indexes.values())
+        log(f"  Índices lidos, {total_referenced} topic files referenciados")
 
-        log("Fase 2: Gather Signal")
-        signals = gather_signal(referenced)
-        log(f"  relative_dates: {len(signals['relative_dates'])}")
-        log(f"  stale: {len(signals['stale'])}")
-        log(f"  orphaned: {len(signals['orphaned'])}")
-        log(f"  multi_date warnings: {len(signals['multi_date'])}")
+        log("Fase 2: Gather Signal (todos os espaços)")
+        all_signals = gather_signal_all(indexes)
+        for space_name, signals in all_signals.items():
+            log(f"  [{space_name}]")
+            log(f"    relative_dates: {len(signals['relative_dates'])}")
+            log(f"    stale: {len(signals['stale'])}")
+            log(f"    orphaned: {len(signals['orphaned'])}")
+            log(f"    multi_date warnings: {len(signals['multi_date'])}")
 
         log("Fase 3: Consolidation (DRY RUN)")
-        changes = consolidate(signals, dry_run=True)
+        changes = consolidate_all(all_signals, dry_run=True)
         log(f"  {len(changes)} mudanças pendentes")
 
         log("Fase 4: Prune & Index (DRY RUN)")
-        prune_and_index(changes, dry_run=True)
+        prune_and_index_all(all_signals, changes, dry_run=True)
 
         if changes:
             log("=== DRY RUN CONCLUÍDO — aplicando ===")
-            changes = consolidate(signals, dry_run=False)
-            prune_and_index(changes, dry_run=False)
+            changes = consolidate_all(all_signals, dry_run=False)
+            prune_and_index_all(all_signals, changes, dry_run=False)
         else:
             log("=== Nenhuma mudança necessária ===")
 
