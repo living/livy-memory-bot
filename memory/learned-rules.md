@@ -1,13 +1,15 @@
 # Learned Rules — Livy Memory Agent
 
 Gerado por: learn_from_feedback.py
-Atualizado: (date)
+Atualizado: 2026-03-31
 
 ## Regras com score positivo (manter padrão)
-_Nenhuma regra aprendida ainda._
+- `add_frontmatter`: score +1 (1✍ 0✎)
+  Notas: "bom trabalho"
 
 ## Regras com score negativo (evitar)
-_Nenhuma regra aprendida ainda._
+- `archive_file`: score -1 (0✍ 1✎)
+  Notas: "nao archive ainda"
 
 ## Regras neutras (experimentar aborduras alternativas)
 _Nenhuma regra aprendida ainda._
