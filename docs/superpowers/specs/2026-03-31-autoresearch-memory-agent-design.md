@@ -45,8 +45,8 @@ CRON (07h BRT, dream-memory-consolidation)
 │   Iterations: 10
 │
 ├─3. REPORTAR
-│   Mensagem enviada ao Telegram (@livy_agentic_memory_bot)
-│   Grupo: -5158607302
+│   Mensagem enviada via DM (Telegram, bot @livy_agentic_memory_bot)
+│   Usuário: Lincoln (tg:7426291192)
 │   Verbose: todas as ações do loop
 │
 ├─4. RECEBER FEEDBACK
@@ -151,11 +151,14 @@ Cada ação reportada individualmente no Telegram:
 ```
 
 > ⚠️ Itens sem resposta em 1 hora são marcados como inconclusivos no log.
+> 📱 Enviado via DM para @lincoln — não aparece no grupo.
 
 ### Mensagens de Resumo (cron)
 
 ```
 🧠 [Livy Memory] Consolidacao Noturna — 2026-03-31
+
+📱 Enviado via DM
 
 Métricas antes:
 - Completude: 7.2/10
@@ -206,10 +209,11 @@ python3 skills/memoria-consolidation/learn_from_feedback.py
 
 ### 5. Integration com OpenClaw
 
-O bot `@livy_agentic_memory_bot` precisa de um handler que:
-- Recebe callback_query com dados `action_id`, `rating`
+O bot `@livy_agentic_memory_bot`:
+- Recebe callback_query com dados `action:target:rating`
 - Grava no feedback-log.jsonl
 - Responde ao callback para remover loading state
+- **DM direto para Lincoln** (tg:7426291192) — não no grupo
 
 ## Cron Jobs
 
