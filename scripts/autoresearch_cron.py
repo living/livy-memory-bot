@@ -78,12 +78,12 @@ def send_message(chat_id, text, reply_markup=None):
         log(f"  ⚠️ sendMessage failed: {result.get('description', result)}")
     return result.get("ok")
 
-def feedback_buttons(action_id):
-    """Inline keyboard with 👍/👎 for feedback."""
+def feedback_buttons(sep, filename):
+    """Inline keyboard with 👍/👎 for feedback. Uses | as sep to avoid filename issues."""
     return {
         "inline_keyboard": [[
-            {"text": "👍", "callback_data": f"feedback:{action_id}:up"},
-            {"text": "👎", "callback_data": f"feedback:{action_id}:down"},
+            {"text": "👍", "callback_data": f"feedback|{sep}|{filename}|up"},
+            {"text": "👎", "callback_data": f"feedback|{sep}|{filename}|down"},
         ]]
     }
 
@@ -196,8 +196,8 @@ def main():
 
     intro_keyboard = {
         "inline_keyboard": [
-            [{"text": "👍 Tudo ok", "callback_data": f"feedback:{action_id}:all:up"},
-             {"text": "👎 Precisa melhorar", "callback_data": f"feedback:{action_id}:all:down"}],
+            [{"text": "👍 Tudo ok", "callback_data": f"feedback|{action_id}|all|up"},
+             {"text": "👎 Precisa melhorar", "callback_data": f"feedback|{action_id}|all|down"}],
         ]
     }
 
@@ -225,7 +225,7 @@ def main():
             msg = f"Resumo: {summary}\n\n"
             send_message(
                 CHAT_ID, msg,
-                reply_markup=feedback_buttons(f"{action_id}:{f.name}")
+                reply_markup=feedback_buttons(action_id, f.name)
             )
 
     # 7. Send summary with feedback button
@@ -247,7 +247,7 @@ Clique nos botões acima para avaliar."""
 
     ok = send_message(
         CHAT_ID, summary,
-        reply_markup=feedback_buttons(f"{action_id}:summary")
+        reply_markup=feedback_buttons(action_id, "summary")
     )
 
     if ok:
