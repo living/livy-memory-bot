@@ -13,7 +13,9 @@ from pathlib import Path
 from datetime import datetime
 import requests
 
-BOT_TOKEN = "8725269523:AAFqAFEFcbAa6daClbUiVH9qBLfzu46SMOQ"
+BOT_TOKEN = os.getenv("FEEDBACK_BOT_TOKEN", "")
+if not BOT_TOKEN:
+    raise ValueError("FEEDBACK_BOT_TOKEN env var not set")
 BASE_URL = f"https://api.telegram.org/bot{BOT_TOKEN}"
 # Allowed user IDs for memory-general feedback (comma-separated in env var)
 # Empty means accept ALL users
@@ -88,6 +90,11 @@ def process_callback(callback):
 
     if skill_prefix == "meetings_tldv":
         # meetings_tldv|{mode}|{query_hash}|{rating}
+        # Optional: restrict to allowed users if MEETINGS_TLDV_ALLOWED_USER_IDS is set
+        user = callback.get("from", {})
+        user_id = user.get("id")
+        if ALLOWED_USER_IDS and user_id not in ALLOWED_USER_IDS:
+            return
         if len(parts) >= 4 and parts[3] in ("up", "down"):
             mode = parts[1]
             query_hash = parts[2]

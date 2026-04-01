@@ -13,8 +13,8 @@ import hashlib
 import json
 import os
 import sys
+import time
 from datetime import datetime, timezone, timedelta
-from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
@@ -82,9 +82,16 @@ def infer_mode(question: str) -> Literal["temporal", "semantic", "detail"]:
     return "semantic"
 
 
-@lru_cache(maxsize=1000)
+EMBEDDING_CACHE: dict[str, tuple[list[float], float]] = {}  # text -> (embedding, timestamp)
+EMBEDDING_TTL = 300  # 5 minutes
+
 def get_embedding(text: str) -> list[float] | None:
     """Embed text via OpenAI, cached 5 min per text string."""
+    now = time.time()
+    if text in EMBEDDING_CACHE:
+        emb, ts = EMBEDDING_CACHE[text]
+        if now - ts < EMBEDDING_TTL:
+            return emb
     if not OPENAI_API_KEY:
         return None
     try:
@@ -94,7 +101,13 @@ def get_embedding(text: str) -> list[float] | None:
             model="text-embedding-3-small",
             input=text,
         )
-        return resp.data[0].embedding
+        embedding = resp.data[0].embedding
+        EMBEDDING_CACHE[text] = (embedding, now)
+        # Prune cache if too large
+        if len(EMBEDDING_CACHE) > 1000:
+            oldest = min(EMBEDDING_CACHE.items(), key=lambda x: x[1][1])
+            del EMBEDDING_CACHE[oldest[0]]
+        return embedding
     except Exception as e:
         log(f"Embedding error: {e}")
         return None
@@ -220,7 +233,7 @@ def format_result(rows: list[dict], mode: str, query: str,
     ]
 
     for i, row in enumerate(rows, 1):
-        date_str_val = row.get("date_str", "")
+        date_str_val = row.get("date_str") or ""
         if date_str_val:
             try:
                 dt = datetime.fromisoformat(date_str_val.replace("Z", "+00:00"))
@@ -231,9 +244,13 @@ def format_result(rows: list[dict], mode: str, query: str,
             date_brt = "—"
 
         score = row.get("similarity", 0.0) or row.get("hybrid_score", 0.0)
-        title = row.get("meeting_name", "Sem título")
-        content = row.get("content", "")[:200]
-        participants = row.get("participants", [])
+        title = row.get("meeting_name") or "Sem título"
+        raw_content = row.get("content") or ""
+        if len(raw_content) > 200:
+            content = raw_content[:197].rsplit(" ", 1)[0] + "..."
+        else:
+            content = raw_content
+        participants = row.get("participants") or []
         importance = row.get("importance", "")
         source_url = row.get("source_url", "")
 
