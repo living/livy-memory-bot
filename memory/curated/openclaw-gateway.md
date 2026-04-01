@@ -148,7 +148,7 @@ Skills de workspace em `workspace/skills/` têm precedência sobre skills bundle
 ## Pendências
 
 - [ ] Investigar `memory-agent-sonhar` em estado **error** — cron job das 07h BRT com falha
-- [ ] Verificar se chat ID `-5158607302` é o grupo correto para o canal `memory`
+- [x] Verificar se chat ID `-5158607302` é o grupo correto para o canal `memory` — ✅ CONFIRMADO: Living Memory Observation, ativo
 - [ ] Simlink `~/.claude/skills/meetings-tldv` pendente (referenciado em #1661)
 
 ---

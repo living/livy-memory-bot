@@ -136,7 +136,7 @@ status: ativo
 ## Pendências
 
 - [ ] Criar symlink `~/.claude/skills/meetings-tldv` → workspace skills (próximo passo do Bug #1661)
-- [ ] Verificar se chat ID `-5158607302` é o grupo desejado para o observation feed SSE
+- [x] Verificar se chat ID `-5158607302` é o grupo desejado para o observation feed SSE — ✅ CONFIRMADO: é o grupo Living Memory Observation
 - [ ] Token JWT do TLDV — renovação pendente (impacta pipeline de meetings)
 
 ---

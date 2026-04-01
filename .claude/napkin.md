@@ -78,8 +78,8 @@ description: ...` — without it, `openclaw skills list` won't show the skill.
 1. **[2026-03-31] Repo `living/livy-memory-bot` is this workspace**
    Do instead: confirm repo before pushing — similar names exist across the org.
 
-2. **[2026-04-01] Canal `livy-memory-feed` = grupo (feed), canal `memory` = DM do agente**
-   Do instead: memory-agent usa canal `memory` (conta própria, bot `@livy_agentic_memory_bot`). O canal `livy-memory-feed` era só para feed de grupo e foi removido.
+2. **[2026-04-01] Canal `memory` = grupo Living Memory Observation**
+   Do instead: memory-agent usa canal `memory` (conta própria, bot `@livy_agentic_memory_bot`). O grupo `-5158607302` (Living Memory Observation) recebe observações via SSE do claude-mem.
 
 ## TLDV Pipeline
 

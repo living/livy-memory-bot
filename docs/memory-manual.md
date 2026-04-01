@@ -184,7 +184,7 @@ plugins: {
 }
 ```
 
-**Nota:** O chat ID `-5158607302` está configurado mas não corresponde aos grupos Living conhecidos. Verificar se é o grupo desejado.
+**Nota:** O chat ID `-5158607302` é o grupo **Living Memory Observation** — está ativo e recebendo observações via SSE.
 
 ### O que NÃO observa
 
