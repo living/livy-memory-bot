@@ -165,3 +165,73 @@ def test_collector_fetches_meetings(mock_get):
 
     collector = TLDVCollector()
     assert collector.source == "tldv"
+
+
+# -------------------------------------------------------------------
+# Topic Analyzer tests
+# -------------------------------------------------------------------
+from pathlib import Path
+import sys, tempfile
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "skills/memoria-consolidation"))
+from signal_bus import SignalEvent
+from topic_analyzer import TopicAnalyzer, CandidateChange
+
+def test_candidate_change_dataclass():
+    change = CandidateChange(
+        change_type="add_decision",
+        description="Use Postgres",
+        evidence="meeting #123",
+        signal_source="tldv",
+    )
+    assert change.change_type == "add_decision"
+    assert "Postgres" in change.description
+
+def test_analyzer_adds_decision(tmp_path):
+    """New decision from signal → add_entry candidate."""
+    topic_file = tmp_path / "forge-platform.md"
+    topic_file.write_text("---\nname: forge\n---\n\n# Forge\n\n## Decisões\n(nenhuma)\n")
+
+    signal = SignalEvent(
+        source="tldv",
+        priority=1,
+        topic_ref="forge-platform.md",
+        signal_type="decision",
+        payload={"description": "Usar Postgres com Neon", "evidence": "meeting #123", "confidence": 0.9},
+        origin_id="m123",
+        origin_url="https://tldv.io/meeting/123",
+    )
+
+    analyzer = TopicAnalyzer()
+    candidates = analyzer.analyze(topic_file, [signal])
+    assert len(candidates) == 1
+    assert candidates[0].change_type == "add_decision"
+    assert "Postgres" in candidates[0].description
+
+def test_analyzer_skips_duplicate():
+    """Decision already in topic file → no candidate."""
+    content = "---\nname: forge\n---\n\n# Forge\n\n## Decisões\n- Usar Postgres com Neon\n"
+    signal = SignalEvent(
+        source="tldv", priority=1, topic_ref="forge-platform.md",
+        signal_type="decision",
+        payload={"description": "Usar Postgres com Neon", "evidence": "meeting #123", "confidence": 0.9},
+        origin_id="m123", origin_url=None,
+    )
+    analyzer = TopicAnalyzer()
+    candidates = analyzer.analyze_content("forge-platform.md", content, [signal])
+    assert candidates == []
+
+def test_analyzer_failure_signal():
+    """Failure signal with confidence 1.0 → deprecate_entry candidate."""
+    signal = SignalEvent(
+        source="logs",
+        priority=2,
+        topic_ref="delphos-video-vistoria.md",
+        signal_type="failure",
+        payload={"description": "Job Vonage falhou 3x", "evidence": "reports/daily/2026-04-01.json", "confidence": 1.0},
+        origin_id="delphos-daily-2026-04-01",
+        origin_url=None,
+    )
+    analyzer = TopicAnalyzer()
+    candidates = analyzer.analyze_content("delphos-video-vistoria.md", "# Delphos\n\n## Status\n- Vonage: em uso\n", [signal])
+    assert len(candidates) == 1
+    assert candidates[0].change_type == "deprecate_entry"
