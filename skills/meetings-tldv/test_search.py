@@ -50,15 +50,18 @@ def test_format_result_empty():
 def test_format_result_with_rows():
     from search import format_result
     rows = [{
-        "title": "Reunião BAT",
-        "created_at": "2026-03-28T14:00:00Z",
-        "summary": "Robert pediu mudança no schedule.",
+        "meeting_name": "Reunião BAT",
+        "date_str": "2026-03-28T14:00:00Z",
+        "content": "Robert pediu mudança no schedule.",
+        "participants": ["Lincoln", "Robert"],
+        "importance": "high",
         "similarity": 0.87,
     }]
     result = format_result(rows, "semantic", "decisões BAT", 0.55)
     assert "Reuniões — TLDV" in result
     assert "Reunião BAT" in result
     assert "0.87" in result
+    assert "Lincoln, Robert" in result
     print("test_format_result_with_rows PASSED")
 
 def test_dry_run_inference(capsys=None):

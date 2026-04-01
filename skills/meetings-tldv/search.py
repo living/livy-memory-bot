@@ -125,22 +125,22 @@ def rpc_match_vectors(embedding: list[float], threshold: float, limit: int) -> l
 
 
 def search_semantic_fallback(query: str, limit: int) -> list[dict]:
-    """Fallback: ILIKE search when RPC or OpenAI API unavailable."""
+    """Fallback: ILIKE search on content + meeting_name when RPC unavailable."""
     try:
         resp = requests.get(
             f"{SUPABASE_URL}/rest/v1/meeting_memories",
             headers=get_supabase_headers(),
             params={
-                "select": "id,meeting_id,user_id,title,summary,created_at",
-                "summary": f"ilike.*{query}*",
-                "order": "created_at.desc",
+                "select": "id,meeting_id,meeting_name,date_str,content,participants,importance,source_url",
+                "or": f"(meeting_name.ilike.*{query}*,content.ilike.*{query}*)",
+                "order": "date_str.desc",
                 "limit": str(limit),
             },
             timeout=10,
         )
         if resp.status_code == 200:
             return resp.json()
-        log(f"Fallback search failed: {resp.status_code}")
+        log(f"Fallback search failed: {resp.status_code} {resp.text[:200]}")
     except Exception as e:
         log(f"Fallback search error: {e}")
     return []
@@ -153,17 +153,17 @@ def search_temporal(start_utc: datetime, end_utc: datetime, limit: int) -> list[
             f"{SUPABASE_URL}/rest/v1/meeting_memories",
             headers=get_supabase_headers(),
             params={
-                "select": "id,meeting_id,user_id,title,summary,created_at",
-                "created_at": f"gte.{start_utc.isoformat()}",
-                "created_at": f"lte.{end_utc.isoformat()}",
-                "order": "created_at.desc",
+                "select": "id,meeting_id,meeting_name,date_str,content,participants,importance,source_url",
+                "date_str": f"gte.{start_utc.isoformat()}",
+                "date_str": f"lte.{end_utc.isoformat()}",
+                "order": "date_str.desc",
                 "limit": str(limit),
             },
             timeout=10,
         )
         if resp.status_code == 200:
             return resp.json()
-        log(f"Temporal search failed: {resp.status_code} {resp.text}")
+        log(f"Temporal search failed: {resp.status_code} {resp.text[:200]}")
     except Exception as e:
         log(f"Temporal search error: {e}")
     return []
@@ -176,7 +176,7 @@ def search_detail(meeting_id: str) -> dict | None:
             f"{SUPABASE_URL}/rest/v1/meeting_memories",
             headers=get_supabase_headers(),
             params={
-                "select": "id,meeting_id,user_id,title,summary,insights_json,created_at",
+                "select": "id,meeting_id,meeting_name,date_str,content,participants,importance,source_url",
                 "meeting_id": f"eq.{meeting_id}",
                 "limit": "1",
             },
@@ -220,21 +220,35 @@ def format_result(rows: list[dict], mode: str, query: str,
     ]
 
     for i, row in enumerate(rows, 1):
-        created = row.get("created_at", "")
-        if created:
-            dt = datetime.fromisoformat(created.replace("Z", "+00:00"))
-            created_brt = brt(dt).strftime("%d/%m/%Y, %Hh%M BRT")
+        date_str_val = row.get("date_str", "")
+        if date_str_val:
+            try:
+                dt = datetime.fromisoformat(date_str_val.replace("Z", "+00:00"))
+                date_brt = brt(dt).strftime("%d/%m/%Y, %Hh%M BRT")
+            except:
+                date_brt = date_str_val
         else:
-            created_brt = "—"
+            date_brt = "—"
 
         score = row.get("similarity", 0.0) or row.get("hybrid_score", 0.0)
-        title = row.get("title", "Sem título")
-        summary = row.get("summary", "")[:200]
+        title = row.get("meeting_name", "Sem título")
+        content = row.get("content", "")[:200]
+        participants = row.get("participants", [])
+        importance = row.get("importance", "")
+        source_url = row.get("source_url", "")
+
+        participants_str = ", ".join(participants) if participants else ""
 
         lines.append(f"### {i}. {title}\n")
-        lines.append(f"**Score:** {score:.2f} | **Data:** {created_brt}\n")
-        if summary:
-            lines.append(f"> {summary}\n")
+        lines.append(f"**Score:** {score:.2f} | **Data:** {date_brt}\n")
+        if participants_str:
+            lines.append(f"**Participantes:** {participants_str}\n")
+        if importance:
+            lines.append(f"**Importância:** {importance}\n")
+        if content:
+            lines.append(f"> {content}\n")
+        if source_url:
+            lines.append(f"[ver no TLDV →]({source_url})\n")
         lines.append("---\n")
 
     lines.append(f"_{len(rows)} resultados · query: \"{query}\" · threshold: {threshold}_")
