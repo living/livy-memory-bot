@@ -97,3 +97,71 @@ def test_signal_bus_persist_and_load(tmp_path):
     bus2.load(events_file)
     assert len(bus2.events) == 1
     assert bus2.events[0].source == "tldv"
+
+
+# -------------------------------------------------------------------
+# TLDV Collector tests
+# -------------------------------------------------------------------
+import os, sys
+from pathlib import Path
+from unittest.mock import patch, MagicMock
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "skills/memoria-consolidation"))
+
+from collectors.tldv_collector import TLDVCollector, build_tldv_signal
+
+def test_build_tldv_signal():
+    """Build a SignalEvent from a TLDV summary row."""
+    row = {
+        "meeting_id": "abc123",
+        "topics": ["BAT", "Azure", "KQL"],
+        "decisions": ["Usar KQL para queries"],
+    }
+    signal = build_tldv_signal(row, "https://tldv.io/meeting/abc123")
+    assert signal.source == "tldv"
+    assert signal.priority == 1
+    assert signal.signal_type == "decision"
+    assert "KQL" in signal.payload["description"]
+    assert signal.origin_id == "abc123"
+    assert signal.origin_url == "https://tldv.io/meeting/abc123"
+    assert signal.topic_ref is not None  # matched via topics
+
+def test_build_tldv_signal_with_robert():
+    """Robert as participant = explicit direction signal."""
+    row = {
+        "meeting_id": "xyz789",
+        "topics": ["Forge"],
+        "decisions": ["Migrar para Forge"],
+        "participant_names": ["Robert"],
+    }
+    signal = build_tldv_signal(row, "https://tldv.io/meeting/xyz789")
+    assert signal.priority == 1
+    assert signal.payload["confidence"] == 1.0  # Robert = max confidence
+
+def test_topic_matching():
+    """Topics like BAT, Forge, Delphos map to specific topic files."""
+    row = {
+        "meeting_id": "m1",
+        "topics": ["BAT", "ConectaBot"],
+        "decisions": [],
+    }
+    signal = build_tldv_signal(row, None)
+    assert signal.topic_ref in ["bat-conectabot-observability.md", "forge-platform.md"]
+
+def test_collector_initialization():
+    collector = TLDVCollector()
+    assert collector.source == "tldv"
+    assert collector.priority == 1
+
+@patch("collectors.tldv_collector.requests.get")
+def test_collector_fetches_meetings(mock_get):
+    """Collector fetches from Supabase REST API."""
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = [
+        {"id": "m1", "name": "Daily", "created_at": "2026-04-01T10:00:00Z",
+         "enriched_at": "2026-04-01T10:05:00Z"},
+    ]
+    mock_get.return_value = mock_response
+
+    collector = TLDVCollector()
+    assert collector.source == "tldv"
