@@ -1,8 +1,8 @@
 # Signal Cross-Curation — Design
 
-**Versão:** 1.1
+**Versão:** 1.2
 **Data:** 2026-04-01
-**Status:** Ready for approval
+**Status:** Ready for approval (fact-checked)
 
 ---
 
@@ -32,18 +32,19 @@ Um sistema de curadoria inteligente que cruza sinais de múltiplas fontes para m
 ### O que cada fonte extrai
 
 **TLDV (primária — direção)**
-- Fonte: Supabase (`meetings`, `summaries` tables)
-- `decisions[]` — decisões tomadas na reunião
-- `action_items[]` — tarefas designadas + responsável
-- `status_changes[]` — mudanças de status de projetos discutidas
-- `consensus_topics[]` — temas com consenso da equipe
+- Fonte: Supabase (`meetings`, `summaries` tables) via REST API
+- `decisions[]` — decisões tomadas na reunião ✅ disponível
+- `topics[]` — tópicos extraídos da reunião ✅ disponível
+- `action_items[]`, `status_changes[]`, `consensus_topics[]` — **NÃO existem no schema** (erro 42703 se consultar)
+- Fallback: usar `enrichment_context` (PRs + Cards dos últimos 7 dias) como proxy de contexto
 - Robert como participante = direcionamento explícito
 
 **Logs (secundária — verificação)**
-- `job_name`, `timestamp`, `status` (success/failure/error)
-- `error_message` (se failure)
-- `duration_seconds`
-- Jobs: BAT, Delphos, crons, enrichments
+- Fonte: relatórios agregados em `reports/intraday/` e `reports/daily/` (BAT, Delphos)
+- Formato atual: JSON agregado com `total_errors`, `distinct_operations`, `taxa_confirmacao`
+- **Não há logs por execução** com `status`/timestamp individual — usar agregado como proxy de saúde
+- Regra: se `total_errors > 0` no último relatório → job teve problemas
+- Jobs: BAT, Delphos, crons de autoresearch
 
 **Git (terciária — evidência)**
 - PR: `repo`, `number`, `title`, `description`, `merged_at`, `state`
@@ -103,17 +104,28 @@ Cada collector emite eventos normalizados para o signal bus:
 
 ```python
 SignalEvent = {
+    # Identity
+    "event_id": str,                    # UUID v4 — unique per event
+    "correlation_id": str,              # UUID — shared across all events in one curation cycle
+
+    # Provenance
     "source": "tldv" | "logs" | "github" | "feedback",
     "priority": 1 | 2 | 3 | 4,          # 1 = mais confiavel
-    "timestamp": ISO8601,
+    "collected_at": ISO8601,             # quando o collector capturou
+    "processed_at": ISO8601 | None,      # quando o analyzer processou
+
+    # Content
     "topic_ref": str | None,             # qual topic file refere
-    "signal_type": "decision" | "status_change" | "action_item" | "success" | "failure" | "correction",
+    "signal_type": "decision" | "topic_mentioned" | "success" | "failure" | "correction",
     "payload": {
         "description": str,
         "evidence": str | None,           # link, log excerpt, etc
         "confidence": float,              # 0-1
     },
+
+    # Origin
     "origin_id": str,                    # meeting_id, pr_number, job_name, etc
+    "origin_url": str | None,            # URL clicável (TLDV meeting, PR, log file)
 }
 ```
 
@@ -302,6 +314,8 @@ memory/
 ├── curation-log.md           # log de curadorias aplicadas
 ├── signal-events.jsonl       # eventos normalizados (signal bus)
 ├── conflict-queue.md         # fila de conflitos pendentes
+├── logs/
+│   └── curation-{date}.log  # JSON Lines — observabilidade completa
 ├── signals/
 │   ├── tldv/
 │   ├── github/
@@ -349,4 +363,70 @@ resolution = {
 # O sistema registra: qual fonte estava certa?
 # → atualiza weight de fontes para esse tipo de topic
 # → se Lincoln frequentemente corrige sinais primários, talvez Robert esteja desconectado da execução
+```
+
+---
+
+## 14. Observabilidade
+
+Todo evento no sistema carrega `correlation_id` para rastrear uma curadoria completa, e cada componente loga com campos estruturados.
+
+### Tracing — Correlation ID
+
+```
+correlation_id: "550e8400-e29b-41d4-a716-446655440000"
+  ↓ usado em todos os collectors, bus, analyzer, curator
+  ↓ every log line, every event, every API call
+```
+
+Um `correlation_id` é gerado no início de cada ciclo de curadoria e acompanha todo o fluxo:
+- Collector → Signal Bus → Analyzer → Conflict Detector → Auto-Curator
+- Todas as operações logadas com o mesmo `correlation_id`
+
+### Log Estruturado (JSON Lines)
+
+Todo componente emite JSON Lines para `memory/logs/curation-{date}.log`:
+
+```json
+{"level": "INFO", "ts": "2026-04-01T12:00:00Z", "correlation_id": "...", "component": "tldv_collector", "event": "signal_collected", "source": "tldv", "count": 3, "duration_ms": 234}
+{"level": "INFO", "ts": "2026-04-01T12:00:00Z", "correlation_id": "...", "component": "signal_bus", "event": "event_emitted", "event_id": "...", "topic_ref": "forge-platform.md"}
+{"level": "INFO", "ts": "2026-04-01T12:00:01Z", "correlation_id": "...", "component": "auto_curator", "event": "change_applied", "topic": "forge-platform.md", "change_type": "add_decision", "auto": true}
+{"level": "WARN", "ts": "2026-04-01T12:00:01Z", "correlation_id": "...", "component": "conflict_detector", "event": "conflict_detected", "topic": "delphos.md", "signals": ["tldv", "logs"]}
+{"level": "ERROR", "ts": "2026-04-01T12:00:02Z", "correlation_id": "...", "component": "tldv_collector", "event": "collection_failed", "error": "Supabase connection timeout", "retryable": true}
+```
+
+### Campos de Log por Componente
+
+| Campo | Descrição |
+|---|---|
+| `ts` | ISO8601 com timezone (UTC) |
+| `correlation_id` | UUID do ciclo de curadoria |
+| `component` | Nome do componente (`tldv_collector`, `signal_bus`, etc) |
+| `event` | Tipo de evento (`signal_collected`, `conflict_detected`, etc) |
+| `duration_ms` | Tempo de execução (em collectors e analyzers) |
+| `error` | Mensagem de erro (em eventos de erro) |
+| `retryable` | Boolean — se o erro é retentável |
+
+### Métricas de Observabilidade
+
+| Métrica | Como mede |
+|---|---|
+| Latência de coleta | `duration_ms` por collector por ciclo |
+| Sinais capturados | `count` por source por ciclo |
+| Conflitos detectados | `conflict_detected` events por ciclo |
+| Auto-curations aplicadas | `change_applied` com `auto: true` |
+| Falhas de coleta | `collection_failed` events por source |
+| Tempo total de ciclo | `ts` do primeiro ao último evento do `correlation_id` |
+
+### Log de Curadoria com Correlation
+
+```markdown
+## 2026-04-01 09:15 BRT · correlation_id: 550e8400-e29b-41d4-a716-446655440000
+
+**topic:** forge-platform.md
+**auto:** Yes
+**signal:** tldv (Robert, 2026-04-01 daily) + github (PR #47 merged)
+
+### Mudanças
+- ADD decision: "Forge usa Postgres com Neon (não Mongo)" — evidência: tldv meeting #123 + PR #47
 ```
