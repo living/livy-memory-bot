@@ -28,6 +28,43 @@ CURATED_DIR = MEMORY_DIR / "curated"
 def log(msg):
     print(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}", flush=True)
 
+def health_check():
+    """
+    Verifies all 3 memory layers are available.
+    Returns True if all up, False if any down.
+    Aborts the entire cycle if any layer is down.
+    """
+    errors = []
+
+    # Layer 1: openclaw memory
+    try:
+        r = subprocess.run(
+            ["openclaw", "memory", "status"],
+            capture_output=True, text=True, timeout=10
+        )
+        if r.returncode != 0:
+            errors.append("openclaw memory: unreachable")
+    except Exception as e:
+        errors.append(f"openclaw memory: {e}")
+
+    # Layer 2: claude-mem worker
+    try:
+        resp = requests.get("http://localhost:37777/api/health", timeout=5)
+        if resp.status_code != 200 or resp.json().get("status") != "ok":
+            errors.append("claude-mem worker: unhealthy")
+    except Exception:
+        errors.append("claude-mem worker: unreachable")
+
+    # Layer 3: curated dir
+    if not CURATED_DIR.exists():
+        errors.append("curated dir: not found")
+
+    if errors:
+        log(f"HEALTH CHECK FAILED: {'; '.join(errors)}. Abortando.")
+        return False
+    log("Health check: OK (3/3 layers)")
+    return True
+
 def send_document(chat_id, file_path, caption=None):
     """Send a document via Telegram Bot API (no buttons in caption)."""
     url = f"{BASE_URL}/sendDocument"
