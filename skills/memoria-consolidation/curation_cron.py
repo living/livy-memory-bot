@@ -46,8 +46,13 @@ TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "-5158607302")
 
 from signal_bus import SignalBus
 from collectors.tldv_collector import TLDVCollector
+from collectors.logs_collector import LogsCollector
+from collectors.github_collector import GitHubCollector
+from collectors.feedback_collector import FeedbackCollector
 from topic_analyzer import TopicAnalyzer
 from auto_curator import AutoCurator
+from conflict_detector import ConflictDetector
+from conflict_queue import ConflictQueue
 
 
 def log_structured(level: str, correlation_id: str, component: str, event: str, **kwargs):
@@ -116,6 +121,56 @@ def main():
 
     for sig in tldv_signals:
         bus.emit(sig)
+
+    # Collect logs signals
+    logs_collector = LogsCollector()
+    try:
+        logs_signals = logs_collector.collect()
+        for sig in logs_signals:
+            bus.emit(sig)
+        log_structured("INFO", correlation_id, "logs_collector", "collection_complete",
+                       count=len(logs_signals))
+    except Exception as e:
+        log_structured("ERROR", correlation_id, "logs_collector", "collection_failed",
+                       error=str(e))
+
+    # Collect GitHub signals
+    github_collector = GitHubCollector()
+    try:
+        github_signals = github_collector.collect()
+        for sig in github_signals:
+            bus.emit(sig)
+        log_structured("INFO", correlation_id, "github_collector", "collection_complete",
+                       count=len(github_signals))
+    except Exception as e:
+        log_structured("ERROR", correlation_id, "github_collector", "collection_failed",
+                       error=str(e))
+
+    # Collect feedback signals
+    feedback_collector = FeedbackCollector()
+    try:
+        feedback_signals = feedback_collector.collect()
+        for sig in feedback_signals:
+            bus.emit(sig)
+        log_structured("INFO", correlation_id, "feedback_collector", "collection_complete",
+                       count=len(feedback_signals))
+    except Exception as e:
+        log_structured("ERROR", correlation_id, "feedback_collector", "collection_failed",
+                       error=str(e))
+
+    # Detect conflicts
+    conflict_detector = ConflictDetector()
+    conflicts = conflict_detector.detect(bus.events, {})
+    log_structured("INFO", correlation_id, "conflict_detector", "detection_complete",
+                   count=len(conflicts))
+
+    # Add conflicts to queue
+    if conflicts:
+        queue = ConflictQueue()
+        for conflict in conflicts:
+            queue.add(conflict)
+        log_structured("WARN", correlation_id, "conflict_queue", "conflicts_added",
+                       count=len(conflicts))
 
     log_structured("INFO", correlation_id, "signal_bus", "events_collected",
                     total=len(bus.events))
