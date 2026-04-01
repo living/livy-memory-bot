@@ -15,7 +15,12 @@ import requests
 
 BOT_TOKEN = "8725269523:AAFqAFEFcbAa6daClbUiVH9qBLfzu46SMOQ"
 BASE_URL = f"https://api.telegram.org/bot{BOT_TOKEN}"
-USER_ID = 7426291192  # Lincoln
+# Allowed user IDs for memory-general feedback (comma-separated in env var)
+# Empty means accept ALL users
+ALLOWED_USER_IDS = set(
+    int(uid.strip()) for uid in os.getenv("MEETINGS_TLDV_ALLOWED_USER_IDS", "").split(",")
+    if uid.strip()
+) if os.getenv("MEETINGS_TLDV_ALLOWED_USER_IDS") else set()
 
 FEEDBACK_LOG = Path("/home/lincoln/.openclaw/workspace-livy-memory/memory/feedback-log.jsonl")
 POLL_INTERVAL = 5  # seconds between polls
@@ -35,6 +40,27 @@ def log_feedback(action, target, rating):
         f.write(json.dumps(entry, ensure_ascii=False) + "\n")
     print(f"[{datetime.now().strftime('%H:%M:%S')}] Feedback logged: {action}:{target}:{rating}", flush=True)
 
+def _log_feedback_to_skill(skill: str, action: str, target: str, rating: str, callback):
+    """Route feedback to the correct skill-specific log file."""
+    FEEDBACK_FILES = {
+        "meetings_tldv": Path("/home/lincoln/.openclaw/workspace-livy-memory/memory/meetings-tldv-feedback-log.jsonl"),
+        "memory_general": Path("/home/lincoln/.openclaw/workspace-livy-memory/memory/feedback-log.jsonl"),
+    }
+    user = callback.get("from", {})
+    user_id = user.get("id")
+    entry = {
+        "ts": datetime.utcnow().isoformat() + "Z",
+        "user_id": user_id,
+        "action": action,
+        "target": target,
+        "rating": rating,
+        "note": None,
+    }
+    log_file = FEEDBACK_FILES.get(skill, FEEDBACK_FILES["memory_general"])
+    with log_file.open("a") as f:
+        f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    print(f"[{datetime.now().strftime('%H:%M:%S')}] [{skill}] Feedback: {action}:{target}:{rating}", flush=True)
+
 def answer_callback(callback_id, text=None):
     """Tell Telegram to dismiss the loading spinner."""
     payload = {"callback_query_id": callback_id}
@@ -52,17 +78,40 @@ def process_callback(callback):
         return
     processed_callbacks.add(callback_id)
 
-    user = callback.get("from", {})
-    if user.get("id") != USER_ID:
-        return
-
     data = callback.get("data", "")
     parts = data.split("|")
-    if len(parts) >= 4 and parts[0] == "feedback":
-        action, action_id, target, rating = parts[0], parts[1], parts[2], parts[3]
-        if rating in ("up", "down"):
-            log_feedback(f"{action_id}:{target}", target, rating)
-            answer_callback(callback_id, f"👍" if rating == "up" else "👎")
+    if not parts:
+        answer_callback(callback_id)
+        return
+
+    skill_prefix = parts[0]
+
+    if skill_prefix == "meetings_tldv":
+        # meetings_tldv|{mode}|{query_hash}|{rating}
+        if len(parts) >= 4 and parts[3] in ("up", "down"):
+            mode = parts[1]
+            query_hash = parts[2]
+            rating = parts[3]
+            action = f"{mode}|{query_hash}"
+            target = mode
+            _log_feedback_to_skill("meetings_tldv", action, target, rating, callback)
+            answer_callback(callback_id, "👍" if rating == "up" else "👎")
+        else:
+            answer_callback(callback_id)
+
+    elif skill_prefix == "feedback":
+        # memory-general: feedback|{action_id}|{target}|{rating}
+        user = callback.get("from", {})
+        user_id = user.get("id")
+        # Optional: restrict to allowed users for memory-general
+        if ALLOWED_USER_IDS and user_id not in ALLOWED_USER_IDS:
+            return
+        if len(parts) >= 4 and parts[3] in ("up", "down"):
+            action = "|".join(parts[1:3])
+            target = parts[2]
+            rating = parts[3]
+            _log_feedback_to_skill("memory_general", action, target, rating, callback)
+            answer_callback(callback_id, "👍" if rating == "up" else "👎")
         else:
             answer_callback(callback_id)
     else:
