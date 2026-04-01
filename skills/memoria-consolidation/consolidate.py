@@ -161,6 +161,133 @@ def gather_signal_all(indexes):
 
     return all_signals
 
+# ── PHASE 2B: VIOLATION DETECTION ─────────────────────────────────────────
+
+VIOLATION_WEIGHTS = {
+    "missing-frontmatter": 8,
+    "missing-status": 4,
+    "missing-decisoes": 6,
+    "decisoes-no-reason": 3,
+    "daily-log-in-curated": 5,
+    "only-description": 2,
+    "stale": 10,
+}
+
+REASON_PATTERNS = re.compile(
+    r'\b(porque|motivo|razão|since|because|devido|por causa)\b',
+    re.IGNORECASE
+)
+
+FRONTMATTER_RE = re.compile(r'^---\n(.*?)\n---\n', re.DOTALL)
+STATUS_RE = re.compile(r'^## Status|^\*\*Status:\*\*', re.MULTILINE | re.IGNORECASE)
+DECISOES_RE = re.compile(r'^## Decisões|^\*\*Decisões:\*\*', re.MULTILINE | re.IGNORECASE)
+DATE_LOG_RE = re.compile(r'^\d{4}-\d{2}-\d{2}')
+
+def _has_frontmatter(content: str) -> bool:
+    m = FRONTMATTER_RE.match(content)
+    if not m:
+        return False
+    fm_text = m.group(1)
+    return all(k in fm_text for k in ['name:', 'description:', 'type:'])
+
+def _has_status(content: str) -> bool:
+    """Has Status: either in frontmatter or body section."""
+    m = FRONTMATTER_RE.match(content)
+    if m and 'status:' in m.group(1):
+        return True
+    return bool(STATUS_RE.search(content))
+
+def _has_decisoes(content: str) -> bool:
+    """Has Decisões: either 'decision:' in frontmatter or ## Decisões body section."""
+    m = FRONTMATTER_RE.match(content)
+    if m and 'decision:' in m.group(1):
+        return True
+    return bool(DECISOES_RE.search(content))
+
+def _decisoes_have_reason(content: str) -> bool:
+    """Check if each decision line contains a reason pattern."""
+    m = FRONTMATTER_RE.match(content)
+    if m and 'decision:' in m.group(1):
+        # Decision in frontmatter — check if it has a reason
+        decision_line = [l for l in m.group(1).split('\n') if 'decision:' in l]
+        if decision_line:
+            return bool(REASON_PATTERNS.search(decision_line[0]))
+        return True
+    lines = content.split('\n')
+    in_decisoes = False
+    decision_lines = []
+    for line in lines:
+        if DECISOES_RE.search(line):
+            in_decisoes = True
+            continue
+        if in_decisoes:
+            if line.strip() == '' or line.startswith('#'):
+                break
+            if line.strip().startswith('-'):
+                decision_lines.append(line)
+    if not decision_lines:
+        return True
+    with_reason = sum(1 for l in decision_lines if REASON_PATTERNS.search(l))
+    return with_reason >= len(decision_lines) / 2
+
+def detect_violations(files: list, signals: dict) -> list:
+    """
+    Returns list of dicts: {file, score, violations[]}
+    Only curated/*.md files are checked. Daily logs are skipped.
+    """
+    cutoff_60 = datetime.now().timestamp() - 60 * 86400
+    results = []
+
+    for f in files:
+        try:
+            content = f.read_text()
+        except Exception:
+            continue
+
+        # Skip daily logs
+        if DATE_LOG_RE.match(f.name):
+            continue
+
+        violations = []
+        score = 0
+
+        # Check: frontmatter
+        if not _has_frontmatter(content):
+            violations.append("missing-frontmatter")
+            score += VIOLATION_WEIGHTS["missing-frontmatter"]
+
+        # Check: Status section
+        if not _has_status(content):
+            violations.append("missing-status")
+            score += VIOLATION_WEIGHTS["missing-status"]
+
+        # Check: Decisões section
+        if not _has_decisoes(content):
+            violations.append("missing-decisoes")
+            score += VIOLATION_WEIGHTS["missing-decisoes"]
+        elif not _decisoes_have_reason(content):
+            violations.append("decisoes-no-reason")
+            score += VIOLATION_WEIGHTS["decisoes-no-reason"]
+
+        # Check: stale > 60 days
+        try:
+            mtime = f.stat().st_mtime
+            if mtime < cutoff_60:
+                violations.append("stale:>60d")
+                score += VIOLATION_WEIGHTS["stale"]
+        except Exception:
+            pass
+
+        if violations:
+            results.append({
+                "file": f,
+                "score": score,
+                "violations": violations,
+            })
+
+    results.sort(key=lambda x: x["score"], reverse=True)
+    return results
+
 # ── PHASE 3: CONSOLIDATION (TODOS OS ESPAÇOS) ───────────────────────────────
 
 def consolidate_all(all_signals, dry_run=True):
