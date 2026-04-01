@@ -230,6 +230,19 @@ def run_feedback_learning():
         log(f"Feedback learning: {result.stderr.strip() or 'no feedback yet'}")
     return result.returncode == 0
 
+def run_meetings_tldv_autoresearch():
+    """Run meetings_tldv daily autoresearch."""
+    log("Running meetings-tldv autoresearch...")
+    result = subprocess.run(
+        ["python3", str(WORKSPACE / "scripts/meetings_tldv_autoresearch.py")],
+        capture_output=True, text=True, cwd=str(WORKSPACE)
+    )
+    if result.returncode == 0:
+        log(result.stdout.strip())
+    else:
+        log(f"meetings-tldv autoresearch: {result.stderr.strip() or 'no feedback yet'}")
+    return result.returncode == 0
+
 def main():
     log("=== Autoresearch Cron (Telegram Direct) ===")
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M BRT")
@@ -247,7 +260,10 @@ def main():
     # 3. Run dream (processa sessões do main)
     dream_ok = run_dream()
 
-    # 3. Run metrics after
+    # 3b. Run meetings-tldv autoresearch
+    meetings_tldv_ok = run_meetings_tldv_autoresearch()
+
+    # 4. Run metrics after
     metrics_after = run_metrics()
     log(f"Metrics after: {metrics_after}")
 
