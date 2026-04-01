@@ -55,6 +55,36 @@ Topic files in `memory/curated/` contain detailed project/agent context. They ar
 - When encountering stale entries: register for consolidation
 - `HEARTBEAT.md` is the operational dashboard — keep it current
 
+## Skills
+
+**Skill central de contexto histórico:** `memory-assistant` (em `~/.openclaw/workspace/skills/memory-assistant/`) — consulta built-in memory search E claude-mem 3-layer automaticamente quando o agente precisa de contexto de sessões passadas.
+
+**Skills do OpenClaw** vivem em `~/.openclaw/workspace/skills/` — compartilhadas por todos os agentes. Todas precisam de YAML frontmatter com `name` + `description`.
+
+## Skill Development — Regras Importantes
+
+### Skills precisam YAML frontmatter
+OpenClaw só reconhece skills com `name` e `description` em YAML frontmatter:
+```yaml
+---
+name: minha-skill
+description: Descrição pushy. USE ESTA SKILL SEMPRE que...
+---
+```
+Sem frontmatter, `openclaw skills list` não mostra a skill.
+
+### Testar skills localmente
+```bash
+source ~/.openclaw/.env && export SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY && python3 skills/minha-skill/search.py --query "teste"
+```
+Python subprocessos não herdam env vars automaticamente — precisa de `source` + `export`.
+
+### Tabela TLDV correta
+- **ERRADO**: `meeting_memories` (vector store secundário, só resumos curtos)
+- **CERTO**: `meetings` + `summaries` (projeto `fbnelbwsjfjnkiexxtom`, dados ricos)
+- `meeting_participants` frequentemente vazio — não filtrar por ele
+- `enrichment_context` (PRs/Cards) é genérico (últimos 7 dias), não específico da reunião
+
 ## OpenClaw Automation
 
 **Cron jobs:** `openclaw cron list` / `openclaw cron add` / `openclaw cron run <id>` / `openclaw cron edit <id>`
