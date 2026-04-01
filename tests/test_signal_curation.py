@@ -331,3 +331,77 @@ def test_collector_initialization():
     collector = LogsCollector()
     assert collector.source == "logs"
     assert collector.priority == 2
+
+
+# -------------------------------------------------------------------
+# ConflictDetector tests
+# -------------------------------------------------------------------
+from conflict_detector import ConflictDetector, Conflict
+
+def test_no_conflict_when_tldv_and_logs_agree():
+    """TLDV says 'X', logs show 'X working' → no conflict."""
+    signals = [
+        SignalEvent(source="tldv", priority=1, topic_ref="forge.md",
+                   signal_type="decision",
+                   payload={"description": "Usar Postgres", "evidence": None, "confidence": 0.9},
+                   origin_id="m1", origin_url=None),
+        SignalEvent(source="logs", priority=2, topic_ref="forge.md",
+                   signal_type="success",
+                   payload={"description": "Job succeeded", "evidence": None, "confidence": 1.0},
+                   origin_id="job1", origin_url=None),
+    ]
+    detector = ConflictDetector()
+    conflicts = detector.detect(signals, {})
+    assert conflicts == []
+
+def test_conflict_when_tldv_decides_but_logs_show_failure():
+    """TLDV decides 'X is good', but logs show X failing → CONFLICT."""
+    signals = [
+        SignalEvent(source="tldv", priority=1, topic_ref="delphos.md",
+                   signal_type="decision",
+                   payload={"description": "Migrar para Vonage", "evidence": "meeting #123", "confidence": 0.9},
+                   origin_id="m1", origin_url=None),
+        SignalEvent(source="logs", priority=2, topic_ref="delphos.md",
+                   signal_type="failure",
+                   payload={"description": "Vonage job falhou", "evidence": "reports/daily/2026-04-01.json", "confidence": 1.0},
+                   origin_id="delphos-daily", origin_url=None),
+    ]
+    detector = ConflictDetector()
+    conflicts = detector.detect(signals, {})
+    assert len(conflicts) == 1
+    assert conflicts[0].topic == "delphos.md"
+    assert conflicts[0].primary_signal.source == "tldv"
+    assert conflicts[0].conflicting_signal.source == "logs"
+
+def test_conflict_when_pr_shows_revert():
+    """TLDV says 'use X', but Git PR shows X was reverted → CONFLICT."""
+    signals = [
+        SignalEvent(source="tldv", priority=1, topic_ref="forge.md",
+                   signal_type="decision",
+                   payload={"description": "Usar MongoDB", "evidence": None, "confidence": 0.8},
+                   origin_id="m1", origin_url=None),
+        SignalEvent(source="github", priority=3, topic_ref="forge.md",
+                   signal_type="correction",
+                   payload={"description": "PR reverted: MongoDB removed", "evidence": "PR #47", "confidence": 1.0},
+                   origin_id="PR#47", origin_url="https://github.com/living/repo/pull/47"),
+    ]
+    detector = ConflictDetector()
+    conflicts = detector.detect(signals, {})
+    assert len(conflicts) == 1
+    assert conflicts[0].conflicting_signal.source == "github"
+
+def test_conflict_dataclass():
+    c = Conflict(
+        topic="delphos.md",
+        primary_signal=SignalEvent(source="tldv", priority=1, topic_ref="delphos.md",
+                                  signal_type="decision",
+                                  payload={"description": "X", "evidence": None, "confidence": 0.9},
+                                  origin_id="m1", origin_url=None),
+        conflicting_signal=SignalEvent(source="logs", priority=2, topic_ref="delphos.md",
+                                     signal_type="failure",
+                                     payload={"description": "X failed", "evidence": None, "confidence": 1.0},
+                                     origin_id="job1", origin_url=None),
+        proposal="Manter decisão mas investigar falha",
+    )
+    assert c.topic == "delphos.md"
+    assert c.proposal is not None
