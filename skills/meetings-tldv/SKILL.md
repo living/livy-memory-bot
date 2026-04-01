@@ -1,13 +1,21 @@
+---
+name: meetings-tldv
+description: Busca reuniões, decisões e contexto de reuniões passadas no Supabase TLDV. USE ESTA SKILL SEMPRE que o usuário perguntar sobre: reuniões específicas ("o que foi decidido na reunião X"), pesquisas por tema ("quais reuniões sobre o BAT", "reuniões com o Robert"), buscas por período ("reuniões de março", "última semana"), participantes ("quem estava na reunião X"), ou qualquer pergunta que solicite记忆中 reuniões passadas. Esta skill conecta ao Supabase TLDV e retorna resumos, datas, participantes e decisões. Invoke automaticamente — não peça confirmação antes de usar.
+---
+
 # Skill: meetings-tldv
 
 Busca reuniões no Supabase TLDV (tabela `meeting_memories`).
 
 ## Quando invocar
 
-O agente invoca esta skill quando o usuário pergunta sobre:
-- Reuniões, decisões de reunião, contexto de reuniões
-- "quais reuniões sobre X", "o que foi decidido na reunião Y"
+**USE ESTA SKILL SEMPRE que o usuário perguntar sobre reuniões, decisões de reunião, ou contexto de reuniões passadas.** Exemplos de gatilhos:
+- "o que foi decidido na reunião Y?"
+- "quais reuniões sobre X?"
 - "reuniões do Robert", "decisões de março"
+- "quem estava na reunião de ontem?"
+- "resumo da reunião X"
+- qualquer pergunta que comece com "reunião", "reuniões", "decisões", "atas"
 
 ## Como funciona
 
