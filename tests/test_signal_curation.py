@@ -304,3 +304,30 @@ def test_apply_deprecate_entry(tmp_path):
     content = topic_file.read_text()
     assert "DEPRECADO" in content or "deprecated" in content.lower()
     assert "Vonage" in content
+
+
+# -------------------------------------------------------------------
+# Logs Collector tests (BAT/Delphos report parser)
+# -------------------------------------------------------------------
+from collectors.logs_collector import LogsCollector, BATReportParser
+
+def test_bat_report_parser_success():
+    """Report with total_errors=0 → no failure signal."""
+    report = {"total_errors": 0, "distinct_operations": 5}
+    signals = BATReportParser.parse("bat-intraday", report, "reports/intraday/2026-04-01.json")
+    assert signals == []
+
+def test_bat_report_parser_failure():
+    """Report with total_errors>0 → failure signal."""
+    report = {"total_errors": 3, "operations": [{"name": "query-kql", "errors": 2}]}
+    signals = BATReportParser.parse("bat-intraday", report, "reports/intraday/2026-04-01.json")
+    assert len(signals) == 1
+    assert signals[0].signal_type == "failure"
+    assert signals[0].priority == 2
+    assert signals[0].topic_ref == "bat-conectabot-observability.md"
+    assert "total_errors=3" in signals[0].payload["description"]
+
+def test_collector_initialization():
+    collector = LogsCollector()
+    assert collector.source == "logs"
+    assert collector.priority == 2
