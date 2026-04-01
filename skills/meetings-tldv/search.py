@@ -2,21 +2,21 @@
 """
 meetings-tldv/search.py — Skill: busca reuniões no Supabase TLDV.
 
+Busca na tabela `meetings` (não em `meeting_memories`).
+Projeto: fbnelbwsjfjnkiexxtom
+
 Usage:
-    python3 skills/meetings-tldv/search.py --query "decisões sobre o BAT"
-    python3 skills/meetings-tldv/search.py --dry-run --query "últimas reuniões"
-    python3 skills/meetings-tldv/search.py --mode detail --meeting-id abc123
+    python3 skills/meetings-tldv/search.py --query "Status"
+    python3 skills/meetings-tldv/search.py --query "Status" --limit 3
+    python3 skills/meetings-tldv/search.py --mode temporal --start 2026-03-01 --end 2026-03-31
+    python3 skills/meetings-tldv/search.py --mode detail --meeting-id 69cc323d38b6a8001405708a
 """
 
 import argparse
-import hashlib
-import json
 import os
 import sys
 import time
 from datetime import datetime, timezone, timedelta
-from pathlib import Path
-from typing import Literal
 
 import requests
 
@@ -24,13 +24,11 @@ BRT = timezone(timedelta(hours=-3))
 
 # ── Config ────────────────────────────────────────────────────────────────────
 
-SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_URL = os.getenv("SUPABASE_URL")        # https://fbnelbwsjfjnkiexxtom.supabase.co
 SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 DEFAULT_LIMIT = 5
 MAX_LIMIT = 20
-DEFAULT_THRESHOLD = 0.55
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
@@ -46,15 +44,26 @@ def brt(dt: datetime) -> datetime:
     return dt.astimezone(BRT)
 
 
-def query_recency_ts_from_text(question: str) -> float | None:
-    """Extrai timestamp de recência de uma pergunta livre."""
+def get_headers():
+    return {
+        "apikey": SUPABASE_SERVICE_ROLE_KEY,
+        "Authorization": f"Bearer {SUPABASE_SERVICE_ROLE_KEY}",
+    }
+
+
+def query_recency_ts_from_text(question: str) -> tuple[str, str] | None:
+    """Extrai janela temporal de uma pergunta livre. Returns (start, end) as ISO strings or None."""
     q = question.lower()
     now = datetime.now(BRT)
 
     if "última semana" in q:
-        return (now - timedelta(days=7)).timestamp()
+        start = (now - timedelta(days=7)).strftime("%Y-%m-%d")
+        end = now.strftime("%Y-%m-%d")
+        return start, end
     if "este mês" in q:
-        return datetime(now.year, now.month, 1, tzinfo=BRT).timestamp()
+        start = datetime(now.year, now.month, 1, tzinfo=BRT).strftime("%Y-%m-%d")
+        end = now.strftime("%Y-%m-%d")
+        return start, end
 
     months = {
         "janeiro": 1, "fevereiro": 2, "março": 3, "abril": 4,
@@ -64,115 +73,59 @@ def query_recency_ts_from_text(question: str) -> float | None:
     for month_name, month_num in months.items():
         if month_name in q:
             year = now.year if month_num <= now.month else now.year - 1
-            start = datetime(year, month_num, 1, tzinfo=BRT)
-            return start.timestamp()
-
+            start = datetime(year, month_num, 1, tzinfo=BRT).strftime("%Y-%m-%d")
+            end = datetime(year, month_num, 28, tzinfo=BRT).strftime("%Y-%m-%d")  # rough
+            return start, end
     return None
 
 
-def infer_mode(question: str) -> Literal["temporal", "semantic", "detail"]:
+def infer_mode(question: str, meeting_id: str | None) -> str:
     """Analisa a pergunta e decide o modo de busca."""
-    q = question.lower()
-
-    if any(kw in q for kw in ["meeting ", "meeting_id", "summarize", "detail da reun"]):
+    if meeting_id:
         return "detail"
-    if any(kw in q for kw in ["última semana", "este mês", "março", "janeiro", "fevereiro",
-                                 "entre ", "período"]):
+    if query_recency_ts_from_text(question):
         return "temporal"
-    return "semantic"
+    return "keyword"
 
 
-EMBEDDING_CACHE: dict[str, tuple[list[float], float]] = {}  # text -> (embedding, timestamp)
-EMBEDDING_TTL = 300  # 5 minutes
-
-def get_embedding(text: str) -> list[float] | None:
-    """Embed text via OpenAI, cached 5 min per text string."""
-    now = time.time()
-    if text in EMBEDDING_CACHE:
-        emb, ts = EMBEDDING_CACHE[text]
-        if now - ts < EMBEDDING_TTL:
-            return emb
-    if not OPENAI_API_KEY:
-        return None
+def search_keyword(query: str, limit: int) -> list[dict]:
+    """Busca por ILIKE no nome da reunião."""
     try:
-        import openai
-        client = openai.OpenAI(api_key=OPENAI_API_KEY)
-        resp = client.embeddings.create(
-            model="text-embedding-3-small",
-            input=text,
-        )
-        embedding = resp.data[0].embedding
-        EMBEDDING_CACHE[text] = (embedding, now)
-        # Prune cache if too large
-        if len(EMBEDDING_CACHE) > 1000:
-            oldest = min(EMBEDDING_CACHE.items(), key=lambda x: x[1][1])
-            del EMBEDDING_CACHE[oldest[0]]
-        return embedding
-    except Exception as e:
-        log(f"Embedding error: {e}")
-        return None
-
-
-def get_supabase_headers():
-    return {
-        "apikey": SUPABASE_SERVICE_ROLE_KEY,
-        "Authorization": f"Bearer {SUPABASE_SERVICE_ROLE_KEY}",
-    }
-
-
-def rpc_match_vectors(embedding: list[float], threshold: float, limit: int) -> list[dict] | None:
-    """Call match_summary_vectors RPC. Returns None if RPC unavailable (caller falls back)."""
-    try:
-        resp = requests.post(
-            f"{SUPABASE_URL}/rest/v1/rpc/match_summary_vectors",
-            headers=get_supabase_headers(),
-            json={"query_embedding": embedding, "threshold": threshold, "limit": limit},
+        resp = requests.get(
+            f"{SUPABASE_URL}/rest/v1/meetings",
+            headers=get_headers(),
+            params={
+                "select": "id,name,created_at,enriched_at,source,enrichment_context",
+                "enriched_at": "not.is.null",
+                "name": f"ilike.*{query}*",
+                "order": "created_at.desc",
+                "limit": str(limit),
+            },
             timeout=15,
         )
         if resp.status_code == 200:
             return resp.json()
-        log(f"RPC returned {resp.status_code}, falling back to ILIKE")
+        log(f"Keyword search failed: {resp.status_code} {resp.text[:200]}")
     except Exception as e:
-        log(f"RPC call failed: {e}, falling back to ILIKE")
-    return None
-
-
-def search_semantic_fallback(query: str, limit: int) -> list[dict]:
-    """Fallback: ILIKE search on content + meeting_name when RPC unavailable."""
-    try:
-        resp = requests.get(
-            f"{SUPABASE_URL}/rest/v1/meeting_memories",
-            headers=get_supabase_headers(),
-            params={
-                "select": "id,meeting_id,meeting_name,date_str,content,participants,importance,source_url",
-                "or": f"(meeting_name.ilike.*{query}*,content.ilike.*{query}*)",
-                "order": "date_str.desc",
-                "limit": str(limit),
-            },
-            timeout=10,
-        )
-        if resp.status_code == 200:
-            return resp.json()
-        log(f"Fallback search failed: {resp.status_code} {resp.text[:200]}")
-    except Exception as e:
-        log(f"Fallback search error: {e}")
+        log(f"Keyword search error: {e}")
     return []
 
 
-def search_temporal(start_utc: datetime, end_utc: datetime, limit: int) -> list[dict]:
-    """SELECT via REST API for temporal range."""
+def search_temporal(start: str, end: str, limit: int) -> list[dict]:
+    """Busca por janela temporal."""
     try:
         resp = requests.get(
-            f"{SUPABASE_URL}/rest/v1/meeting_memories",
-            headers=get_supabase_headers(),
+            f"{SUPABASE_URL}/rest/v1/meetings",
+            headers=get_headers(),
             params={
-                "select": "id,meeting_id,meeting_name,date_str,content,participants,importance,source_url",
-                "date_str": f"gte.{start_utc.isoformat()}",
-                "date_str": f"lte.{end_utc.isoformat()}",
-                "order": "date_str.desc",
+                "select": "id,name,created_at,enriched_at,source,enrichment_context",
+                "enriched_at": "not.is.null",
+                "created_at": f"gte.{start}T00:00:00Z",
+                "created_at": f"lte.{end}T23:59:59Z",
+                "order": "created_at.desc",
                 "limit": str(limit),
             },
-            timeout=10,
+            timeout=15,
         )
         if resp.status_code == 200:
             return resp.json()
@@ -182,93 +135,97 @@ def search_temporal(start_utc: datetime, end_utc: datetime, limit: int) -> list[
     return []
 
 
-def search_detail(meeting_id: str) -> dict | None:
-    """SELECT single meeting by meeting_id."""
+def search_detail(meeting_id: str) -> list[dict]:
+    """Busca reunião por ID."""
     try:
         resp = requests.get(
-            f"{SUPABASE_URL}/rest/v1/meeting_memories",
-            headers=get_supabase_headers(),
+            f"{SUPABASE_URL}/rest/v1/meetings",
+            headers=get_headers(),
             params={
-                "select": "id,meeting_id,meeting_name,date_str,content,participants,importance,source_url",
-                "meeting_id": f"eq.{meeting_id}",
+                "select": "id,name,created_at,enriched_at,source,enrichment_context",
+                "enriched_at": "not.is.null",
+                "id": f"eq.{meeting_id}",
                 "limit": "1",
             },
-            timeout=10,
+            timeout=15,
         )
         if resp.status_code == 200:
             rows = resp.json()
-            return rows[0] if rows else None
+            return rows if rows else []
+        log(f"Detail search failed: {resp.status_code} {resp.text[:200]}")
     except Exception as e:
         log(f"Detail search error: {e}")
-    return None
+    return []
 
 
-def hybrid_score(result_created_at: datetime, semantic_sim: float | None,
-                 query_recency_ts: float | None) -> float:
-    """score = 0.4 * recency_normalized + 0.6 * semantic_similarity"""
-    DAYS_90 = 90 * 86400
-    now_ts = datetime.now(BRT).timestamp()
+def get_summaries(meeting_ids: list[str]) -> dict[str, dict]:
+    """Busca summaries para uma lista de meeting_ids. Retorna dict keyed by meeting_id."""
+    if not meeting_ids:
+        return {}
+    try:
+        resp = requests.get(
+            f"{SUPABASE_URL}/rest/v1/summaries",
+            headers=get_headers(),
+            params={
+                "select": "meeting_id,topics,decisions,tags,raw_text,model_used",
+                "meeting_id": f"in.({','.join(meeting_ids)})",
+            },
+            timeout=15,
+        )
+        if resp.status_code == 200:
+            rows = resp.json()
+            return {r["meeting_id"]: r for r in rows}
+    except Exception as e:
+        log(f"Summaries fetch error: {e}")
+    return {}
 
-    if query_recency_ts is not None:
-        age_days = (now_ts - result_created_at.timestamp()) / 86400
-        recency_norm = max(0.0, 1.0 - age_days / DAYS_90)
-    else:
-        recency_norm = 0.5
 
-    sim = 0.5 if semantic_sim is None else semantic_sim
-    return 0.4 * recency_norm + 0.6 * sim
-
-
-def format_result(rows: list[dict], mode: str, query: str,
-                  threshold: float) -> str:
+def format_result(meetings: list[dict], summaries: dict[str, dict],
+                  mode: str, query: str) -> str:
     """Format search results as markdown."""
-    if not rows:
+    if not meetings:
         return f"**Nenhuma reunião encontrada** para: \"{query}\""
 
     lines = [
         f"## Reuniões — TLDV\n",
-        f"**Modo:** {mode} | **Query:** \"{query}\" | **Threshold:** {threshold}\n",
-        f"**Encontradas:** {len(rows)} reuniões\n",
+        f"**Modo:** {mode} | **Query:** \"{query}\"\n",
+        f"**Encontradas:** {len(meetings)} reuniões\n",
         "---\n",
     ]
 
-    for i, row in enumerate(rows, 1):
-        date_str_val = row.get("date_str") or ""
-        if date_str_val:
+    for i, m in enumerate(meetings, 1):
+        name = m.get("name") or "Sem título"
+        created = m.get("created_at") or ""
+        if created:
             try:
-                dt = datetime.fromisoformat(date_str_val.replace("Z", "+00:00"))
+                dt = datetime.fromisoformat(created.replace("Z", "+00:00"))
                 date_brt = brt(dt).strftime("%d/%m/%Y, %Hh%M BRT")
             except:
-                date_brt = date_str_val
+                date_brt = created[:10]
         else:
             date_brt = "—"
 
-        score = row.get("similarity", 0.0) or row.get("hybrid_score", 0.0)
-        title = row.get("meeting_name") or "Sem título"
-        raw_content = row.get("content") or ""
-        if len(raw_content) > 200:
-            content = raw_content[:197].rsplit(" ", 1)[0] + "..."
-        else:
-            content = raw_content
-        participants = row.get("participants") or []
-        importance = row.get("importance", "")
-        source_url = row.get("source_url", "")
+        summary = summaries.get(m["id"], {})
+        topics = summary.get("topics") or []
+        decisions = summary.get("decisions") or []
+        tags = summary.get("tags") or []
+        ctx = m.get("enrichment_context") or {}
+        gh_prs = len(ctx.get("github", {}).get("pull_requests") or [])
+        tr_cards = len(ctx.get("trello", {}).get("cards") or [])
 
-        participants_str = ", ".join(participants) if participants else ""
-
-        lines.append(f"### {i}. {title}\n")
-        lines.append(f"**Score:** {score:.2f} | **Data:** {date_brt}\n")
-        if participants_str:
-            lines.append(f"**Participantes:** {participants_str}\n")
-        if importance:
-            lines.append(f"**Importância:** {importance}\n")
-        if content:
-            lines.append(f"> {content}\n")
-        if source_url:
-            lines.append(f"[ver no TLDV →]({source_url})\n")
+        lines.append(f"### {i}. {name}\n")
+        lines.append(f"**Data:** {date_brt}\n")
+        if tags:
+            lines.append(f"**Tags:** {', '.join(tags[:5])}\n")
+        if topics:
+            lines.append(f"> **Topics:** {'; '.join(topics[:2])}\n")
+        if decisions:
+            lines.append(f"> **Decisões:** {'; '.join(decisions[:2])}\n")
+        if gh_prs or tr_cards:
+            lines.append(f"> **Enriquecimento:** {gh_prs} PRs, {tr_cards} cards (validação necessária)\n")
         lines.append("---\n")
 
-    lines.append(f"_{len(rows)} resultados · query: \"{query}\" · threshold: {threshold}_")
+    lines.append(f"_{len(meetings)} resultados_")
     return "".join(lines)
 
 
@@ -277,82 +234,59 @@ def format_result(rows: list[dict], mode: str, query: str,
 def main():
     parser = argparse.ArgumentParser(description="meetings-tldv search")
     parser.add_argument("--query", help="Pergunta livre (infern modo)")
-    parser.add_argument("--mode", choices=["temporal", "semantic", "detail"],
-                        help="Modo forçado (sobressai inferência)")
-    parser.add_argument("--start", help="Data início (YYYY-MM-DD)")
-    parser.add_argument("--end", help="Data fim (YYYY-MM-DD)")
+    parser.add_argument("--mode", choices=["temporal", "keyword", "detail"],
+                        help="Modo: keyword (default), temporal, detail")
+    parser.add_argument("--start", help="Data início (YYYY-MM-DD, modo temporal)")
+    parser.add_argument("--end", help="Data fim (YYYY-MM-DD, modo temporal)")
     parser.add_argument("--meeting-id", help="Meeting ID (modo detail)")
     parser.add_argument("--limit", type=int, default=DEFAULT_LIMIT)
-    parser.add_argument("--threshold", type=float, default=DEFAULT_THRESHOLD)
-    parser.add_argument("--dry-run", action="store_true",
-                        help="Testa inferência sem queryar Supabase")
     args = parser.parse_args()
 
-    # Validate env (skip for dry-run since it doesn't query Supabase)
-    if not args.dry_run:
-        missing = []
-        if not SUPABASE_URL:
-            missing.append("SUPABASE_URL")
-        if not SUPABASE_SERVICE_ROLE_KEY:
-            missing.append("SUPABASE_SERVICE_ROLE_KEY")
-        if missing:
-            log(f"ERRO: variáveis de ambiente faltando: {', '.join(missing)}")
-            sys.exit(1)
-
-    # Infer or validate mode
-    if args.mode:
-        mode = args.mode
-    elif args.meeting_id:
-        mode = "detail"
-    elif args.query:
-        mode = infer_mode(args.query)
-    else:
-        log("ERRO: forneça --query, --meeting-id, ou --mode")
+    if not args.query and not args.meeting_id and not (args.mode == "temporal" and args.start):
+        log("ERRO: forneça --query, --meeting-id, ou --mode temporal com --start/--end")
         sys.exit(1)
 
-    if args.dry_run:
-        log(f"[DRY RUN] mode={mode} query={args.query}")
-        recency = query_recency_ts_from_text(args.query or "")
-        log(f"[DRY RUN] recency_ts={recency}")
-        return
+    # Validate env
+    if not SUPABASE_URL or not SUPABASE_SERVICE_ROLE_KEY:
+        log("ERRO: SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY precisam estar em ~/.openclaw/.env")
+        sys.exit(1)
+
+    # Determine mode
+    mode = args.mode
+    if not mode:
+        mode = infer_mode(args.query or "", args.meeting_id)
 
     log(f"Mode: {mode}")
 
-    # Execute
+    # Execute search
     if mode == "temporal":
-        start_dt = datetime.fromisoformat(args.start) if args.start \
-            else datetime.now(BRT) - timedelta(days=30)
-        end_dt = datetime.fromisoformat(args.end) if args.end \
-            else datetime.now(BRT)
-        start_utc = start_dt.astimezone(timezone.utc)
-        end_utc = end_dt.astimezone(timezone.utc)
-        rows = search_temporal(start_utc, end_utc, args.limit)
-
-    elif mode == "semantic":
-        if not args.query:
-            log("ERRO: --query requerido para modo semantic")
+        if not args.start:
+            log("ERRO: --start requerido para modo temporal")
             sys.exit(1)
-        embedding = get_embedding(args.query)
-        if embedding:
-            rows = rpc_match_vectors(embedding, args.threshold, args.limit)
-            if rows is None:
-                rows = search_semantic_fallback(args.query, args.limit)
-        else:
-            log("OpenAI API indisponível, usando fallback ILIKE")
-            rows = search_semantic_fallback(args.query, args.limit)
+        end = args.end or datetime.now(BRT).strftime("%Y-%m-%d")
+        meetings = search_temporal(args.start, end, args.limit)
 
     elif mode == "detail":
         if not args.meeting_id:
             log("ERRO: --meeting-id requerido para modo detail")
             sys.exit(1)
-        row = search_detail(args.meeting_id)
-        rows = [row] if row else []
+        meetings = search_detail(args.meeting_id)
 
-    if not rows:
+    else:  # keyword
+        if not args.query:
+            log("ERRO: --query requerido para modo keyword")
+            sys.exit(1)
+        meetings = search_keyword(args.query, args.limit)
+
+    if not meetings:
         print(f"**Nenhuma reunião encontrada**")
         return
 
-    output = format_result(rows, mode, args.query or args.meeting_id, args.threshold)
+    # Fetch summaries for all meetings
+    meeting_ids = [m["id"] for m in meetings]
+    summaries = get_summaries(meeting_ids)
+
+    output = format_result(meetings, summaries, mode, args.query or args.meeting_id)
     print(output)
 
 
