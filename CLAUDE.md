@@ -87,3 +87,9 @@ Topic files in `memory/curated/` contain detailed project/agent context. They ar
 - **Learned rules:** `memory/meetings-tldv-learned-rules.md`
 - **Autoresearch:** `scripts/meetings_tldv_autoresearch.py` (daily, invoked by autoresearch_cron.py)
 - **PREREQUISITE:** Supabase RPC `match_summary_vectors` must exist — fallback to ILIKE if not
+- **Supabase schema:** Always verify actual columns first — GET /rest/v1/table_name?select=*&limit=3 — never trust schema docs
+- **Filter syntax:** Supabase REST API uses dot notation — `field.ilike.*{value}*`, `field.eq.{value}`, not Python client syntax
+- **New skill with feedback:** add prefix to callback_data, add routing case in feedback_poller.py, add ALLOWED_USER_IDS check, add log file path to FEEDBACK_FILES
+- **Token security:** os.getenv() with fail-fast — never hardcode tokens or secrets
+- **Time-bounded cache:** use dict with (value, timestamp) — lru_cache has no TTL enforcement
+- **Test suites:** skills/X/test_X.py (unit) + scripts/test_X.py (functional) + scripts/test_security.py (security) — run all three after changes
