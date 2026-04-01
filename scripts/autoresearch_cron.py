@@ -284,7 +284,17 @@ def main():
     log("=== Autoresearch Cron (Telegram Direct) ===")
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M BRT")
 
-    # 0. Process feedback acumulado desde última execução
+    # 0. Health check — abort if any layer is down
+    if not health_check():
+        summary = f"""🧠 *Autoresearch — {timestamp}*
+
+⚠️ *Ciclo abortado — dependência down.*
+
+🔄 Próximo ciclo em ~1h. Nenhuma evolução aplicada."""
+        send_message(CHAT_ID, summary)
+        sys.exit(1)
+
+    # 0b. Process feedback acumulado desde última execução
     run_feedback_learning()
 
     # 1. Run metrics before
