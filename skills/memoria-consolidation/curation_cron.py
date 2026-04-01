@@ -30,7 +30,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger("curation")
 
-BASE_DIR = Path(__file__).resolve().parents[1]  # workspace-livy-memory/
+BASE_DIR = Path(__file__).resolve().parents[2]  # workspace-livy-memory/ (up from collectors/ and skills/)
 MEMORY_DIR = BASE_DIR / "memory"
 CURATED_DIR = MEMORY_DIR / "curated"
 LOGS_DIR = MEMORY_DIR / "logs"
