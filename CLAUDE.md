@@ -79,3 +79,11 @@ Topic files in `memory/curated/` contain detailed project/agent context. They ar
 **Consolidation output:** "DRY RUN" + "mudanças pendentes" messages are informational only — changes ARE applied if pending count > 0
 **Autoresearch script:** `python3 scripts/autoresearch_cron.py` — sends files via Telegram Direct API with feedback buttons, processes feedback at start
 **Dream:** `python3 skills/memoria-consolidation/dream_all.py` — processes sessions from main (Livy Deep) and both memory workspaces
+
+## meetings-tldv Skill
+
+- **Skill:** `skills/meetings-tldv/` — queries Supabase TLDV (meeting_memories table)
+- **Feedback:** `memory/meetings-tldv-feedback-log.jsonl` (isolated per skill)
+- **Learned rules:** `memory/meetings-tldv-learned-rules.md`
+- **Autoresearch:** `scripts/meetings_tldv_autoresearch.py` (daily, invoked by autoresearch_cron.py)
+- **PREREQUISITE:** Supabase RPC `match_summary_vectors` must exist — fallback to ILIKE if not
