@@ -7,7 +7,7 @@ Key endpoints:
   GET /repos/{owner}/{repo}/pulls?state=closed → merged PRs with merged_at
   GET /repos/{owner}/{repo}/pulls/{number}/comments → PR comments
 
-Env: GITHUB_TOKEN (personal access token)
+Env: GITHUB_PERSONAL_ACCESS_TOKEN (personal access token)
 """
 import os, requests
 from datetime import datetime, timezone
@@ -17,8 +17,8 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from signal_bus import SignalEvent
 
-GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "")
-GITHUB_ORG = os.environ.get("GITHUB_ORGS", "living")
+GITHUB_TOKEN = os.environ.get("GITHUB_PERSONAL_ACCESS_TOKEN", "")
+GITHUB_ORG = os.environ.get("GITHUB_ORG", "living")
 
 REPO_TOPIC_MAP = {
     "livy-bat-jobs": "bat-conectabot-observability.md",
