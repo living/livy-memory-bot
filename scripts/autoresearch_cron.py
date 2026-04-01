@@ -250,6 +250,142 @@ def get_curated_files():
         return []
     return sorted(CURATED_DIR.glob("*.md"))
 
+# ── Evolution Cursor (round-robin) ────────────────────────────────────────────
+
+CURSOR_FILE = MEMORY_DIR / ".evolution_cursor"
+MAX_FILES_PER_CYCLE = 5
+
+def load_cursor() -> int:
+    """Load last processed cursor index. Returns 0 if file missing."""
+    if not CURSOR_FILE.exists():
+        return 0
+    try:
+        return int(CURSOR_FILE.read_text().strip())
+    except Exception:
+        return 0
+
+def save_cursor(idx: int):
+    """Persist cursor index to disk."""
+    CURSOR_FILE.write_text(str(idx))
+
+# ── Evolution Prompt Builder ─────────────────────────────────────────────────
+
+def build_evolution_prompt(file_path: Path, violations: list) -> str:
+    """Build the prompt sent to livy-memory agent for one file."""
+    try:
+        content = file_path.read_text()[:2000]
+    except Exception:
+        content = "(unable to read file)"
+
+    theme = file_path.stem.replace("-", " ").replace("_", " ")
+
+    return f"""Você é o agente de consolidação da memória institucional.
+
+TAREFA: Reescreva o arquivo {file_path} segundo o memory-manual.md.
+
+ANTES de reescrever, pesquise em todas as 3 camadas para enriquecer o conteúdo:
+
+1. CAMADA 1 (Built-in search):
+   Execute: openclaw memory search --json "{theme}"
+   Leia os resultados mais relevantes
+
+2. CAMADA 2 (claude-mem observations):
+   Execute: curl "http://localhost:37777/api/search?query={theme}&limit=5"
+   Se IDs relevantes forem encontrados:
+   - Execute: curl "http://localhost:37777/api/timeline?anchor=<id>&depth_before=2&depth_after=2"
+   - Execute: curl -X POST "http://localhost:37777/api/observations/batch" \\
+     -H "Content-Type: application/json" \\
+     -d '{{"ids": [<ids relevantes>],"orderBy":"date_desc"}}'
+
+3. CAMADA 3 (curated files):
+   Leia MEMORY.md e arquivos relacionados em memory/curated/
+
+VIOLAÇÕES DETECTADAS:
+{', '.join(violations)}
+
+REGRAS (memory-manual.md):
+- YAML frontmatter com name, description, type
+- Seções: Status, Decisões (com MOTIVO da escolha), Pendências, Bugs
+- Status: ativo | pausado | concluído | cancelado
+- NUNCA remova conteúdo existente — só reestruture e enriqueça
+- Seções Decisões devem explicar o PORQUE de cada decisão
+
+PASSOS OBRIGATÓRIOS:
+1. Execute as pesquisas nas 3 camadas
+2. Leia memory-manual.md para entender o formato ideal
+3. ARQUIVE a versão original ANTES de qualquer modificação:
+   mkdir -p .archive/$(date +%Y%m%d%H%M)
+   cp {file_path} .archive/$(date +%Y%m%d%H%M)/
+4. Reescreva o arquivo integrando o contexto das 3 camadas
+5. Retorne um relatório breve do que mudou e por quê
+
+ARQUIVO ATUAL (primeiros 2000 chars):
+{content}
+"""
+
+# ── Evolution Runner ──────────────────────────────────────────────────────────
+
+def run_memory_evolution():
+    """
+    Detects violations, selects top 5 (round-robin), and delegates
+    each to the livy-memory agent for research + rewrite.
+    Returns list of (filename, report, violations) tuples.
+    """
+    from consolidate import detect_violations, gather_signal_all, load_memory_indexes
+
+    log("Running memory evolution...")
+
+    indexes = load_memory_indexes()
+    signals = gather_signal_all(indexes)
+
+    curated_files = get_curated_files()
+    if not curated_files:
+        log("No curated files found.")
+        return []
+
+    violations = detect_violations(curated_files, signals)
+    if not violations:
+        log("No violations detected.")
+        return []
+
+    cursor = load_cursor()
+    total = len(violations)
+    selected = []
+    for i in range(MAX_FILES_PER_CYCLE):
+        idx = (cursor + i) % total
+        selected.append(violations[idx])
+
+    next_cursor = (cursor + MAX_FILES_PER_CYCLE) % total
+    save_cursor(next_cursor)
+
+    log(f"Selected {len(selected)} files for evolution: {[v['file'].name for v in selected]}")
+
+    reports = []
+    for v in selected:
+        f = v["file"]
+        prompt = build_evolution_prompt(f, v["violations"])
+        log(f"Delegating to livy-memory: {f.name}")
+
+        try:
+            result = subprocess.run(
+                ["openclaw", "agent", "--agent", "livy-memory", "--message", prompt],
+                capture_output=True, text=True, timeout=120
+            )
+            report = result.stdout.strip() if result.stdout else "(no output)"
+            if result.returncode != 0:
+                report = f"ERROR (rc={result.returncode}): {result.stderr.strip()}"
+            log(f"  → {report[:200]}")
+        except subprocess.TimeoutExpired:
+            report = "TIMEOUT — agent did not complete within 120s"
+            log(f"  → TIMEOUT for {f.name}")
+        except Exception as e:
+            report = f"EXCEPTION: {e}"
+            log(f"  → EXCEPTION for {f.name}: {e}")
+
+        reports.append((f.name, report, v["violations"]))
+
+    return reports
+
 # ── Main ─────────────────────────────────────────────────────────────────────
 
 # ── Feedback Learning ─────────────────────────────────────────────────────────────
@@ -310,7 +446,11 @@ def main():
     # 3b. Run meetings-tldv autoresearch
     meetings_tldv_ok = run_meetings_tldv_autoresearch()
 
-    # 4. Run metrics after
+    # 4. Run memory evolution (top 5 files, round-robin)
+    evolution_reports = run_memory_evolution()
+    evolution_count = len([r for r in evolution_reports if not r[1].startswith("ERROR")])
+
+    # 5. Run metrics after
     metrics_after = run_metrics()
     log(f"Metrics after: {metrics_after}")
 
@@ -333,9 +473,25 @@ def main():
         ]
     }
 
+    # Build evolution section
+    if evolution_reports:
+        evolution_lines = ["🔄 *Evoluções aplicadas:*"]
+        for fname, report, violations in evolution_reports:
+            short_violations = ", ".join(violations[:2])
+            if report.startswith("ERROR") or report.startswith("TIMEOUT") or report.startswith("EXCEPTION"):
+                evolution_lines.append(f"• `{fname}` — ❌ {report[:80]}")
+            else:
+                evolution_lines.append(f"• `{fname}` — ✅ {short_violations}")
+        evolution_summary = "\n".join(evolution_lines)
+        evolution_summary += f"\n📋 *Evoluções: {evolution_count}/{len(evolution_reports)} aplicadas*"
+    else:
+        evolution_summary = "✅ *Nenhuma violação detectada — nenhuma evolução necessária.*"
+
     intro = f"""🧠 *Autoresearch — {timestamp}*
 
 📊 *Métricas:* completeness {metrics_before.get('completeness',0):.1f} → {metrics_after.get('completeness',0):.1f} | crossrefs {metrics_before.get('crossrefs',0)} → {metrics_after.get('crossrefs',0)}
+
+{evolution_summary}
 
 📁 *{len(files)} arquivos para revisar:*"""
 
