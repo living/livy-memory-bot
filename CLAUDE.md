@@ -110,6 +110,41 @@ Python subprocessos não herdam env vars automaticamente — precisa de `source`
 **Autoresearch script:** `python3 scripts/autoresearch_cron.py` — sends files via Telegram Direct API with feedback buttons, processes feedback at start
 **Dream:** `python3 skills/memoria-consolidation/dream_all.py` — processes sessions from main (Livy Deep) and both memory workspaces
 
+## Signal Cross-Curation
+
+Sistema de curadoria inteligente que cruza sinais de TLDV + GitHub + Logs + Feedback para manter topic files atualizados.
+**Script:** `skills/memoria-consolidation/curation_cron.py`
+**Cron:** `53b45f6f-cb68-4b79-8610-0b4f4db6e585` (every 4h, memory-agent)
+
+**Fontes:** TLDV (priority 1) → Logs (2) → GitHub (3) → Feedback (4)
+**Output files:** `memory/signal-events.jsonl`, `memory/curation-log.md`, `memory/conflict-queue.md`
+**Topic files atualizados:** `memory/curated/*.md`
+
+**Rodar manualmente:**
+```bash
+cd /home/lincoln/.openclaw/workspace-livy-memory && source ~/.openclaw/.env && export SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY GITHUB_PERSONAL_ACCESS_TOKEN && python3 skills/memoria-consolidation/curation_cron.py
+```
+
+## TLDV summaries schema (confirmado)
+
+`decisions[]`, `topics[]` existem; `action_items`, `status_changes`, `consensus_topics` NÃO existem (error 42703).
+
+## GitHub token env var
+
+`GITHUB_PERSONAL_ACCESS_TOKEN` (not `GITHUB_TOKEN`)
+
+## Parent path em scripts em skills/
+
+`Path(__file__).resolve().parents[1]` aponta para `skills/`, não workspace root. Para alcançar `workspace/memory/`, use `parents[2]`.
+
+## Cron jobs para scripts Python
+
+Editar `~/.openclaw/cron/jobs.json` diretamente — `openclaw cron add` é baseado em agente (envia mensagem para agente, não executa script direto).
+
+## Subagent-driven development
+
+Para implementar planos com múltiplas tarefas, usar `EnterWorktree` + agente por tarefa + review em duas fases (spec compliance + code quality).
+
 ## meetings-tldv Skill
 
 - **Skill:** `skills/meetings-tldv/` — queries Supabase TLDV (meeting_memories table)
