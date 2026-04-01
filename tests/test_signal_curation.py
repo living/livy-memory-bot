@@ -235,3 +235,72 @@ def test_analyzer_failure_signal():
     candidates = analyzer.analyze_content("delphos-video-vistoria.md", "# Delphos\n\n## Status\n- Vonage: em uso\n", [signal])
     assert len(candidates) == 1
     assert candidates[0].change_type == "deprecate_entry"
+
+
+# -------------------------------------------------------------------
+# AutoCurator tests
+# -------------------------------------------------------------------
+from auto_curator import AutoCurator
+
+def test_should_apply_returns_true_for_high_confidence():
+    curator = AutoCurator()
+    change = CandidateChange(
+        change_type="add_decision",
+        description="Use Postgres",
+        evidence="meeting #123",
+        signal_source="tldv",
+    )
+    assert curator.should_apply(change) is True
+
+def test_should_apply_returns_false_for_low_confidence():
+    curator = AutoCurator()
+    signal = SignalEvent(
+        source="tldv", priority=1, topic_ref="test.md",
+        signal_type="decision",
+        payload={"description": "Test", "evidence": None, "confidence": 0.5},
+        origin_id="m1", origin_url=None,
+    )
+    change = CandidateChange(
+        change_type="add_decision",
+        description="Use Postgres",
+        evidence=None,
+        signal_source="tldv",
+    )
+    # No evidence + low confidence → don't apply
+    assert curator.should_apply(change) is False
+
+def test_apply_add_decision(tmp_path):
+    topic_file = tmp_path / "forge.md"
+    topic_file.write_text("---\nname: forge\n---\n\n# Forge\n\n## Decisões\n(nenhuma)\n")
+
+    curator = AutoCurator()
+    change = CandidateChange(
+        change_type="add_decision",
+        description="Usar Postgres",
+        evidence="meeting #123",
+        signal_source="tldv",
+    )
+    result = curator.apply_change(topic_file, change)
+
+    assert result is True
+    content = topic_file.read_text()
+    assert "Usar Postgres" in content
+    assert "meeting #123" in content
+
+def test_apply_deprecate_entry(tmp_path):
+    topic_file = tmp_path / "delphos.md"
+    topic_file.write_text("---\nname: delphos\n---\n\n# Delphos\n\n## Status\n- Vonage: em uso\n\n## Decisões\n- Usar Vonage\n")
+
+    curator = AutoCurator()
+    change = CandidateChange(
+        change_type="deprecate_entry",
+        description="Vonage: em uso",
+        evidence="reports/daily/2026-04-01.json",
+        signal_source="logs",
+    )
+    result = curator.apply_change(topic_file, change)
+
+    assert result is True
+    content = topic_file.read_text()
+    assert "DEPRECADO" in content or "deprecated" in content.lower()
+    assert "Vonage" in content
