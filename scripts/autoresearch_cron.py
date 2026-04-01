@@ -331,6 +331,8 @@ def run_memory_evolution():
     each to the livy-memory agent for research + rewrite.
     Returns list of (filename, report, violations) tuples.
     """
+    import sys as _sys
+    _sys.path.insert(0, str(WORKSPACE / "skills/memoria-consolidation"))
     from consolidate import detect_violations, gather_signal_all, load_memory_indexes
 
     log("Running memory evolution...")
@@ -368,7 +370,7 @@ def run_memory_evolution():
 
         try:
             result = subprocess.run(
-                ["openclaw", "agent", "--agent", "livy-memory", "--message", prompt],
+                ["openclaw", "agent", "--agent", "memory-agent", "--message", prompt],
                 capture_output=True, text=True, timeout=120
             )
             report = result.stdout.strip() if result.stdout else "(no output)"
