@@ -1,8 +1,8 @@
 # Signal Cross-Curation — Design
 
-**Versão:** 1.0
+**Versão:** 1.1
 **Data:** 2026-04-01
-**Status:** Draft
+**Status:** Ready for approval
 
 ---
 
@@ -20,33 +20,37 @@ Um sistema de curadoria inteligente que cruza sinais de múltiplas fontes para m
 
 ### Hierarquia (do mais ao menos confiável)
 
-| Prioridade | Fonte | O que captura |
-|---|---|---|
-| **1 — Primária** | TLDV / Robert | Decisões de reunião, direcionamentos, consensos da equipe |
-| **2 — Secundária** | Git PRs | Descrições e comentários de PRs merged; estado de PRs abertos |
-| **3 — Terciária** | Logs de execução | Sucesso/falha de jobs (BAT, Delphos, crons) |
-| **4 — Quartenária** | Feedback Lincoln | 👍/👎 do cron de autoresearch |
+| Prioridade | Fonte | O que captura | Peso em conflitos |
+|---|---|---|---|
+| **1 — Primária** | TLDV / Robert | Direcionamentos, decisões, consensos de reunião | Vence se logs confirmam |
+| **2 — Secundária** | Logs | Sucesso/falha concreto de jobs, crons, deploys | Vence sobre Git |
+| **3 — Terciária** | Git PRs | Descrições e comentários de PRs merged; estado de PRs abertos | Evidência secundária |
+| **4 — Quartenária** | Feedback Lincoln | 👍/👎 do cron de autoresearch | Aprendizado apenas |
+
+**Nota:** TLDV é a fonte de **direção**. Logs são a fonte de **verificação concreta**. Se TLDV diz "vamos fazer X" mas logs mostram "X falhou 3x", há conflito — e logs pesam mais que PRs na evidência.
 
 ### O que cada fonte extrai
 
-**TLDV (primária)**
-- `meeting_id`, `date`, `participants`
+**TLDV (primária — direção)**
+- Fonte: Supabase (`meetings`, `summaries` tables)
 - `decisions[]` — decisões tomadas na reunião
 - `action_items[]` — tarefas designadas + responsável
 - `status_changes[]` — mudanças de status de projetos discutidas
 - `consensus_topics[]` — temas com consenso da equipe
+- Robert como participante = direcionamento explícito
 
-**Git (secundária)**
+**Logs (secundária — verificação)**
+- `job_name`, `timestamp`, `status` (success/failure/error)
+- `error_message` (se failure)
+- `duration_seconds`
+- Jobs: BAT, Delphos, crons, enrichments
+
+**Git (terciária — evidência)**
 - PR: `repo`, `number`, `title`, `description`, `merged_at`, `state`
 - PR comments: `author`, `body`, `created_at`
 - Commit messages: `sha`, `message`, `files_changed`
 
-**Logs (terciária)**
-- `job_name`, `timestamp`, `status` (success/failure/error)
-- `error_message` (se failure)
-- `duration_seconds`
-
-**Feedback Lincoln (quartenária)**
+**Feedback Lincoln (quartenária — aprendizado)**
 - `file`, `action`, `thumbs_up` / `thumbs_down`, `timestamp`
 - Feedback textual (callback_data)
 
@@ -99,7 +103,7 @@ Cada collector emite eventos normalizados para o signal bus:
 
 ```python
 SignalEvent = {
-    "source": "tldv" | "github" | "logs" | "feedback",
+    "source": "tldv" | "logs" | "github" | "feedback",
     "priority": 1 | 2 | 3 | 4,          # 1 = mais confiavel
     "timestamp": ISO8601,
     "topic_ref": str | None,             # qual topic file refere
@@ -127,18 +131,20 @@ Um **conflito** existe quando:
 ```
 Sinal primário (TLDV/Robert) diz "X é o caminho"
 MAS
-Sinal secundário (Git) ou terciário (logs) diz "X falhou ou foi abandonado"
+Sinal secundário (logs) ou terciário (Git) diz "X falhou, foi revertido, ou nunca saiu do papel"
 ```
 
+**Ordem de peso na evidência:** `logs > Git PRs > TLDV`
+
 **Exemplos de conflito:**
-- Reunião decidiu usar arquitetura X → mas PR merged mostra que foi revertido
-- Decisão de migrar para Y → mas logs mostram que jobs Y estão falhando há semanas
-- Ação designada para "responsável Z" → mas Z fechou PR sem implementar
+- Reunião decidiu usar arquitetura X → mas logs mostram que jobs X falharam 3x esta semana
+- Decisão de migrar para Y → mas PR merged mostra que Y foi revertido
+- Ação designada para "responsável Z" → mas Z fechou PR sem implementar e logs confirmam
 
 **Não é conflito (apenas diferença):**
 - Opiniões diferentes sem evidência concreta
 - Tendências ainda não materializadas em código/logs
-- Correções de feedback (isso é aprendizaje, não conflito)
+- Correções de feedback (isso é aprendizado, não conflito)
 
 ---
 
@@ -229,9 +235,9 @@ Para cada Topic File candidato a update:
 
 | Collector | Source | Method |
 |---|---|---|
-| `tldv_collector.py` | TLDV API | Fetch meetings with Robert as participant since last run |
+| `tldv_collector.py` | Supabase | Fetch meetings with Robert since last run — read from `meetings` + `summaries` tables |
+| `logs_collector.py` | Job logs | Parse success/failure from BAT, Delphos, crons log files |
 | `github_collector.py` | GitHub API | Fetch merged PRs since last run, parse descriptions + comments |
-| `logs_collector.py` | Job logs | Parse success/failure from existing log files |
 | `feedback_collector.py` | Existing | Reuse `feedback-log.jsonl` + learned-rules |
 
 ### 8.2 Signal Bus (novo)
@@ -263,18 +269,18 @@ Para cada Topic File candidato a update:
 ## 9. Prioridade de Implementação
 
 ### Fase 1 — Foundation (imediatamente útil)
-1. `tldv_collector.py` — extrai decisions + action_items de reuniões com Robert
+1. `tldv_collector.py` — extrai decisions + action_items de reuniões com Robert (Supabase)
 2. `signal_bus.py` — events normalizados com topic_ref
 3. `topic_analyzer.py` + `auto_curator.py` — aplica quando sinais de prioridade 1 convergem
 4. `curation_cron.py` — orquestração com output Telegram (sempre mostra o que auto-curou)
 
 ### Fase 2 — Riqueza
-5. `github_collector.py` — PRs merged como evidência secundária
-6. `conflict_detector.py` — detecta conflitos antes de auto-curar
+5. `logs_collector.py` — sucesso/falha de jobs (BAT, Delphos, crons)
+6. `conflict_detector.py` — detecta conflitos antes de auto-curar (logs > Git na evidência)
 7. Conflict Queue — notifica Lincoln de forma acionável
 
 ### Fase 3 — Completude
-8. `logs_collector.py` — sucesso/falha de jobs
+8. `github_collector.py` — PRs merged como evidência terciária
 9. `feedback_collector.py` — integra com learned-rules existente
 10. Aprendizado: sistema aprende de resoluções do Lincoln para refinar detecção
 
@@ -318,11 +324,12 @@ memory/
 
 ## 12. Risco: Lincoln fica sobrecarregado de conflicts
 
-**Mitigação:** Sinal de prioridade 1 (TLDV) raramente conflita com sinal de prioridade 3 (logs). Conflitos reais são incomuns — só ocorrem quando direção de reunião contradiz evidência concreta. Isso é exatamente o caso que precisa de atenção humana.
+**Mitigação:** Com logs em prioridade 2 (acima de Git), TLDV e logs vão conflitar mais do que TLDV e Git. Isso é intencional — conflitar é o trabalho. A frequência de conflitos é um **sinal de processo**, não um bug:
 
-Se conflicts forem muito frequentes, é sinal de que:
-1. Reuniões estão definindo direções sem visão de execução (problema de processo, não de sistema)
-2. Logs não estão capturando corretamente (problema técnico)
+- Conflitos frequentes = reuniões definem direções sem visão de execução real
+- Conflitos raros = sistema está funcionando como filtro de ruído
+
+Se conflicts > 5/semana, considerar filtrar por tipo de topic (só conflitar em topics de projeto ativo).
 
 ---
 
