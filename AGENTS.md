@@ -44,6 +44,14 @@ HEARTBEAT.md no workspace root é o dashboard. Seções:
 - Decisões pendentes (do MEMORY.md)
 - Última consolidação
 
+## Skills Disponíveis
+
+| Skill | Descrição |
+|---|---|
+| `memory-assistant` | Consulta memória histórica (built-in + claude-mem 3-layer). Dispara automaticamente quando o agente precisa de contexto passado. |
+
+**Referência:** `~/.openclaw/workspace/skills/memory-assistant/SKILL.md`
+
 ## Identity Files
 
 Os arquivos em `.claude/` definem identidade e valores. O workspace root (`SOUL.md`, `IDENTITY.md`, `AGENTS.md`) são cópias operacionais.
