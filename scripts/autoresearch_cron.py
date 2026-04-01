@@ -371,7 +371,7 @@ def run_memory_evolution():
         try:
             result = subprocess.run(
                 ["openclaw", "agent", "--agent", "memory-agent", "--message", prompt],
-                capture_output=True, text=True, timeout=120
+                capture_output=True, text=True, timeout=300
             )
             report = result.stdout.strip() if result.stdout else "(no output)"
             if result.returncode != 0:
