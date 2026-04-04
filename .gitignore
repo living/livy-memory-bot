@@ -1,4 +1,8 @@
 .worktrees/
+**/__pycache__/
+*.pyc
+.claude/worktrees/
+skills/memory/
 
 # Feedback data (sensitive user input)
 memory/feedback-log.jsonl
