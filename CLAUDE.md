@@ -31,16 +31,29 @@ Log output: `memory/consolidation-log.md`
 ## File Structure
 
 ```
-memory/                    # Curated long-term memory
+.claude/                   # Workspace config (napkin, plans, specs)
+├── napkin.md
+├── plans/                 # Implementation plans
+├── specs/                 # Design documents
+└── worktrees/             # Isolated git worktrees
+
+memory/                     # Curated long-term memory
 ├── curated/               # Topic files by project/agent
 │   └── *.md
 ├── .archive/              # Stale files (>60 days, moved here)
-└── consolidation-log.md   # Last consolidation output
+│   └── inbox/             # Raw inputs (audio, HTML, etc.)
+├── consolidation-log.md   # Last consolidation output
+└── signal-events.jsonl     # Cross-curation signal events
 
-.claude/                   # Identity files (read at session start)
-├── SOUL.md
-├── IDENTITY.md
-└── AGENTS.md
+root:                       # Operational files (canonical)
+├── SOUL.md                 # Agent persona
+├── IDENTITY.md             # Agent identity
+├── AGENTS.md               # Agent operational config
+├── MEMORY.md               # Curated memory index
+├── HEARTBEAT.md            # Operational dashboard
+├── TOOLS.md                # Tool references
+├── USER.md                 # User context
+└── CLAUDE.md               # This file
 ```
 
 ## Topic Files
@@ -109,6 +122,7 @@ Python subprocessos não herdam env vars automaticamente — precisa de `source`
 **Consolidation output:** "DRY RUN" + "mudanças pendentes" messages are informational only — changes ARE applied if pending count > 0
 **Autoresearch script:** `python3 scripts/autoresearch_cron.py` — sends files via Telegram Direct API with feedback buttons, processes feedback at start
 **Dream:** `python3 skills/memoria-consolidation/dream_all.py` — processes sessions from main (Livy Deep) and both memory workspaces
+**Audio Processing:** NEVER use the local `whisper` binary (`~/.local/bin/whisper`) — it crashes the VPS due to high resource usage. Always use the OpenAI API with `OPENAI_WHISPER_KEY` from `~/.openclaw/.env`.
 
 ## Signal Cross-Curation
 

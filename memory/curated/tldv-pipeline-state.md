@@ -70,10 +70,12 @@ PENDING → AZURE_DOWNLOADED → DOWNLOADED → TRANSCRIBED → ENRICHED
 |---|---|---|---|
 | gw.tldv.io 502 Bad Gateway | Endpoint de unarchive retorna 502 | Meetings com blobs expirados travam em `UNARCHIVE_REQUESTED` | Usar `video_archiver.py` diretamente |
 | TLDV discover sem hls_url | `list_meetings_with_transcript()` não retorna video URLs | Só afeta tldv-source jobs | — |
-| Whisper RAM no VPS | srv1405423 tem ~2.3GB livre; `small` model causa OOMKilled após 4-5 reuniões | Transcrição falha | Usar `enrich_no_whisper.py` ou OpenAI Whisper API |
+| ~~Whisper RAM no VPS~~ | ✅ **RESOLVIDO** — migrado para OmniRoute API-first (2026-04-03) | — | — |
 | Trello card sem `trello_card_id` | Schema outdated | Cards não vinculam | — |
 | Supabase TLDV stale | Última sync foi 2026-03-20; meetings de 31/03 e 01/04 faltando | Dados desatualizados | — |
 | `livy-meetings-pipeline` desaparecido | Cron job não aparece mais na lista | Pipeline de 6h não executa | Recriar cron job |
+| OmniRoute sem OPENAI_API_KEY | Whisper/rerank/moderation endpoints falham com "No credentials for provider: openai" | API transcription usa groq fallback | Configurar provider keys via OmniRoute dashboard |
+| tl;dv API 403 Forbidden | Enrich pipeline bloqueado em alguns meetings | 11 jobs stuck resetados para pending | Resetar jobs e re-tentar |
 
 ## AutoResearch Pipeline (Nova Feature)
 
@@ -115,11 +117,13 @@ hook_pre_enrich → transcript_analyzer (participants + topics + context)
 
 ## Status
 
-**ativo_com_bugs** — 2026-04-01
+**ativo_com_bugs** — 2026-04-04
 
-- ✅ Pipeline operacional (30 jobs, 23 enriched)
-- ✅ 7 bugs corrigidos historicamente
-- 🔴 6 bugs em aberto (incluindo Supabase stale e cron desaparecido)
+- ✅ Pipeline operacional
+- ✅ Whisper migrado para OmniRoute API-first (2026-04-03)
+- ✅ LLM Rerank + Moderation design aprovado
+- ✅ 7 bugs corrigidos historicamente + Whisper OOM resolvido
+- 🔴 7 bugs em aberto (incluindo OmniRoute provider keys e cron desaparecido)
 - 🔴 `gw.tldv.io` 502 — unarchive travado
 - 🟡 AutoResearch em implementação (feat branch)
 
@@ -127,17 +131,38 @@ hook_pre_enrich → transcript_analyzer (participants + topics + context)
 
 ## Decisões
 
+- [2026-04-03] PR #11: fix(frontend): remove dead Trello/Github panels, wire insights_json + transcript merge [https://github.com/living/livy-tldv-jobs/pull/11] — via github
+- [2026-04-03] PR #10: feat(autoresearch): add TLDV pipeline v3 with continuous improvement loop [https://github.com/living/livy-tldv-jobs/pull/10] — via github
+- [2026-04-01] PR #1: Add Claude Code GitHub Workflow [https://github.com/living/livy-tldv-jobs/pull/1] — via github
+- [2026-04-01] PR #2: fix(archive): timeout ffmpeg 3600s→600s + flags anti-hang HLS [https://github.com/living/livy-tldv-jobs/pull/2] — via github
+- [2026-04-01] PR #3: feat: credential isolation + Living Memory integration [https://github.com/living/livy-tldv-jobs/pull/3] — via github
+- [2026-04-01] PR #4: feat: Phase 3+4 Living Meetings Hub — Web Dashboard + Trello Sync [https://github.com/living/livy-tldv-jobs/pull/4] — via github
+- [2026-04-01] PR #7: Feat/pipeline v3 [https://github.com/living/livy-tldv-jobs/pull/7] — via github
+- [2026-04-01] PR #8: feat(web): Meetings Hub v3 — consume pipeline v3 data [https://github.com/living/livy-tldv-jobs/pull/8] — via github
+- [2026-04-01] PR #9: feat(web): apply Ocean Glass design system to Meetings Hub [https://github.com/living/livy-tldv-jobs/pull/9] — via github
 ### 2026-03-30 — gw.tldv.io 502 Bad Gateway (Token JWT vs API Issue)
 
 **Decisão:** Investigar o endpoint de unarchive como causa raiz do 502, não o JWT.
 
 **MOTIVO:** A suposição inicial era de token expirado. Análise posterior revelou que o token `TLDV_JWT_TOKEN` expira apenas em 2026-04-29 — ainda válido. O 502 no `gw.tldv.io` indica problema no endpoint de unarchive da API do tl;dv (provavelmente rate limit ou endpoint temporariamente indisponível). Workaround: usar `video_archiver.py` diretamente.
 
-### 2026-03-30 — Whisper via OpenAI API em vez de modelo local
+### 2026-04-03 — Whisper API Migration: faster-whisper → OmniRoute API-first
 
-**Decisão:** Não usar `small` model do Whisper local no srv1405423.
+**Decisão:** Reescrever `whisper_client.py` para usar OmniRoute API (localhost:20128/v1/audio/transcriptions) como backend primário, com faster-whisper como opcional.
 
-**MOTIVO:** VPS tem ~2.3GB RAM livre. Após 4-5 reuniões, o processo é OOMKilled. Solução: usar `enrich_no_whisper.py` (que não transcreve) ou OpenAI Whisper API (cloud, não consome RAM local).
+**MOTIVO:** Local faster-whisper causava OOMKilled no VPS (~2.3GB RAM). Nova arquitetura: `WHISPER_BACKEND=api` (default) → groq/whisper → OpenAI direct fallback. faster-whisper import é `try/except` com flag `_FASTER_WHISPER_AVAILABLE`. Audio extraction usa ffmpeg em vez de pydub. **Branch:** feat/whisper-api-migration.
+
+### 2026-04-03 — LLM Rerank + Moderation Guardrails aprovado
+
+**Decisão:** Implementar reranker via LLM (GPT-4o configurable) e moderation como pré-hook no `step_enrich`.
+
+**MOTIVO:** Qualidade dos resumos variável — reranker melhora seleção de contexto relevante. Moderation impede conteúdo inadequado antes do summarizer. Design aprovado, implementation plan commitado. **Spec:** `docs/superpowers/plans/`.
+
+### 2026-03-30 — Whisper via OpenAI API em vez de modelo local (SUPERSEDED by 2026-04-03)
+
+**Decisão:** ~~Não usar `small` model do Whisper local no srv1405423.~~ → Substituído pela decisão de 2026-04-03 (OmniRoute API-first).
+
+**MOTIVO:** VPS tem ~2.3GB RAM livre. Após 4-5 reuniões, o processo é OOMKilled. Solução final: OmniRoute API com groq provider.
 
 ### 2026-04-01 — AutoResearch como Loop de Melhoria Contínua
 
@@ -159,11 +184,13 @@ hook_pre_enrich → transcript_analyzer (participants + topics + context)
 
 - [ ] **CRÍTICO:** Recriar `livy-meetings-pipeline` cron job (desapareceu)
 - [ ] **CRÍTICO:** Investigar `gw.tldv.io` 502 — usar `video_archiver.py` como workaround
+- [ ] **CRÍTICO:** Configurar OPENAI_API_KEY no OmniRoute (whisper/rerank/moderation precisam)
+- [x] ~~Resolver Whisper RAM~~ — ✅ RESOLVIDO: migrado para OmniRoute API-first (2026-04-03)
 - [ ] Investigar Supabase sync — dados stale desde 2026-03-20
 - [ ] Implementar AutoResearch pipeline (branch `feat/autoresearch-tldv-pipeline`)
-- [ ] Resolver Whisper RAM — migrar para OpenAI Whisper API ou `enrich_no_whisper.py`
+- [ ] Finalizar LLM Rerank + Moderation implementation
 - [ ] Atualizar schema Trello para incluir `trello_card_id`
-- [ ] TLDV token renova em 2026-04-29 — preparar renovação
+- [ ] TLDV token renova em 2026-04-29 — preparar renovação (~25 dias)
 
 ---
 

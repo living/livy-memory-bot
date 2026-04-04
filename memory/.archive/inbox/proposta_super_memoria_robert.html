@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Projeto: Super Memória Corporativa - Living Consultoria</title>
+    <style>
+        :root {
+            --primary: #0f172a;
+            --secondary: #3b82f6;
+            --accent: #10b981;
+            --bg-color: #f8fafc;
+            --card-bg: #ffffff;
+            --text-main: #334155;
+            --text-muted: #64748b;
+            --border: #e2e8f0;
+            --living-blue: #0A2540;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            line-height: 1.6;
+        }
+
+        header {
+            background-color: var(--living-blue);
+            color: white;
+            padding: 4rem 2rem;
+            text-align: center;
+            border-bottom: 5px solid var(--secondary);
+        }
+
+        header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+        }
+
+        header p {
+            font-size: 1.2rem;
+            color: #cbd5e1;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .pitch-box {
+            background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+            border-left: 6px solid var(--secondary);
+            padding: 2rem;
+            border-radius: 0 12px 12px 0;
+            margin: -3rem auto 3rem auto;
+            position: relative;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            max-width: 800px;
+        }
+
+        .pitch-box p {
+            font-size: 1.15rem;
+            color: #1e3a8a;
+            font-style: italic;
+            font-weight: 500;
+        }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            margin-bottom: 3rem;
+        }
+
+        .card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 2rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+            transition: transform 0.2s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+
+        h2 {
+            color: var(--primary);
+            font-size: 1.5rem;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .icon-check { color: var(--accent); font-weight: bold; }
+        .icon-cross { color: #ef4444; font-weight: bold; }
+        .icon-gear { color: var(--secondary); font-weight: bold; }
+
+        ul {
+            list-style: none;
+        }
+
+        li {
+            margin-bottom: 1rem;
+            position: relative;
+            padding-left: 1.5rem;
+        }
+
+        .card.have li::before {
+            content: "✓";
+            color: var(--accent);
+            position: absolute;
+            left: 0;
+            font-weight: bold;
+        }
+
+        .card.need li::before {
+            content: "○";
+            color: #ef4444;
+            position: absolute;
+            left: 0;
+            font-weight: bold;
+        }
+
+        .technology {
+            background-color: var(--card-bg);
+            border-radius: 12px;
+            padding: 3rem;
+            text-align: center;
+            margin-bottom: 3rem;
+            border: 1px solid var(--border);
+        }
+
+        .tech-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1.5rem;
+            margin-top: 2rem;
+        }
+
+        .tech-item {
+            padding: 1.5rem;
+            background: #f1f5f9;
+            border-radius: 8px;
+            text-align: left;
+        }
+
+        .tech-item h4 {
+            color: var(--primary);
+            margin-bottom: 0.5rem;
+        }
+
+        .complexity-section {
+            margin-bottom: 4rem;
+        }
+
+        .timeline-item {
+            border-left: 3px solid var(--secondary);
+            padding: 0 0 2rem 2rem;
+            position: relative;
+        }
+
+        .timeline-item::before {
+            content: "";
+            position: absolute;
+            width: 15px;
+            height: 15px;
+            background: var(--secondary);
+            border-radius: 50%;
+            left: -9px;
+            top: 5px;
+            border: 3px solid white;
+        }
+
+        .timeline-item h3 {
+            margin-bottom: 0.5rem;
+            color: var(--primary);
+        }
+
+        .tag {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 999px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+        }
+
+        .tag-medium { background: #fef3c7; color: #b45309; }
+        .tag-high { background: #fee2e2; color: #b91c1c; }
+
+        footer {
+            text-align: center;
+            padding: 3rem;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            border-top: 1px solid var(--border);
+        }
+
+        @media (max-width: 768px) {
+            .grid-2, .tech-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>Super Memória Corporativa</h1>
+        <p>Omni-Busca Agêntica Integrada: WhatsApp, TLDV e Google Workspace</p>
+    </header>
+
+    <div class="container">
+
+        <div class="pitch-box">
+            <p>"Um grande banco de dados centralizado conectando toda comunicação digital oficial da empresa (Docs, E-mails, WhatsApp e Vídeos). Qualquer membro da equipe pode consultar e relacionar informações ao longo do tempo usando linguagem natural."</p>
+        </div>
+
+        <div class="grid-2">
+            <div class="card have">
+                <h2><span class="icon-check">✓</span> O que já temos rodando</h2>
+                <p style="margin-bottom: 1rem; font-size: 0.9rem; color: var(--text-muted);">Infraestrutura baseada no sistema <em>Livy Memory</em>.</p>
+                <ul>
+                    <li><strong>Integração TLDV:</strong> Atas, decisões, transcrições e tópicos de reuniões indexados automaticamente via Supabase.</li>
+                    <li><strong>Mensageria:</strong> Captura de contexto institucional via WhatsApp e Telegram pelo OpenClaw Gateway.</li>
+                    <li><strong>Curação Automática (Cron):</strong> Pipeline que unifica TLDV, Logs, GitHub e Feedback a cada 4 horas.</li>
+                    <li><strong>Base Semântica (RAG):</strong> Banco vetorial ativo (ChromaDB + OpenAI) com busca híbrida baseada em relevância e tempo.</li>
+                </ul>
+            </div>
+
+            <div class="card need">
+                <h2><span class="icon-cross">○</span> O que falta plugar</h2>
+                <p style="margin-bottom: 1rem; font-size: 0.9rem; color: var(--text-muted);">Gaps para o alcance do ecossistema Google Workspace.</p>
+                <ul>
+                    <li><strong>Acesso ao Workspace:</strong> Conectar a pipeline ao Google Drive, Google Docs e E-mails institucionais (Gmail).</li>
+                    <li><strong>Parsing Avançado:</strong> Capacidade de extrair dados de PDFs estruturados, planilhas (XLSX) e apresentações (PPTX).</li>
+                    <li><strong>Grafo Multimodal:</strong> Capacidade de processar o texto e as imagens contidas nos documentos de forma relacional.</li>
+                    <li><strong>ID Mapping Unificado:</strong> Mapear que o e-mail oficial pertence à mesma pessoa que usa o celular X no WhatsApp.</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="technology">
+            <h2><span class="icon-gear">⚙️</span> Proposta Tecnológica: RAG-Anything</h2>
+            <p style="color: var(--text-muted); max-width: 700px; margin: 0 auto;">Para preencher o gap de leitura do Google Drive e E-mails, propomos a integração da arquitetura <strong>RAG-Anything</strong>, um framework focado em ingestão de arquivos empresariais complexos.</p>
+
+            <div class="tech-grid">
+                <div class="tech-item">
+                    <h4>Multi-Formatos</h4>
+                    <p style="font-size: 0.9rem; color: var(--text-muted);">Lê nativamente DOCX, XLSX, PPTX, e PDFs, extraindo tabelas e texto simultaneamente.</p>
+                </div>
+                <div class="tech-item">
+                    <h4>Vision-Language</h4>
+                    <p style="font-size: 0.9rem; color: var(--text-muted);">Se houver um gráfico de vendas no PPT ou PDF, ele lê e descreve a imagem para indexação vetorial.</p>
+                </div>
+                <div class="tech-item">
+                    <h4>Grafo de Conhecimento</h4>
+                    <p style="font-size: 0.9rem; color: var(--text-muted);">Relaciona entidades de forma não-linear (ex: "O email do X cita a ata de reunião Y que gerou o PDF Z").</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="complexity-section">
+            <h2>Roadmap e Avaliação de Complexidade</h2>
+            <br>
+
+            <div class="timeline-item">
+                <span class="tag tag-medium">Complexidade: Média</span>
+                <h3>1. Autorização Google Workspace</h3>
+                <p>Criação de um projeto no Google Cloud interno da Living, ativando Webhooks e permissão <em>Domain-wide Delegation</em> para a service account do nosso Agente conseguir varrer as caixas postais oficiais e pastas de Drive em background de forma segura e auditável.</p>
+            </div>
+
+            <div class="timeline-item">
+                <span class="tag tag-high">Complexidade: Alta</span>
+                <h3>2. Setup da Engenharia Multimodal</h3>
+                <p>Ferramentas como RAG-Anything usam bibliotecas de OCR pesadas (LibreOffice, MinerU). Isso exigirá escalar as especificações do servidor VPS ou dedicar um contêiner Docker apenas para processar os PDFs pesados sem derrubar o gateway da Livy.</p>
+            </div>
+
+            <div class="timeline-item">
+                <span class="tag tag-medium">Complexidade: Média</span>
+                <h3>3. Cruzamento de Identidades (Identity Mapping)</h3>
+                <p>Criar uma base de resolução de identidades. Precisamos que a IA compreenda que "andre@livingnet.com.br" e o ID do Telegram X são exatamente a mesma entidade ao processar a hierarquia do grafo de relacionamento.</p>
+            </div>
+        </div>
+
+    </div>
+
+    <footer>
+        <p>Documento Gerado pela Livy Deep • Living Consultoria • 2026</p>
+    </footer>
+
+</body>
+</html>

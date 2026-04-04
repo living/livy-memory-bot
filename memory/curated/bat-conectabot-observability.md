@@ -84,6 +84,9 @@ Both: `--session isolated`, `--agent main`, `--exact`, `--no-deliver`
 
 ## Decisões
 
+- [2026-04-02] OpenRouter: plano da Living mantém-se (5 credits obrigatórios, 100 USD) — custo será tratado depois [https://tldv.io/meeting/69cbb73298acd80013fa20ce] — via tldv
+- [2026-04-01] PR #1: docs: PRD e Spec para erros de dependência customizados [https://github.com/living/livy-bat-jobs/pull/1] — via github
+- [2026-04-01] Participar da reunião de arquitetura RetailOud às 10h30 para conhecer diretrizes globais [https://tldv.io/meeting/69b00ec37bc9a50013f30a7c] — via tldv
 ### 2026-03-30 — Sev2 Elevado é Comportamento Esperado do ConectaBot
 
 **Decisão:** Manter monitoramento sem intervir nos jobs.

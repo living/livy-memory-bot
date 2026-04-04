@@ -63,6 +63,11 @@ Tailscale Funnel → pública
 
 ## Decisões Técnicas
 
+- [2026-04-01] PR #4: feat(boiler): simulacao de boiler IoT com NTC, Relay e grafico uPlot (#3) [https://github.com/living/livy-forge-platform/pull/4] — via github
+- [2026-04-01] PR #6: feat(boiler): janela de operação configurável — múltiplas janelas + modo 24h (#5) [https://github.com/living/livy-forge-platform/pull/6] — via github
+- [2026-04-01] PR #10: feat(backend): multi-usuário — project_members + endpoints de memberships (#7) [https://github.com/living/livy-forge-platform/pull/10] — via github
+- [2026-04-01] PR #11: feat(frontend): multi-usuário — share modal + realtime sync (#8) [https://github.com/living/livy-forge-platform/pull/11] — via github
+- [2026-04-01] PR #12: fix(frontend): BoilerStatusCard labels dinâmicos por janelas configuradas (#9) [https://github.com/living/livy-forge-platform/pull/12] — via github
 | Decisão | Escolha | MOTIVO |
 |---|---|---|
 | Tag ESP32 | `wokwi-esp32-devkit-v1` | Simula exatamente o hardware usado |
