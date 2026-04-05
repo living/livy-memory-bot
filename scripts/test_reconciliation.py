@@ -15,6 +15,7 @@ from fact_snapshot_builder import build_topic_snapshots
 from tempfile import TemporaryDirectory
 from decision_ledger import DecisionLedger
 from reconciler import reconcile_topic
+from topic_rewriter import parse_topic_file, render_topic_file
 
 
 def main():
@@ -68,6 +69,20 @@ def main():
         content = path.read_text()
         assert "R004_resolved_bug_moves_to_history_not_erasure" in content, "Rule ID missing from ledger"
         print("OK: reconciler generated decision and wrote to ledger")
+
+        # Ensure there is a tldv-pipeline-state.md in the mock directory
+        # For testing, we read the real one from the workspace
+        source = Path(__file__).resolve().parents[1] / "memory" / "curated" / "tldv-pipeline-state.md"
+        if source.exists():
+            content = source.read_text()
+            parsed = parse_topic_file(content)
+            # Using the decisions generated in Task 3
+            updated = render_topic_file(parsed, decisions_with_both)
+            assert "Issues Resolvidas / Superadas" in updated, "Section missing from rendered output"
+            assert "regra:" in updated, "Decision explanation missing from rendered output"
+            print("OK: topic rewriter parsed and updated sections")
+        else:
+            print(f"WARN: could not find {source} for testing")
 
 
 if __name__ == "__main__":

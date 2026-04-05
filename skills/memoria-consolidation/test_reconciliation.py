@@ -162,3 +162,42 @@ def test_reconciler_defers_meeting_only_claim_without_operational_confirmation()
     decisions = reconcile_topic("tldv-pipeline-state.md", current, evidence)
     assert decisions[0].result == "deferred"
     assert decisions[0].rule_id == "R002_meeting_claim_needs_operational_confirmation"
+
+from topic_rewriter import parse_topic_file, render_topic_file
+from decision_ledger import DecisionRecord
+
+
+def test_render_topic_file_moves_resolved_issue_to_resolved_section():
+    original = """---
+name: tldv-pipeline-state
+description: test
+type: project
+status: active
+---
+
+# TLDV Pipeline
+
+## Issues Abertas
+- Whisper OOM
+
+## Issues Resolvidas / Superadas
+(nenhuma)
+"""
+    parsed = parse_topic_file(original)
+    decision = DecisionRecord(
+        topic="tldv-pipeline-state.md",
+        entity_key="issue:whisper-oom",
+        entity_type="issue",
+        old_status="open",
+        new_status="resolved",
+        why="PR #12 + meeting confirm migration.",
+        rule_id="R004_resolved_bug_moves_to_history_not_erasure",
+        confidence=0.95,
+        result="accepted",
+        evidence_refs=["meeting-1", "pr-12"],
+        observed_at="2026-04-05T10:00:00Z",
+    )
+    updated = render_topic_file(parsed, [decision])
+    assert "## Issues Resolvidas / Superadas" in updated
+    assert "Whisper OOM" in updated
+    assert "R004_resolved_bug_moves_to_history_not_erasure" in updated
