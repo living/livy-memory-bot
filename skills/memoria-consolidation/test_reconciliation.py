@@ -88,3 +88,32 @@ def test_signal_bus_persist_load_roundtrip(tmp_path):
     assert bus2.events[0].source == "tldv"
     assert bus2.events[0].topic_ref == "memory/curated/foo.md"
     assert bus2.events[0].payload["description"] == "x"
+
+
+from evidence_normalizer import normalize_signal_event
+from fact_snapshot_builder import TopicFactSnapshot
+from signal_bus import SignalEvent
+
+
+def test_normalize_signal_event_maps_to_entity_claim():
+    event = SignalEvent(
+        source="logs",
+        priority=2,
+        topic_ref="tldv-pipeline-state.md",
+        signal_type="failure",
+        payload={"description": "gw.tldv.io 502", "evidence": "/tmp/report.json", "confidence": 1.0},
+        origin_id="report-1",
+        origin_url=None,
+    )
+    item = normalize_signal_event(event)
+    assert item.entity_type == "issue"
+    assert item.claim_type == "failure"
+    assert item.topic_ref == "tldv-pipeline-state.md"
+    assert item.evidence_ref == "/tmp/report.json"
+
+
+def test_topic_fact_snapshot_groups_claims_by_entity_key():
+    snapshot = TopicFactSnapshot(topic="tldv-pipeline-state.md")
+    snapshot.add_claim(entity_key="issue:gw-tldv-502", claim_type="failure", source="logs")
+    snapshot.add_claim(entity_key="issue:gw-tldv-502", claim_type="decision", source="tldv")
+    assert set(snapshot.claims_by_entity["issue:gw-tldv-502"]) == {"failure", "decision"}
