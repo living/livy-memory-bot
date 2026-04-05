@@ -6,12 +6,13 @@ Flow:
   1. Generate correlation_id
   2. Collect signals from all sources (TLDV primary)
   3. Group signals by topic_ref
-  4. Analyze each topic file → candidate changes
-  5. Auto-curate (apply when conditions met)
-  6. Persist events to signal-events.jsonl
-  7. Log to memory/logs/curation-{date}.log (JSON Lines)
-  8. Write curation-log.md
-  9. Send Telegram summary
+  4. Persist events to signal-events.jsonl
+  5. Run reconciliation in shadow mode (pilot: tldv-pipeline-state.md)
+  6. Analyze each topic file → candidate changes
+  7. Auto-curate (apply when conditions met)
+  8. Log to memory/logs/curation-{date}.log (JSON Lines)
+  9. Write curation-log.md
+  10. Send Telegram summary
 
 Environment:
   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY — TLDV
@@ -36,6 +37,8 @@ CURATED_DIR = MEMORY_DIR / "curated"
 LOGS_DIR = MEMORY_DIR / "logs"
 SIGNAL_EVENTS_FILE = MEMORY_DIR / "signal-events.jsonl"
 CURATION_LOG_FILE = MEMORY_DIR / "curation-log.md"
+RECONCILIATION_LEDGER_FILE = MEMORY_DIR / "reconciliation-ledger.jsonl"
+RECONCILIATION_REPORT_FILE = MEMORY_DIR / "reconciliation-report.md"
 
 # Ensure directories exist
 LOGS_DIR.mkdir(parents=True, exist_ok=True)
@@ -53,6 +56,11 @@ from topic_analyzer import TopicAnalyzer
 from auto_curator import AutoCurator
 from conflict_detector import ConflictDetector
 from conflict_queue import ConflictQueue
+from evidence_normalizer import normalize_signal_event
+from fact_snapshot_builder import build_topic_snapshots
+from reconciler import reconcile_topic
+from decision_ledger import DecisionLedger
+from topic_rewriter import parse_topic_file
 
 
 def log_structured(level: str, correlation_id: str, component: str, event: str, **kwargs):
@@ -95,6 +103,96 @@ def format_curation_log_entry(correlation_id: str, topic: str, change_type: str,
 **description:** {description}
 **evidence:** {evidence}
 """
+
+
+def run_reconciliation_shadow_mode(correlation_id: str, topic_ref: str, topic_path: Path, events: list) -> dict:
+    """
+    Run the reconciliation pipeline in shadow mode for a single topic.
+    - Normalizes signals into evidence items
+    - Builds a fact snapshot
+    - Reconciles against the topic's current state
+    - Writes decisions to the ledger and a report
+    - Does NOT modify the topic file
+    """
+    if not topic_path.exists():
+        return {"topic": topic_ref, "mode": "shadow", "skipped": True, "reason": "file_not_found"}
+
+    # Normalize all events and build topic snapshots via fact_snapshot_builder
+    all_items = [normalize_signal_event(e) for e in events]
+    all_snapshots = build_topic_snapshots(all_items)
+    snapshot = all_snapshots.get(topic_ref)
+    evidence_items = snapshot.evidence if snapshot else []
+
+    # Build current state from topic file sections
+    content = topic_path.read_text()
+    parsed = parse_topic_file(content)
+
+    open_issues = []
+    resolved_issues = []
+
+    open_section = parsed.sections.get("Issues Abertas", "")
+    if open_section and open_section not in ("(nenhuma)", ""):
+        for line in open_section.split("\n"):
+            line = line.strip()
+            if line.startswith("-"):
+                title = line.lstrip("-").strip().split("—")[0].strip()
+                slug = title.lower().replace(" ", "-").replace(":", "")[:40]
+                open_issues.append({"key": f"issue:{slug}", "title": title, "status": "open"})
+
+    resolved_section = parsed.sections.get("Issues Resolvidas / Superadas", "")
+    if resolved_section and resolved_section not in ("(nenhuma)", ""):
+        for line in resolved_section.split("\n"):
+            line = line.strip()
+            if line.startswith("-"):
+                title = line.lstrip("-").strip().split("—")[0].strip()
+                slug = title.lower().replace(" ", "-").replace(":", "")[:40]
+                resolved_issues.append({"key": f"issue:{slug}", "title": title, "status": "resolved"})
+
+    current_state = {"open_issues": open_issues, "resolved_issues": resolved_issues}
+
+    # Reconcile
+    decisions = reconcile_topic(topic_ref, current_state, evidence_items)
+
+    # Write to ledger
+    if decisions:
+        ledger = DecisionLedger(RECONCILIATION_LEDGER_FILE)
+        ledger.append_many(decisions)
+
+    # Write reconciliation report
+    ts = datetime.now(timezone.utc).isoformat()
+    accepted = [d for d in decisions if d.result == "accepted"]
+    deferred = [d for d in decisions if d.result == "deferred"]
+    causal_completeness = sum(d.confidence for d in decisions) / len(decisions) if decisions else 0.0
+
+    report_lines = [
+        f"# Reconciliation Report — {ts}",
+        f"**correlation_id:** {correlation_id}",
+        f"**topic:** {topic_ref}",
+        f"**mode:** shadow",
+        "",
+        "## Decisions",
+    ]
+    for d in decisions:
+        report_lines.append(f"- `{d.result}` | {d.entity_key} | {d.rule_id} | conf={d.confidence:.2f}")
+
+    report_lines.extend([
+        "",
+        f"**confirmed:** {len(accepted)}",
+        f"**deferred:** {len(deferred)}",
+        f"**causal_completeness:** {causal_completeness:.2f}",
+    ])
+
+    RECONCILIATION_REPORT_FILE.parent.mkdir(parents=True, exist_ok=True)
+    RECONCILIATION_REPORT_FILE.write_text("\n".join(report_lines) + "\n")
+
+    return {
+        "topic": topic_ref,
+        "mode": "shadow",
+        "decisions": len(decisions),
+        "accepted": len(accepted),
+        "deferred": len(deferred),
+        "causal_completeness": round(causal_completeness, 2),
+    }
 
 
 def main():
@@ -175,19 +273,44 @@ def main():
     log_structured("INFO", correlation_id, "signal_bus", "events_collected",
                     total=len(bus.events))
 
+    # Group signals by topic_ref (used by both reconciliation and auto-curate)
+    topics = set(e.topic_ref for e in bus.events if e.topic_ref)
+
     # ── 2. Persist signals to JSONL ──────────────────────────────────────
-    bus.persist(SIGNAL_EVENTS_FILE)
+    bus.persist(SIGNAL_EVENTS_FILE, mode="append")
     log_structured("INFO", correlation_id, "signal_bus", "events_persisted",
                     path=str(SIGNAL_EVENTS_FILE), count=len(bus.events))
 
-    # ── 3. Analyze + Auto-curate per topic ───────────────────────────────
+    # ── 3. Run reconciliation in shadow mode (TLDV pilot only) ─────────────
+    reconciliation_topics = {"tldv-pipeline-state.md"}
+    reconciliation_results = []
+
+    for topic_ref in topics:
+        if topic_ref not in reconciliation_topics:
+            continue
+
+        topic_path = curated_dir / topic_ref
+        result = run_reconciliation_shadow_mode(
+            correlation_id=correlation_id,
+            topic_ref=topic_ref,
+            topic_path=topic_path,
+            events=bus.events,
+        )
+        reconciliation_results.append(result)
+        log_structured("INFO", correlation_id, "reconciliation", "shadow_run_complete",
+                        topic=topic_ref, mode="shadow", **result)
+
+    if reconciliation_results:
+        log_structured("INFO", correlation_id, "reconciliation", "pilot_complete",
+                       topics=len(reconciliation_results))
+
+    # ── 4. Analyze + Auto-curate per topic ───────────────────────────────
     analyzer = TopicAnalyzer()
     curator = AutoCurator()
     curation_log_lines = []
     applied_count = 0
 
     # Group signals by topic
-    topics = set(e.topic_ref for e in bus.events if e.topic_ref)
     for topic_ref in topics:
         topic_path = curated_dir / topic_ref
         if not topic_path.exists():
@@ -224,12 +347,12 @@ def main():
                     )
                 )
 
-    # ── 4. Write curation log ───────────────────────────────────────────
+    # ── 5. Write curation log ───────────────────────────────────────────
     if curation_log_lines:
         with CURATION_LOG_FILE.open("a") as f:
             f.write("\n".join(curation_log_lines) + "\n")
 
-    # ── 5. Send Telegram summary ─────────────────────────────────────────
+    # ── 6. Send Telegram summary ─────────────────────────────────────────
     ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     summary = f"""🧠 *Signal Curation — {ts}*
 

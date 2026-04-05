@@ -87,3 +87,42 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+# ── Shadow mode integration test ─────────────────────────────────────────────
+
+def test_shadow_mode_reconciliation_runs_without_error():
+    """Verify run_reconciliation_shadow_mode executes end-to-end without touching topic files."""
+    from curation_cron import run_reconciliation_shadow_mode
+    from tempfile import TemporaryDirectory
+    from pathlib import Path as P
+
+    with TemporaryDirectory() as tmp:
+        fake_topic = P(tmp) / "test-topic.md"
+        fake_topic.write_text("""---
+name: test
+---
+# Test Topic
+
+## Issues Abertas
+- Whisper OOM
+
+## Issues Resolvidas / Superadas
+(nenhuma)
+""")
+        result = run_reconciliation_shadow_mode(
+            correlation_id="test-001",
+            topic_ref="test-topic.md",
+            topic_path=fake_topic,
+            events=[],  # no evidence → no decisions
+        )
+
+        assert result["mode"] == "shadow"
+        assert result["decisions"] == 0
+        assert not result.get("skipped")
+        print("OK: shadow mode reconciliation runs without error")
+
+
+if __name__ == "__main__":
+    main()
+    test_shadow_mode_reconciliation_runs_without_error()
