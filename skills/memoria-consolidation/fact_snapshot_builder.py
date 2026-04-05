@@ -17,7 +17,7 @@ class TopicFactSnapshot:
         self.evidence.append(item)
         self.claims_by_entity[item.entity_key].append(item.claim_type)
 
-    def add_claim(self, entity_key: str, claim_type: str, source: str) -> None:
+    def add_claim(self, entity_key: str, claim_type: str) -> None:
         self.claims_by_entity[entity_key].append(claim_type)
 
 

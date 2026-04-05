@@ -110,10 +110,27 @@ def test_normalize_signal_event_maps_to_entity_claim():
     assert item.claim_type == "failure"
     assert item.topic_ref == "tldv-pipeline-state.md"
     assert item.evidence_ref == "/tmp/report.json"
+    assert item.entity_key == "issue:gw.tldv.io-502"
+    assert item.confidence == 1.0
+
+
+def test_normalize_signal_event_empty_payload():
+    event = SignalEvent(
+        source="logs",
+        priority=2,
+        topic_ref="tldv-pipeline-state.md",
+        signal_type="failure",
+        payload={},
+        origin_id="report-1",
+        origin_url=None,
+    )
+    item = normalize_signal_event(event)
+    assert item.entity_key == "issue:report-1"
+    assert item.confidence == 0.0
 
 
 def test_topic_fact_snapshot_groups_claims_by_entity_key():
     snapshot = TopicFactSnapshot(topic="tldv-pipeline-state.md")
-    snapshot.add_claim(entity_key="issue:gw-tldv-502", claim_type="failure", source="logs")
-    snapshot.add_claim(entity_key="issue:gw-tldv-502", claim_type="decision", source="tldv")
+    snapshot.add_claim(entity_key="issue:gw-tldv-502", claim_type="failure")
+    snapshot.add_claim(entity_key="issue:gw-tldv-502", claim_type="decision")
     assert set(snapshot.claims_by_entity["issue:gw-tldv-502"]) == {"failure", "decision"}

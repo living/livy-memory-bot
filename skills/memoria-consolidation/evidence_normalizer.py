@@ -20,7 +20,8 @@ class EvidenceItem:
 
 
 def normalize_signal_event(event: SignalEvent) -> EvidenceItem:
-    desc = (event.payload.get("description") or "").lower()
+    payload = event.payload or {}
+    desc = (payload.get("description") or "").lower()
     entity_type = "issue" if event.signal_type in {"failure", "correction"} else "decision"
     slug = desc.replace(" ", "-")[:60] or event.origin_id.lower()
     return EvidenceItem(
@@ -29,8 +30,8 @@ def normalize_signal_event(event: SignalEvent) -> EvidenceItem:
         entity_key=f"{entity_type}:{slug}",
         claim_type=event.signal_type,
         source=event.source,
-        confidence=float(event.payload.get("confidence") or 0.0),
-        evidence_ref=event.payload.get("evidence"),
+        confidence=float(payload.get("confidence") or 0.0),
+        evidence_ref=payload.get("evidence"),
         origin_id=event.origin_id,
         observed_at=event.collected_at,
     )
