@@ -159,6 +159,42 @@ Editar `~/.openclaw/cron/jobs.json` diretamente — `openclaw cron add` é basea
 
 Para implementar planos com múltiplas tarefas, usar `EnterWorktree` + agente por tarefa + review em duas fases (spec compliance + code quality).
 
+## Reconciliation Pipeline (Shadow/Write Mode)
+
+The reconciliation pipeline lives in `skills/memoria-consolidation/` and reconciles
+topic files against concrete evidence sources (TLDV, GitHub, logs, feedback).
+
+**Files:** evidence_normalizer.py → fact_snapshot_builder.py → reconciler.py →
+decision_ledger.py → topic_rewriter.py
+**Script:** `skills/memoria-consolidation/curation_cron.py`
+**Outputs:** `memory/reconciliation-ledger.jsonl`, `memory/reconciliation-report.md`
+
+**Shadow mode (default):** runs reconciliation end-to-end but does not modify topic files.
+**Write mode:** guarded by `RECONCILIATION_WRITE_MODE=1` — archives to `memory/.archive/YYYYMMDDHHMM/`
+then uses atomic `.tmp → replace` pattern. Only `tldv-pipeline-state.md` is in scope for the pilot.
+
+### Running tests in skills/memoria-consolidation
+
+Unit tests: `cd skills/memoria-consolidation && python3 -m pytest test_reconciliation.py -q`
+Functional scripts: `cd <worktree-root> && python3 scripts/test_reconciliation.py`
+Security tests: `cd <worktree-root> && python3 scripts/test_security.py`
+
+Hyphenated module names (e.g. `memoria-consolidation`) cannot be used in Python import paths.
+Scripts in `scripts/` must use `sys.path.insert(0, ...)` to import from the skills directory.
+
+### Decision ledger is append-only (audit log)
+
+`DecisionLedger` writes to `memory/reconciliation-ledger.jsonl` — this is an append-only audit trail.
+`deduplicate_records()` only removes same-run duplicates by (entity_key, rule_id).
+Do NOT deduplicate across runs — each decision records WHEN it was made.
+Downstream consumers needing "current state" should query the most recent entry per entity.
+
+### Known pre-existing test failure
+
+`test_embedding_cache_has_ttl` in `scripts/test_security.py` fails with
+`AttributeError: module 'search' has no attribute 'EMBEDDING_CACHE'` — this is a pre-existing
+bug in the meetings-tldv skill. Ignore it when running test_security.py.
+
 ## meetings-tldv Skill
 
 - **Skill:** `skills/meetings-tldv/` — queries Supabase TLDV (meeting_memories table)

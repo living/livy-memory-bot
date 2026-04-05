@@ -16,7 +16,17 @@ description: ...` — without it, `openclaw skills list` won't show the skill.
 2. **[2026-04-01] Supabase TLDV: `meetings` + `summaries`, NOT `meeting_memories`**
    Do instead: query `meetings` (name, created_at, enrichment_context) + `summaries` (topics, decisions) — `meeting_memories` is a secondary vector store with only short summaries. Wrong table = no data.
 
-4. **[2026-04-01] Three test suites exist — run all after any change**
+3. **[2026-04-05] Subagent-driven worktree: run pytest from inside skills dir**
+   Do instead: `cd skills/memoria-consolidation && python3 -m pytest test_reconciliation.py -q`
+   — running from worktree root fails with ModuleNotFoundError because Python can't find the hyphenated module.
+
+4. **[2026-04-05] Always clean untracked test artifacts before finalizing PR**
+   Do instead: check `git status --short` for stray `a.txt`, `memory/reconciliation-report.md` etc. and `rm` them before push.
+
+5. **[2026-04-05] Two-phase review loop: spec compliance THEN code quality**
+   Do instead: never start code quality review until spec compliance is ✅ — review findings differ in nature and order matters.
+
+6. **[2026-04-01] Three test suites exist — run all after any change**
    Do instead: `python3 skills/X/test_X.py && python3 scripts/test_X.py && python3 scripts/test_security.py` — all three must pass before commit.
 
 5. **[2026-04-01] Token/secrets: fail-fast with ValueError**
