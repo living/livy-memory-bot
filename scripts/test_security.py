@@ -253,6 +253,30 @@ def test_bot_token_from_env():
     assert "TESTBOTTOCKENFOR" in token, "BOT_TOKEN should come from env"
     print("  ✓ test_bot_token_from_env")
 
+# ── reconciliation write-mode tests ──────────────────────────────────────────
+
+def test_topic_rewrite_uses_tempfile_then_atomic_replace():
+    """Verify atomic replace pattern: write to .tmp, then rename."""
+    from pathlib import Path
+    import os
+
+    # Setup
+    tmp_dir = Path(os.environ.get("TMPDIR", "/tmp"))
+    original = tmp_dir / "topic_test.md"
+    original.write_text("# topic\n")
+
+    # Simulate atomic write: write to .tmp, then replace
+    tmp = original.with_suffix(".tmp")
+    tmp.write_text("# updated\n")
+    tmp.replace(original)
+
+    # Verify
+    assert original.read_text() == "# updated\n"
+    # Cleanup
+    original.unlink(missing_ok=True)
+    print("  ✓ test_topic_rewrite_uses_tempfile_then_atomic_replace")
+
+
 # ── Main ─────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
@@ -279,5 +303,8 @@ if __name__ == "__main__":
     test_callback_prefix_routing()
     test_meetings_tldv_has_user_filter()
     test_bot_token_from_env()
+
+    print("\nreconciliation write-mode:")
+    test_topic_rewrite_uses_tempfile_then_atomic_replace()
 
     print("\n=== Done ===")

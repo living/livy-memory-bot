@@ -70,6 +70,11 @@ def main():
         assert "R004_resolved_bug_moves_to_history_not_erasure" in content, "Rule ID missing from ledger"
         print("OK: reconciler generated decision and wrote to ledger")
 
+        # Test that apply_reconciliation_write_mode respects the guard
+        from curation_cron import RECONCILIATION_WRITE_MODE
+        assert RECONCILIATION_WRITE_MODE == False, "RECONCILIATION_WRITE_MODE should be False by default"
+        print("OK: write mode guard is correctly disabled by default")
+
         # Ensure there is a tldv-pipeline-state.md in the mock directory
         # For testing, we read the real one from the workspace
         source = Path(__file__).resolve().parents[1] / "memory" / "curated" / "tldv-pipeline-state.md"

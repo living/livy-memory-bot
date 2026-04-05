@@ -7,17 +7,18 @@ Flow:
   2. Collect signals from all sources (TLDV primary)
   3. Group signals by topic_ref
   4. Persist events to signal-events.jsonl
-  5. Run reconciliation in shadow mode (pilot: tldv-pipeline-state.md)
+  5. Reconciliation (shadow or write mode, TLDV pilot)
   6. Analyze each topic file → candidate changes
   7. Auto-curate (apply when conditions met)
   8. Log to memory/logs/curation-{date}.log (JSON Lines)
-  9. Write curation-log.md
+  9. Write curation log
   10. Send Telegram summary
 
 Environment:
   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY — TLDV
   TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID — notifications
   CURATED_DIR — path to memory/curated/ (default: same dir as script)
+  RECONCILIATION_WRITE_MODE — set to "1" to promote TLDV pilot to write mode
 """
 import json, logging, sys, uuid
 from datetime import datetime, timezone
@@ -61,6 +62,8 @@ from fact_snapshot_builder import build_topic_snapshots
 from reconciler import reconcile_topic
 from decision_ledger import DecisionLedger
 from topic_rewriter import parse_topic_file
+
+RECONCILIATION_WRITE_MODE = os.environ.get("RECONCILIATION_WRITE_MODE", "0") == "1"
 
 
 def log_structured(level: str, correlation_id: str, component: str, event: str, **kwargs):
@@ -185,6 +188,22 @@ def run_reconciliation_shadow_mode(correlation_id: str, topic_ref: str, topic_pa
     RECONCILIATION_REPORT_FILE.parent.mkdir(parents=True, exist_ok=True)
     RECONCILIATION_REPORT_FILE.write_text("\n".join(report_lines) + "\n")
 
+    # Write mode: actually update the topic file
+    if RECONCILIATION_WRITE_MODE and decisions:
+        from topic_rewriter import render_topic_file as _render
+
+        # Re-normalize to build snapshots for rendering
+        all_items = [normalize_signal_event(e) for e in events]
+        all_snapshots = build_topic_snapshots(all_items)
+        snapshot = all_snapshots.get(topic_ref)
+        evidence_items = snapshot.evidence if snapshot else []
+
+        # Only apply accepted decisions
+        accepted_decisions = [d for d in decisions if d.result == "accepted"]
+        if accepted_decisions:
+            rendered = _render(parsed, accepted_decisions)
+            apply_reconciliation_write_mode(topic_path, rendered)
+
     return {
         "topic": topic_ref,
         "mode": "shadow",
@@ -193,6 +212,30 @@ def run_reconciliation_shadow_mode(correlation_id: str, topic_ref: str, topic_pa
         "deferred": len(deferred),
         "causal_completeness": round(causal_completeness, 2),
     }
+
+
+def apply_reconciliation_write_mode(topic_path: Path, rendered_content: str) -> None:
+    """
+    Safely write reconciled content to a topic file using atomic replace.
+    1. Archive current version to memory/.archive/YYYYMMDDHHMM/
+    2. Write to topic_path.tmp
+    3. Atomically replace original
+    """
+    from datetime import datetime, timezone
+
+    if not RECONCILIATION_WRITE_MODE:
+        return  # Guard: do nothing unless write mode is explicitly enabled
+
+    # Archive
+    archive_dir = MEMORY_DIR / ".archive" / datetime.now(timezone.utc).strftime("%Y%m%d%H%M")
+    archive_dir.mkdir(parents=True, exist_ok=True)
+    archived = archive_dir / topic_path.name
+    archived.write_text(topic_path.read_text())
+
+    # Atomic replace
+    temp_path = topic_path.with_suffix(".tmp")
+    temp_path.write_text(rendered_content)
+    temp_path.replace(topic_path)
 
 
 def main():
