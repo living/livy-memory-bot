@@ -134,3 +134,31 @@ def test_topic_fact_snapshot_groups_claims_by_entity_key():
     snapshot.add_claim(entity_key="issue:gw-tldv-502", claim_type="failure")
     snapshot.add_claim(entity_key="issue:gw-tldv-502", claim_type="decision")
     assert set(snapshot.claims_by_entity["issue:gw-tldv-502"]) == {"failure", "decision"}
+
+from reconciler import reconcile_topic
+from evidence_normalizer import EvidenceItem
+
+
+def test_reconciler_marks_issue_resolved_when_context_and_concrete_evidence_agree():
+    current = {
+        "open_issues": [{"key": "issue:whisper-oom", "title": "Whisper OOM", "status": "open"}],
+        "resolved_issues": [],
+    }
+    evidence = [
+        EvidenceItem("tldv-pipeline-state.md", "issue", "issue:whisper-oom", "decision", "tldv", 0.9, "meeting-1", "meeting-1", "2026-04-05T10:00:00Z"),
+        EvidenceItem("tldv-pipeline-state.md", "issue", "issue:whisper-oom", "decision", "github", 0.8, "pr-12", "PR#12", "2026-04-05T10:01:00Z"),
+    ]
+    decisions = reconcile_topic("tldv-pipeline-state.md", current, evidence)
+    assert decisions[0].result == "accepted"
+    assert decisions[0].new_status == "resolved"
+    assert decisions[0].rule_id == "R004_resolved_bug_moves_to_history_not_erasure"
+
+
+def test_reconciler_defers_meeting_only_claim_without_operational_confirmation():
+    current = {"open_issues": [{"key": "issue:cron-missing", "title": "Cron missing", "status": "open"}], "resolved_issues": []}
+    evidence = [
+        EvidenceItem("tldv-pipeline-state.md", "issue", "issue:cron-missing", "decision", "tldv", 0.9, "meeting-2", "meeting-2", "2026-04-05T10:00:00Z"),
+    ]
+    decisions = reconcile_topic("tldv-pipeline-state.md", current, evidence)
+    assert decisions[0].result == "deferred"
+    assert decisions[0].rule_id == "R002_meeting_claim_needs_operational_confirmation"
