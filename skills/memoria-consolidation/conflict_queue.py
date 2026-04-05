@@ -10,7 +10,7 @@ from pathlib import Path
 from conflict_detector import Conflict
 
 
-CONFLICT_QUEUE_FILE = Path(__file__).resolve().parents[1] / "memory" / "conflict-queue.md"
+CONFLICT_QUEUE_FILE = Path(__file__).resolve().parents[2] / "memory" / "conflict-queue.md"
 
 
 class ConflictQueue:
@@ -73,12 +73,12 @@ class ConflictQueue:
         if not self.queue_file.exists():
             return []
         content = self.queue_file.read_text()
-        entries = re.findall(r"(CONFLITO-\d+)[^#]*(?=## CONFLITO-|$)", content, re.DOTALL)
+        entries = re.findall(r"(## CONFLITO-\d+.*?)(?=\n## CONFLITO-|$)", content, re.DOTALL)
         results = []
         for entry in entries:
-            cid = re.search(r"(CONFLITO-\d+)", entry)
-            topic = re.search(r"·\s+(.+\.md)", entry)
-            status = re.search(r"\*\*Status:\*\*\s+(\w+)", entry)
+            cid = re.search(r"##\s+(CONFLITO-\d+)", entry)
+            topic = re.search(r"##\s+CONFLITO-\d+\s+·\s+(.+)", entry)
+            status = re.search(r"\*\*Status:\*\*\s+([^\n]+)", entry)
             if cid:
                 results.append({
                     "id": cid.group(1),

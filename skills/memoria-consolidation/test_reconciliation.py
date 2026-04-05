@@ -1,0 +1,90 @@
+#!/usr/bin/env python3
+from pathlib import Path
+import sys
+
+
+HERE = Path(__file__).resolve().parent
+if str(HERE) not in sys.path:
+    sys.path.insert(0, str(HERE))
+
+from conflict_queue import CONFLICT_QUEUE_FILE, ConflictQueue
+from signal_bus import SignalBus, SignalEvent
+
+
+def test_signal_bus_persist_append_mode_preserves_existing_lines(tmp_path):
+    path = tmp_path / "signal-events.jsonl"
+    existing = '{"event_id":"existing"}\n'
+    path.write_text(existing)
+
+    bus = SignalBus()
+    bus.emit(
+        SignalEvent(
+            source="logs",
+            priority=2,
+            signal_type="failure",
+            origin_id="log-1",
+            payload={"description": "new event"},
+        )
+    )
+
+    bus.persist(path, mode="append")
+
+    lines = path.read_text().splitlines()
+    assert len(lines) == 2
+    assert lines[0] == existing.strip()
+    assert "new event" in lines[1]
+
+
+def test_conflict_queue_default_file_points_to_workspace_memory():
+    from conflict_queue import CONFLICT_QUEUE_FILE
+    assert CONFLICT_QUEUE_FILE.name == "conflict-queue.md"
+    assert CONFLICT_QUEUE_FILE.parent.name == "memory"
+    assert CONFLICT_QUEUE_FILE.parents[1].name not in ("skills", "memoria-consolidation")
+
+
+def test_conflict_queue_list_pending_parses_topic_and_status(tmp_path):
+    queue_file = tmp_path / "conflict-queue.md"
+    queue_file.write_text(
+        "# Conflict Queue — 2026-04-05\n\n"
+        "## CONFLITO-001 · memory/curated/topic-a.md\n"
+        "**Detectado:** 2026-04-05 10:00 UTC\n"
+        "**Status:** AWAITING_REVIEW\n"
+        "**Resolução Lincoln:** ___________________________\n\n"
+        "## CONFLITO-002 · memory/curated/topic-b.md\n"
+        "**Detectado:** 2026-04-05 11:00 UTC\n"
+        "**Status:** RESOLVED\n"
+        "**Resolução Lincoln:** revisado\n"
+    )
+
+    queue = ConflictQueue(queue_file=queue_file)
+
+    assert queue.list_pending() == [
+        {
+            "id": "CONFLITO-001",
+            "topic": "memory/curated/topic-a.md",
+            "status": "AWAITING_REVIEW",
+        },
+        {
+            "id": "CONFLITO-002",
+            "topic": "memory/curated/topic-b.md",
+            "status": "RESOLVED",
+        },
+    ]
+
+
+def test_signal_bus_persist_load_roundtrip(tmp_path):
+    from signal_bus import SignalBus, SignalEvent
+    from pathlib import Path
+    path = tmp_path / "events.jsonl"
+    bus = SignalBus()
+    bus.emit(SignalEvent(
+        source="tldv", priority=1, signal_type="decision", origin_id="t-1",
+        topic_ref="memory/curated/foo.md", payload={"description": "x"}
+    ))
+    bus.persist(path)
+    bus2 = SignalBus()
+    bus2.load(path)
+    assert len(bus2.events) == 1
+    assert bus2.events[0].source == "tldv"
+    assert bus2.events[0].topic_ref == "memory/curated/foo.md"
+    assert bus2.events[0].payload["description"] == "x"
