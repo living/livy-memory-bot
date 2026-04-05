@@ -23,7 +23,11 @@ def normalize_signal_event(event: SignalEvent) -> EvidenceItem:
     payload = event.payload or {}
     desc = (payload.get("description") or "").lower()
     entity_type = "issue" if event.signal_type in {"failure", "correction"} else "decision"
-    slug = desc.replace(" ", "-")[:60] or event.origin_id.lower()
+    slug = desc.replace(" ", "-")
+    if len(slug) > 50:
+        slug = f"{slug[:50]}-{abs(hash(desc) % 10000):04d}"
+    else:
+        slug = slug or event.origin_id.lower()
     return EvidenceItem(
         topic_ref=event.topic_ref,
         entity_type=entity_type,

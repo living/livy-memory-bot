@@ -201,3 +201,4 @@ status: active
     assert "## Issues Resolvidas / Superadas" in updated
     assert "Whisper OOM" in updated
     assert "R004_resolved_bug_moves_to_history_not_erasure" in updated
+    assert "Whisper OOM" not in updated.split("## Issues Abertas")[1].split("## ")[0]

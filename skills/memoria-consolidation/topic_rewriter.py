@@ -59,12 +59,26 @@ def render_topic_file(parsed: ParsedTopic, decisions: list[DecisionRecord]) -> s
     parsed.sections["Issues Abertas"] = open_section.strip() or "(nenhuma)"
     parsed.sections["Issues Resolvidas / Superadas"] = resolved_section.strip()
     
+    SECTION_ORDER = [
+        "Status Atual",
+        "Estado Operacional",
+        "Issues Abertas",
+        "Issues Resolvidas / Superadas",
+        "Decisões Históricas",
+        "Conflitos / Aguardando Confirmação",
+    ]
+
     ordered = [
         parsed.frontmatter.strip(),
         parsed.title,
         "",
     ]
+    for name in SECTION_ORDER:
+        if name in parsed.sections:
+            ordered.extend([f"## {name}", parsed.sections[name], ""])
+    # Append any sections not in SECTION_ORDER (future-proofing)
     for name, value in parsed.sections.items():
-        ordered.extend([f"## {name}", value, ""])
+        if name not in SECTION_ORDER:
+            ordered.extend([f"## {name}", value, ""])
         
     return "\n".join(part for part in ordered if part is not None).strip() + "\n"
