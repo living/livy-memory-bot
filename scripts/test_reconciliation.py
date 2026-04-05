@@ -131,3 +131,14 @@ name: test
 if __name__ == "__main__":
     main()
     test_shadow_mode_reconciliation_runs_without_error()
+
+    # Verify reconciliation report was written with all required fields
+    report = Path(__file__).resolve().parents[1] / "memory" / "reconciliation-report.md"
+    if report.exists():
+        report_text = report.read_text()
+        required_fields = ["confirmed:", "deferred:", "causal_completeness:"]
+        for field in required_fields:
+            assert field in report_text, f"Report missing required field: {field}"
+        print("OK: reconciliation report contains all required fields")
+    else:
+        print("WARN: reconciliation-report.md not found (may not have been generated in this run)")

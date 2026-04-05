@@ -277,6 +277,51 @@ def test_topic_rewrite_uses_tempfile_then_atomic_replace():
     print("  ✓ test_topic_rewrite_uses_tempfile_then_atomic_replace")
 
 
+def test_decision_ledger_deduplicates_same_entity_and_rule():
+    """Verify DecisionLedger deduplicates records with same entity_key + rule_id."""
+    import sys
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "skills" / "memoria-consolidation"))
+    from decision_ledger import DecisionLedger, DecisionRecord
+    from tempfile import TemporaryDirectory
+
+    with TemporaryDirectory() as tmp:
+        path = Path(tmp) / "ledger.jsonl"
+        ledger = DecisionLedger(path)
+
+        record1 = DecisionRecord(
+            topic="tldv-pipeline-state.md",
+            entity_key="issue:whisper-oom",
+            entity_type="issue",
+            old_status="open",
+            new_status="resolved",
+            why="Test",
+            rule_id="R004",
+            confidence=0.9,
+            result="accepted",
+            evidence_refs=["pr-1"],
+            observed_at="2026-04-05T10:00:00Z",
+        )
+        record2 = DecisionRecord(
+            topic="tldv-pipeline-state.md",
+            entity_key="issue:whisper-oom",
+            entity_type="issue",
+            old_status="open",
+            new_status="resolved",
+            why="Test",
+            rule_id="R004",
+            confidence=0.9,
+            result="accepted",
+            evidence_refs=["pr-2"],
+            observed_at="2026-04-05T10:01:00Z",
+        )
+
+        ledger.append_many([record1, record2])
+
+        lines = path.read_text().splitlines()
+        assert len(lines) == 1, f"Expected 1 record after dedup, got {len(lines)}"
+        print("  ✓ test_decision_ledger_deduplicates_same_entity_and_rule")
+
+
 # ── Main ─────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":

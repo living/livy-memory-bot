@@ -178,11 +178,17 @@ def run_reconciliation_shadow_mode(correlation_id: str, topic_ref: str, topic_pa
     for d in decisions:
         report_lines.append(f"- `{d.result}` | {d.entity_key} | {d.rule_id} | conf={d.confidence:.2f}")
 
+    conflict_count = len([d for d in decisions if d.result == "conflict"])
+    freshness_checked = "tldv-pipeline-state.md"  # This pilot
+
     report_lines.extend([
         "",
         f"**confirmed:** {len(accepted)}",
         f"**deferred:** {len(deferred)}",
+        f"**conflicts:** {conflict_count}",
         f"**causal_completeness:** {causal_completeness:.2f}",
+        f"**freshness_checked_topics:** {freshness_checked}",
+        f"**run_mode:** shadow" if not RECONCILIATION_WRITE_MODE else f"**run_mode:** write",
     ])
 
     RECONCILIATION_REPORT_FILE.parent.mkdir(parents=True, exist_ok=True)
