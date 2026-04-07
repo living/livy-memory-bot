@@ -190,11 +190,14 @@ then uses atomic `.tmp → replace` pattern. Only `tldv-pipeline-state.md` is in
 to prevent cross-run duplicates (entity_key + rule_id). Downstream consumers needing "current state"
 should query the most recent entry per entity.
 
-### Known pre-existing test failure
+### test_security.py compatibility
 
-`test_embedding_cache_has_ttl` in `scripts/test_security.py` fails with
-`AttributeError: module 'search' has no attribute 'EMBEDDING_CACHE'` — this is a pre-existing
-bug in the meetings-tldv skill. Ignore it when running test_security.py.
+When copying tests between worktrees, verify the API signatures match the target worktree's code:
+- `EMBEDDING_CACHE` exists only in `signal-cross-curation`, not in `memory-reconciliation`
+- `format_result(meetings, summaries, mode, query)` vs old `(rows, mode, query, similarity)`
+- `infer_mode(question, meeting_id)` vs old `(question)` — always pass both args
+- `get_headers()` not `get_supabase_headers()`
+- default `infer_mode` mode is `"keyword"`, not `"semantic"`
 
 ## meetings-tldv Skill
 
