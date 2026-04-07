@@ -212,3 +212,12 @@ When copying tests between worktrees, verify the API signatures match the target
 - **Token security:** os.getenv() with fail-fast — never hardcode tokens or secrets
 - **Time-bounded cache:** use dict with (value, timestamp) — lru_cache has no TTL enforcement
 - **Test suites:** skills/X/test_X.py (unit) + scripts/test_X.py (functional) + scripts/test_security.py (security) — run all three after changes
+
+### test_security.py compatibility
+
+When copying tests between worktrees, verify the API signatures match the target worktree's code:
+- `EMBEDDING_CACHE` exists only in `signal-cross-curation`, not in `memory-reconciliation`
+- `format_result(meetings, summaries, mode, query)` vs old `(rows, mode, query, similarity)`
+- `infer_mode(question, meeting_id)` vs old `(question)` — always pass both args
+- `get_headers()` not `get_supabase_headers()`
+- default `infer_mode` mode is `"keyword"`, not `"semantic"`

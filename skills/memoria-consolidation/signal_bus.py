@@ -65,10 +65,11 @@ class SignalBus:
         """Alias for get_by_topic for semantic clarity in analyzers."""
         return self.get_by_topic(topic_ref)
 
-    def persist(self, path: Path) -> None:
+    def persist(self, path: Path, mode: str = "write") -> None:
         """Write all events as JSON Lines."""
         path.parent.mkdir(parents=True, exist_ok=True)
-        with path.open("w") as f:
+        file_mode = "a" if mode == "append" else "w"
+        with path.open(file_mode) as f:
             for e in self.events:
                 f.write(e.model_dump_json() + "\n")
 
