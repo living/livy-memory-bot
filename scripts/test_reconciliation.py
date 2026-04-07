@@ -43,58 +43,49 @@ def main():
 
     with TemporaryDirectory() as tmp:
         path = Path(tmp) / "ledger.jsonl"
-        decisions = reconcile_topic(
-            "tldv-pipeline-state.md",
-            {"open_issues": [{"key": item.entity_key, "title": "Whisper OOM", "status": "open"}], "resolved_issues": []},
-            [item],
-        )
-        DecisionLedger(path).append_many(decisions)
 
-        # The reconciler rules check for "tldv" combined with "github"/"logs" or "tldv" alone.
-        # Since our mock item only has "github", no decisions will be generated right now.
-        # Let's add a tldv event to trigger the rule:
+        # Add a TLDV event so R004 fires (tldv + github confirms issue resolved)
         tldv_item = normalize_signal_event(SignalEvent(
-            source="tldv", priority=2, topic_ref="tldv-pipeline-state.md", signal_type="decision",
-            payload={"description": "PR #12 migrate whisper", "evidence": "meeting-1"}, origin_id="mtg1"
+            source="tldv", priority=2, topic_ref="tldv-pipeline-state.md",
+            signal_type="decision",
+            payload={"description": "PR #12 migrate whisper", "evidence": "meeting-1"},
+            origin_id="mtg1",
         ))
 
-        decisions_with_both = reconcile_topic(
+        # Build state using the same slugification as curation_cron.py
+        state_key = f"decision:{item.entity_key.split(':')[1]}"
+        decisions = reconcile_topic(
             "tldv-pipeline-state.md",
-            {"open_issues": [{"key": item.entity_key, "title": "Whisper OOM", "status": "open"}], "resolved_issues": []},
+            {
+                "open_issues": [{"key": state_key, "title": "Whisper OOM", "status": "open"}],
+                "resolved_issues": [],
+            },
             [item, tldv_item],
         )
-        DecisionLedger(path).append_many(decisions_with_both)
-        assert path.exists(), "Decision ledger file was not created"
+        assert len(decisions) > 0, "Reconciler should produce at least one decision with tldv+github evidence"
+        DecisionLedger(path).append_many(decisions)
 
         content = path.read_text()
         assert "R004_resolved_bug_moves_to_history_not_erasure" in content, "Rule ID missing from ledger"
         print("OK: reconciler generated decision and wrote to ledger")
 
-        # Test that apply_reconciliation_write_mode respects the guard
+        # Test write mode guard
         from curation_cron import RECONCILIATION_WRITE_MODE
         assert RECONCILIATION_WRITE_MODE == False, "RECONCILIATION_WRITE_MODE should be False by default"
         print("OK: write mode guard is correctly disabled by default")
 
-        # Ensure there is a tldv-pipeline-state.md in the mock directory
-        # For testing, we read the real one from the workspace
+        # Test render against real topic file
         source = Path(__file__).resolve().parents[1] / "memory" / "curated" / "tldv-pipeline-state.md"
         if source.exists():
             content = source.read_text()
             parsed = parse_topic_file(content)
-            # Using the decisions generated in Task 3
-            updated = render_topic_file(parsed, decisions_with_both)
+            updated = render_topic_file(parsed, decisions)
             assert "Issues Resolvidas / Superadas" in updated, "Section missing from rendered output"
             assert "regra:" in updated, "Decision explanation missing from rendered output"
             print("OK: topic rewriter parsed and updated sections")
         else:
             print(f"WARN: could not find {source} for testing")
 
-
-if __name__ == "__main__":
-    main()
-
-
-# ── Shadow mode integration test ─────────────────────────────────────────────
 
 def test_shadow_mode_reconciliation_runs_without_error():
     """Verify run_reconciliation_shadow_mode executes end-to-end without touching topic files."""

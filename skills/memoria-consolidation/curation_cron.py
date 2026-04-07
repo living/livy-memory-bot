@@ -179,7 +179,7 @@ def run_reconciliation_shadow_mode(correlation_id: str, topic_ref: str, topic_pa
         report_lines.append(f"- `{d.result}` | {d.entity_key} | {d.rule_id} | conf={d.confidence:.2f}")
 
     conflict_count = len([d for d in decisions if d.result == "conflict"])
-    freshness_checked = "tldv-pipeline-state.md"  # This pilot
+    freshness_checked = topic_ref  # single-topic function
 
     report_lines.extend([
         "",
@@ -195,16 +195,10 @@ def run_reconciliation_shadow_mode(correlation_id: str, topic_ref: str, topic_pa
     RECONCILIATION_REPORT_FILE.write_text("\n".join(report_lines) + "\n")
 
     # Write mode: actually update the topic file
+    # evidence_items already computed at top of function — no need to re-normalize
     if RECONCILIATION_WRITE_MODE and decisions:
         from topic_rewriter import render_topic_file as _render
 
-        # Re-normalize to build snapshots for rendering
-        all_items = [normalize_signal_event(e) for e in events]
-        all_snapshots = build_topic_snapshots(all_items)
-        snapshot = all_snapshots.get(topic_ref)
-        evidence_items = snapshot.evidence if snapshot else []
-
-        # Only apply accepted decisions
         accepted_decisions = [d for d in decisions if d.result == "accepted"]
         if accepted_decisions:
             rendered = _render(parsed, accepted_decisions)
