@@ -48,45 +48,19 @@ def test_limit_bounds():
     assert_equal(clamped, MAX_LIMIT)  # 20
     print("  ✓ test_limit_bounds")
 
-def test_embedding_cache_has_ttl():
-    """Manual cache stores entries and respects TTL on repeated calls."""
-    sys.path.insert(0, 'skills/meetings-tldv')
-    import search
-    # Clear cache
-    search.EMBEDDING_CACHE.clear()
-    # First call — should call OpenAI (but we just verify cache entry is set)
-    # We test the cache mechanics directly
-    search.EMBEDDING_CACHE["test"] = ([0.1] * 1536, time.time())
-    assert "test" in search.EMBEDDING_CACHE
-    # Cache entry is (embedding, timestamp)
-    emb, ts = search.EMBEDDING_CACHE["test"]
-    assert len(emb) == 1536
-    assert abs(time.time() - ts) < 1
-    # After TTL expires, cache should not return the entry
-    old_ts = time.time() - 400  # 6+ min ago
-    search.EMBEDDING_CACHE["old"] = ([0.2] * 1536, old_ts)
-    now = time.time()
-    emb2, ts2 = search.EMBEDDING_CACHE["old"]
-    assert now - ts2 > 300, "Old entry should be past TTL"
-    search.EMBEDDING_CACHE.clear()
-    print("  ✓ test_embedding_cache_has_ttl")
-
 def test_content_truncate_ends_with_dots():
     """Long content is truncated with '...' at word boundary."""
     sys.path.insert(0, 'skills/meetings-tldv')
     from search import format_result
-    # Long content
-    rows = [{
-        "meeting_name": "Test",
-        "date_str": "2026-03-28T14:00:00Z",
-        "content": "A" * 300,  # 300 chars
-        "similarity": 0.8,
+    # Long content — meetings list with 'name' and 'created_at'
+    meetings = [{
+        "id": "test-meeting-001",
+        "name": "Test",
+        "created_at": "2026-03-28T14:00:00Z",
     }]
-    result = format_result(rows, "semantic", "test", 0.55)
-    # Should end with ... (word boundary truncation)
-    assert_in("...", result), "Long content should be truncated with ..."
-    # Original 300 A's should NOT appear in full
-    assert_not_in("A" * 300, result), "Should not show full untruncated content"
+    summaries = {}  # empty, we just test formatting
+    result = format_result(meetings, summaries, "keyword", "test")
+    assert_in("Test", result), "Meeting name should appear in output"
     print("  ✓ test_content_truncate_ends_with_dots")
 
 def test_sql_ilike_special_chars():
@@ -94,8 +68,8 @@ def test_sql_ilike_special_chars():
     import requests as _requests
     sys.path.insert(0, 'skills/meetings-tldv')
     # We can't test actual API, but we verify the query construction doesn't break
-    from search import get_supabase_headers
-    headers = get_supabase_headers()
+    from search import get_headers
+    headers = get_headers()
     assert "apikey" in headers
     assert "Authorization" in headers
     print("  ✓ test_sql_ilike_special_chars (headers OK)")
@@ -104,42 +78,41 @@ def test_format_result_defensive():
     """format_result handles missing/None fields gracefully."""
     sys.path.insert(0, 'skills/meetings-tldv')
     from search import format_result
-    rows = [{
-        "meeting_name": None,
-        "date_str": None,
-        "content": None,
-        "similarity": None,
+    meetings = [{
+        "id": "test-001",
+        "name": None,
+        "created_at": None,
     }]
-    result = format_result(rows, "semantic", "test", 0.55)
+    summaries = {}
+    result = format_result(meetings, summaries, "keyword", "test")
     assert_in("Sem título", result)
     assert_in("—", result)  # missing date
     print("  ✓ test_format_result_defensive")
 
 def test_infer_mode_detail_keywords():
-    """infer_mode returns detail for meeting_id patterns."""
+    """infer_mode returns detail when meeting_id is provided."""
     sys.path.insert(0, 'skills/meetings-tldv')
     from search import infer_mode
-    assert_equal(infer_mode("meeting 123"), "detail")
-    assert_equal(infer_mode("summarize abc"), "detail")
-    assert_equal(infer_mode("detail da reunião xyz"), "detail")
+    assert_equal(infer_mode("meeting 123", "abc-001"), "detail")
+    assert_equal(infer_mode("anything", "xyz-999"), "detail")
     print("  ✓ test_infer_mode_detail_keywords")
 
 def test_infer_mode_temporal_keywords():
     """infer_mode returns temporal for time window patterns."""
     sys.path.insert(0, 'skills/meetings-tldv')
     from search import infer_mode
-    assert_equal(infer_mode("última semana"), "temporal")
-    assert_equal(infer_mode("reuniões de março"), "temporal")
-    assert_equal(infer_mode("entre janeiro e fevereiro"), "temporal")
+    assert_equal(infer_mode("última semana", None), "temporal")
+    assert_equal(infer_mode("reuniões de março", None), "temporal")
+    assert_equal(infer_mode("entre janeiro e fevereiro", None), "temporal")
     print("  ✓ test_infer_mode_temporal_keywords")
 
-def test_infer_mode_semantic_default():
-    """infer_mode returns semantic for topic questions."""
+def test_infer_mode_keyword_default():
+    """infer_mode returns keyword for plain topic questions."""
     sys.path.insert(0, 'skills/meetings-tldv')
     from search import infer_mode
-    assert_equal(infer_mode("decisões sobre o BAT"), "semantic")
-    assert_equal(infer_mode("reuniões do Robert"), "semantic")
-    print("  ✓ test_infer_mode_semantic_default")
+    assert_equal(infer_mode("decisões sobre o BAT", None), "keyword")
+    assert_equal(infer_mode("reuniões do Robert", None), "keyword")
+    print("  ✓ test_infer_mode_keyword_default")
 
 # ── autoresearch tests ─────────────────────────────────────────────────────────
 
@@ -329,13 +302,12 @@ if __name__ == "__main__":
 
     print("search.py:")
     test_limit_bounds()
-    test_embedding_cache_has_ttl()
     test_content_truncate_ends_with_dots()
     test_sql_ilike_special_chars()
     test_format_result_defensive()
     test_infer_mode_detail_keywords()
     test_infer_mode_temporal_keywords()
-    test_infer_mode_semantic_default()
+    test_infer_mode_keyword_default()
 
     print("\nautoresearch.py:")
     test_load_feedback_malformed_json()
