@@ -159,6 +159,15 @@ Editar `~/.openclaw/cron/jobs.json` diretamente — `openclaw cron add` é basea
 
 Para implementar planos com múltiplas tarefas, usar `EnterWorktree` + agente por tarefa + review em duas fases (spec compliance + code quality).
 
+### Running tests in skills/memoria-consolidation
+
+Unit tests: `cd <worktree-root> && python3 -m pytest skills/memoria-consolidation/test_reconciliation.py -q`
+Functional scripts: `cd <worktree-root> && python3 scripts/test_reconciliation.py`
+Security tests: `cd <worktree-root> && python3 scripts/test_security.py`
+
+Hyphenated module names (e.g. `memoria-consolidation`) cannot be used in Python import paths.
+Scripts in `scripts/` must use `sys.path.insert(0, ...)` to import from the skills directory.
+
 ## Reconciliation Pipeline (Shadow/Write Mode)
 
 The reconciliation pipeline lives in `skills/memoria-consolidation/` and reconciles
@@ -173,21 +182,13 @@ decision_ledger.py → topic_rewriter.py
 **Write mode:** guarded by `RECONCILIATION_WRITE_MODE=1` — archives to `memory/.archive/YYYYMMDDHHMM/`
 then uses atomic `.tmp → replace` pattern. Only `tldv-pipeline-state.md` is in scope for the pilot.
 
-### Running tests in skills/memoria-consolidation
-
-Unit tests: `cd skills/memoria-consolidation && python3 -m pytest test_reconciliation.py -q`
-Functional scripts: `cd <worktree-root> && python3 scripts/test_reconciliation.py`
-Security tests: `cd <worktree-root> && python3 scripts/test_security.py`
-
-Hyphenated module names (e.g. `memoria-consolidation`) cannot be used in Python import paths.
-Scripts in `scripts/` must use `sys.path.insert(0, ...)` to import from the skills directory.
 
 ### Decision ledger is append-only (audit log)
 
 `DecisionLedger` writes to `memory/reconciliation-ledger.jsonl` — this is an append-only audit trail.
-`deduplicate_records()` only removes same-run duplicates by (entity_key, rule_id).
-Do NOT deduplicate across runs — each decision records WHEN it was made.
-Downstream consumers needing "current state" should query the most recent entry per entity.
+`deduplicate_records()` removes within-run duplicates; `append_many()` also checks existing ledger keys
+to prevent cross-run duplicates (entity_key + rule_id). Downstream consumers needing "current state"
+should query the most recent entry per entity.
 
 ### Known pre-existing test failure
 
