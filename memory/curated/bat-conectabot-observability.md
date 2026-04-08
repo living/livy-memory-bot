@@ -84,6 +84,12 @@ Both: `--session isolated`, `--agent main`, `--exact`, `--no-deliver`
 
 ## Decisões
 
+- [2026-04-06] Limpar o banco Supabase e re-migrar os dados do MySQL de forma mais controlada, corrigindo FKs e removendo registros duplicados/órfãos [https://tldv.io/meeting/69d3a0419a861200135c6d50] — via tldv
+- [2026-04-06] Limpar o banco Supabase e re-migrar os dados do MySQL de forma mais controlada, corrigindo FKs e removendo registros duplicados/órfãos [https://tldv.io/meeting/69d3a0419a861200135c6d50] — via tldv
+- [2026-04-06] Utilizar Lightning para tarefas que não dependam de status (custos, tempo de sessão, contexto) [https://tldv.io/meeting/69cbb73298acd80013fa20ce] — via tldv
+- [2026-04-06] Utilizar Lightning para tarefas que não dependam de status (custos, tempo de sessão, contexto) [https://tldv.io/meeting/69cbb73298acd80013fa20ce] — via tldv
+- [2026-04-05] Realizada força-tarefa com André, Esteves e Márcio para atender demanda do Kaba/BAT/BOT [https://tldv.io/meeting/69bbe542230f040013752c82] — via tldv
+- [2026-04-05] Utilizar o Cloud/Docker para realizar a migração de dados em vez do Minimax ou PG Loader [https://tldv.io/meeting/69cd08b33e05d90013d2676e] — via tldv
 - [2026-04-02] OpenRouter: plano da Living mantém-se (5 credits obrigatórios, 100 USD) — custo será tratado depois [https://tldv.io/meeting/69cbb73298acd80013fa20ce] — via tldv
 - [2026-04-01] PR #1: docs: PRD e Spec para erros de dependência customizados [https://github.com/living/livy-bat-jobs/pull/1] — via github
 - [2026-04-01] Participar da reunião de arquitetura RetailOud às 10h30 para conhecer diretrizes globais [https://tldv.io/meeting/69b00ec37bc9a50013f30a7c] — via tldv

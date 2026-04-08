@@ -341,7 +341,7 @@ def main():
         )
         reconciliation_results.append(result)
         log_structured("INFO", correlation_id, "reconciliation", "shadow_run_complete",
-                        topic=topic_ref, mode="shadow", **result)
+                        **result)
 
     if reconciliation_results:
         log_structured("INFO", correlation_id, "reconciliation", "pilot_complete",

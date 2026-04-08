@@ -214,3 +214,107 @@
 **description:** PR #11: fix(frontend): remove dead Trello/Github panels, wire insights_json + transcript merge
 **evidence:** https://github.com/living/livy-tldv-jobs/pull/11
 
+## 2026-04-04 17:01 BRT · e7a2417b-7a6a-47ce-915e-df118983f871
+
+**topic:** tldv-pipeline-state.md
+**auto:** Yes
+**change:** add_decision
+**description:** PR #12: feat(whisper): migrate to OmniRoute API, remove local faster-whisper
+**evidence:** https://github.com/living/livy-tldv-jobs/pull/12
+
+## 2026-04-05 17:01 BRT · dce57f78-83fb-4344-ba9b-b997abda740e
+
+**topic:** bat-conectabot-observability.md
+**auto:** Yes
+**change:** add_decision
+**description:** Utilizar o Cloud/Docker para realizar a migração de dados em vez do Minimax ou PG Loader
+**evidence:** https://tldv.io/meeting/69cd08b33e05d90013d2676e
+
+## 2026-04-05 17:01 BRT · dce57f78-83fb-4344-ba9b-b997abda740e
+
+**topic:** bat-conectabot-observability.md
+**auto:** Yes
+**change:** add_decision
+**description:** Realizada força-tarefa com André, Esteves e Márcio para atender demanda do Kaba/BAT/BOT
+**evidence:** https://tldv.io/meeting/69bbe542230f040013752c82
+
+## 2026-04-06 03:04 BRT · 5d36f998-943b-45f7-81fc-c0a98a76c13f
+
+**topic:** bat-conectabot-observability.md
+**auto:** Yes
+**change:** add_decision
+**description:** Utilizar Lightning para tarefas que não dependam de status (custos, tempo de sessão, contexto)
+**evidence:** https://tldv.io/meeting/69cbb73298acd80013fa20ce
+
+## 2026-04-06 03:04 BRT · 5d36f998-943b-45f7-81fc-c0a98a76c13f
+
+**topic:** bat-conectabot-observability.md
+**auto:** Yes
+**change:** add_decision
+**description:** Utilizar Lightning para tarefas que não dependam de status (custos, tempo de sessão, contexto)
+**evidence:** https://tldv.io/meeting/69cbb73298acd80013fa20ce
+
+## 2026-04-06 21:03 BRT · 00719f16-0cdb-45b0-82b9-3e3a8f12793d
+
+**topic:** bat-conectabot-observability.md
+**auto:** Yes
+**change:** add_decision
+**description:** Limpar o banco Supabase e re-migrar os dados do MySQL de forma mais controlada, corrigindo FKs e removendo registros duplicados/órfãos
+**evidence:** https://tldv.io/meeting/69d3a0419a861200135c6d50
+
+## 2026-04-06 21:03 BRT · 00719f16-0cdb-45b0-82b9-3e3a8f12793d
+
+**topic:** bat-conectabot-observability.md
+**auto:** Yes
+**change:** add_decision
+**description:** Limpar o banco Supabase e re-migrar os dados do MySQL de forma mais controlada, corrigindo FKs e removendo registros duplicados/órfãos
+**evidence:** https://tldv.io/meeting/69d3a0419a861200135c6d50
+
+## 2026-04-07 16:22 BRT · 68dbe36e-8858-432e-969d-03df6b127af5
+
+**topic:** openclaw-gateway.md
+**auto:** Yes
+**change:** add_decision
+**description:** Pedro deve assumir como P.O. (Product Owner) ao invés de ser treinado para migrações, devido à curva de aprendizado muito alta
+**evidence:** https://tldv.io/meeting/69d4f1b751a1fe00144e0880
+
+## 2026-04-07 16:22 BRT · 68dbe36e-8858-432e-969d-03df6b127af5
+
+**topic:** openclaw-gateway.md
+**auto:** Yes
+**change:** add_decision
+**description:** Pedro deve assumir como P.O. (Product Owner) ao invés de ser treinado para migrações, devido à curva de aprendizado muito alta
+**evidence:** https://tldv.io/meeting/69d4f1b751a1fe00144e0880
+
+## 2026-04-07 16:22 BRT · 68dbe36e-8858-432e-969d-03df6b127af5
+
+**topic:** openclaw-gateway.md
+**auto:** Yes
+**change:** add_decision
+**description:** Pedro deve assumir como P.O. (Product Owner) ao invés de ser treinado para migrações, devido à curva de aprendizado muito alta
+**evidence:** https://tldv.io/meeting/69d4f1b751a1fe00144e0880
+
+## 2026-04-07 16:22 BRT · 68dbe36e-8858-432e-969d-03df6b127af5
+
+**topic:** openclaw-gateway.md
+**auto:** Yes
+**change:** add_decision
+**description:** Pedro deve assumir como P.O. (Product Owner) ao invés de ser treinado para migrações, devido à curva de aprendizado muito alta
+**evidence:** https://tldv.io/meeting/69d4f1b751a1fe00144e0880
+
+## 2026-04-07 16:22 BRT · 68dbe36e-8858-432e-969d-03df6b127af5
+
+**topic:** openclaw-gateway.md
+**auto:** Yes
+**change:** add_decision
+**description:** Pedro deve assumir como P.O. (Product Owner) ao invés de ser treinado para migrações, devido à curva de aprendizado muito alta
+**evidence:** https://tldv.io/meeting/69d4f1b751a1fe00144e0880
+
+## 2026-04-07 16:22 BRT · 68dbe36e-8858-432e-969d-03df6b127af5
+
+**topic:** openclaw-gateway.md
+**auto:** Yes
+**change:** add_decision
+**description:** Pedro deve assumir como P.O. (Product Owner) ao invés de ser treinado para migrações, devido à curva de aprendizado muito alta
+**evidence:** https://tldv.io/meeting/69d4f1b751a1fe00144e0880
+

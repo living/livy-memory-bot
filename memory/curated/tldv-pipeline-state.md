@@ -131,6 +131,7 @@ hook_pre_enrich → transcript_analyzer (participants + topics + context)
 
 ## Decisões
 
+- [2026-04-04] PR #12: feat(whisper): migrate to OmniRoute API, remove local faster-whisper [https://github.com/living/livy-tldv-jobs/pull/12] — via github
 - [2026-04-03] PR #11: fix(frontend): remove dead Trello/Github panels, wire insights_json + transcript merge [https://github.com/living/livy-tldv-jobs/pull/11] — via github
 - [2026-04-03] PR #10: feat(autoresearch): add TLDV pipeline v3 with continuous improvement loop [https://github.com/living/livy-tldv-jobs/pull/10] — via github
 - [2026-04-01] PR #1: Add Claude Code GitHub Workflow [https://github.com/living/livy-tldv-jobs/pull/1] — via github

@@ -55,7 +55,6 @@ O projeto não parte do zero. A arquitetura atual de memória (`workspace-livy-m
 2. **Archive / multimídia**
    - `archive_videos.py` já arquiva material bruto de reuniões.
    - `whisper_client.py` já foi migrado para API-first, evitando repetir o erro de Whisper local/OOM no VPS.
-   - O TLDV já aprovou evolução com **LLM rerank + moderation guardrails**, o que é relevante para futuro ingestion quality control em Gmail/Drive.
 
 3. **Signal Cross-Curation / memória agêntica**
    - O agente de memória já cruza sinais de reuniões, GitHub, Telegram/WhatsApp e curated memory.
@@ -198,7 +197,7 @@ TLDV API / Gmail API / Google Drive / WhatsApp-Telegram
 
 **Decisão:** Expandir o orquestrador atual para aceitar `source=gmail` e `source=gdrive`, em vez de criar pipelines completamente separados.
 
-**MOTIVO:** O pattern de `discover → enrich → summarize → persist` já existe e foi validado no TLDV. Reutilizar o mesmo state machine reduz complexidade operacional, facilita observability e concentra retry/circuit breaker em um fluxo conhecido. A direção recente do TLDV também reforça isso: o pipeline já migrou Whisper para API-first, aprovou rerank/moderation e substituiu parte da busca vetorial por OpenClaw subprocess + claude-mem HTTP, o que torna a expansão incremental mais coerente do que abrir uma stack paralela.
+**MOTIVO:** O pattern de `discover → enrich → summarize → persist` já existe e foi validado no TLDV. Reutilizar o mesmo state machine reduz complexidade operacional, facilita observability e concentra retry/circuit breaker em um fluxo conhecido.
 
 ### 2026-04-03 — Identity resolution é requisito estrutural, não melhoria opcional
 
@@ -222,7 +221,7 @@ TLDV API / Gmail API / Google Drive / WhatsApp-Telegram
 - [ ] Modelar schema inicial de `gmail_messages`, `drive_documents` e `identity_map`
 - [ ] Decidir se o parsing multimodal roda em container isolado ou API externa
 - [ ] Popular/normalizar identidades de participantes do TLDV para viabilizar reconciliação com e-mail e mensageria
-- [ ] Rever dependência mencionada de ChromaDB/RAG store à luz da arquitetura mais recente do TLDV, que já substituiu pgvector por OpenClaw subprocess + claude-mem HTTP em partes da stack
+- [ ] Rever dependência mencionada de ChromaDB à luz da arquitetura mais recente do TLDV, que já substituiu pgvector por OpenClaw subprocess + claude-mem HTTP em partes da stack
 
 ## Bugs
 

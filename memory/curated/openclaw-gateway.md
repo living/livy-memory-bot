@@ -124,6 +124,12 @@ Skills de workspace em `workspace/skills/` têm precedência sobre skills bundle
 
 ## Decisões
 
+- [2026-04-07] Pedro deve assumir como P.O. (Product Owner) ao invés de ser treinado para migrações, devido à curva de aprendizado muito alta [https://tldv.io/meeting/69d4f1b751a1fe00144e0880] — via tldv
+- [2026-04-07] Pedro deve assumir como P.O. (Product Owner) ao invés de ser treinado para migrações, devido à curva de aprendizado muito alta [https://tldv.io/meeting/69d4f1b751a1fe00144e0880] — via tldv
+- [2026-04-07] Pedro deve assumir como P.O. (Product Owner) ao invés de ser treinado para migrações, devido à curva de aprendizado muito alta [https://tldv.io/meeting/69d4f1b751a1fe00144e0880] — via tldv
+- [2026-04-07] Pedro deve assumir como P.O. (Product Owner) ao invés de ser treinado para migrações, devido à curva de aprendizado muito alta [https://tldv.io/meeting/69d4f1b751a1fe00144e0880] — via tldv
+- [2026-04-07] Pedro deve assumir como P.O. (Product Owner) ao invés de ser treinado para migrações, devido à curva de aprendizado muito alta [https://tldv.io/meeting/69d4f1b751a1fe00144e0880] — via tldv
+- [2026-04-07] Pedro deve assumir como P.O. (Product Owner) ao invés de ser treinado para migrações, devido à curva de aprendizado muito alta [https://tldv.io/meeting/69d4f1b751a1fe00144e0880] — via tldv
 ### 2026-04-03 — OpenClaw Config Cleanup: PremiumFirst + minimax-portal removido
 
 **Decisão:** Padronizar `omniroute/PremiumFirst` como modelo para todos os agentes (exceto neo). Remover plugin `minimax-portal-auth`.
