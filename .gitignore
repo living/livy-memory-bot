@@ -10,6 +10,14 @@ memory/feedback-archive.jsonl
 
 # Temp/processing files
 memory/dream-signal.json
+memory/reconciliation-ledger.jsonl
+memory/reconciliation-report.md
+.openclaw/workspace-state.json
+memory/.evolution_cursor
+memory/2026-*-delphos-cron.md
+skills/memoria-consolidation/__pycache__/autoresearch_metrics.cpython-312.pyc
+skills/memoria-consolidation/__pycache__/consolidate.cpython-312.pyc
+skills/memory/signal-events.jsonl
 
 # Python cache
 __pycache__/
