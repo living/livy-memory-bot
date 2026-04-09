@@ -124,20 +124,80 @@ Python subprocessos não herdam env vars automaticamente — precisa de `source`
 **Dream:** `python3 skills/memoria-consolidation/dream_all.py` — processes sessions from main (Livy Deep) and both memory workspaces
 **Audio Processing:** NEVER use the local `whisper` binary (`~/.local/bin/whisper`) — it crashes the VPS due to high resource usage. Always use the OpenAI API with `OPENAI_WHISPER_KEY` from `~/.openclaw/.env`.
 
+## Credential Security in Cron Jobs
+
+**CRITICAL (2026-04-08):** All credentials were found hardcoded inline in `~/.openclaw/cron/jobs.json`. This exposes secrets in process logs and command history.
+
+**Solution:** Wrapper scripts that load credentials from `~/.openclaw/.env`.
+
+**Created wrappers:**
+- `skills/memoria-consolidation/curation_cron_wrapper.sh`
+- `workspace/operacional/bat/jobs/intraday_wrapper.sh`
+- `workspace/operacional/bat/jobs/daily_wrapper.sh`
+- `workspace/operacional/delphos/jobs/midday_wrapper.sh`
+- `workspace/operacional/delphos/jobs/daily_wrapper.sh`
+
+**Pattern:**
+```bash
+set -a; source ~/.openclaw/.env; set +a
+: "${VAR:?Missing VAR}"  # fail-fast validation
+```
+
+**.env vars added:** `TELEGRAM_TOKEN`, `TELEGRAM_CHAT_ID`, `AZURE_APP_ID`, `AZURE_API_KEY`, `SENDGRID_API_KEY`, `MONGO_URI`, `MONGO_DB`
+
+**Cron job IDs with wrappers:** `signal-curation` (53b45f6f), `bat-intraday`, `bat-daily`, `delphos-midday`, `delphos-daily`
+
+**DO NOT:** pass credentials as `VAR=value` inline in cron `payload.message`. Use wrapper scripts.
+
 ## Signal Cross-Curation
 
 Sistema de curadoria inteligente que cruza sinais de TLDV + GitHub + Logs + Feedback para manter topic files atualizados.
 **Script:** `skills/memoria-consolidation/curation_cron.py`
-**Cron:** `53b45f6f-cb68-4b79-8610-0b4f4db6e585` (every 4h, memory-agent)
+**Cron:** `53b45f6f-cb68-4b79-8610-0b4f4db6e585` (every 2h, memory-agent)
 
 **Fontes:** TLDV (priority 1) → Logs (2) → GitHub (3) → Feedback (4)
 **Output files:** `memory/signal-events.jsonl`, `memory/curation-log.md`, `memory/conflict-queue.md`
 **Topic files atualizados:** `memory/curated/*.md`
 
-**Rodar manualmente:**
+**Rodar manualmente (secure):**
 ```bash
-cd /home/lincoln/.openclaw/workspace-livy-memory && source ~/.openclaw/.env && export SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY GITHUB_PERSONAL_ACCESS_TOKEN && python3 skills/memoria-consolidation/curation_cron.py
+cd /home/lincoln/.openclaw/workspace-livy-memory && bash skills/memoria-consolidation/curation_cron_wrapper.sh
 ```
+
+## Shadow Reconciliation Evolution (2026-04-09)
+
+### Current observed state
+- `reconciliation-report.md` shows mode `shadow` on `tldv-pipeline-state.md`
+- Latest runs: 10 decisions identified, 10 deferred, 0 confirmed
+- `causal_completeness` currently stabilized around `0.60`
+- Rule firing: `R005_new_issue_flagged_for_triage` for PR-linked decisions
+
+### Confirmed evidence sources
+- `memory/reconciliation-ledger.jsonl` (append-only per decision)
+- `memory/reconciliation-report.md` (cycle summary)
+- `openclaw cron runs --id 53b45f6f-cb68-4b79-8610-0b4f4db6e585`
+
+### Approved direction (Lincoln)
+Priorities: **quality > noise reduction > feedback learning > promotion rate**
+- Human intervention: **semi-automatic**
+- False positive tolerance: **0 FP/week**
+- Triage: **Mattermost + LLM pre-filter**, with Telegram summary + override
+- Fact-checking required in decision gate: **Context7 + official docs**
+
+### Design + plan artifacts
+- Spec: `.claude/specs/2026-04-09-shadow-evolution-pipeline-design.md`
+- Plan: `.claude/plans/2026-04-09-shadow-evolution-pipeline-implementation-plan.md`
+
+### Safety policy for promotion
+Auto-promotion allowed only if all are true:
+1. `causal_completeness >= 0.85`
+2. `>= 2` cross-source evidences
+3. `Tier A` (low risk)
+4. No active conflict
+5. No historical divergence alert
+
+Else → triage (never promote).
+
 
 ## TLDV summaries schema (confirmado)
 
