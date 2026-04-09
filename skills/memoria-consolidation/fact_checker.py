@@ -35,7 +35,7 @@ class Context7Client:
     def __init__(
         self,
         api_key: str | None = None,
-        base_url: str = "https://api.context7.com/v1",
+        base_url: str = "https://context7.com/v1",
         sources: list[str] | None = None,
         timeout_seconds: float = 10.0,
     ) -> None:
