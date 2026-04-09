@@ -5,13 +5,16 @@ TDD Phase 1: These tests should FAIL because production modules don't exist yet.
 When production modules are implemented, all 10 cases must remain deferred under
 the strict gate to ensure zero false positives.
 """
+import importlib.util
 import json
-import pytest
 from pathlib import Path
+
+import pytest
 
 # Load the 10 historical R005 cases as fixture
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 REPLAY_FIXTURE = FIXTURES_DIR / "replay_r005_cases.json"
+GATE_FILE = Path(__file__).resolve().parents[1] / "skills" / "memoria-consolidation" / "gate.py"
 
 
 @pytest.fixture
@@ -26,8 +29,16 @@ def replay_cases():
 @pytest.fixture
 def strict_gate():
     """Import the production gate module (will fail until implemented)."""
-    from skills.memoria_consolidation.gate import strict_promotion_gate
-    return strict_promotion_gate
+    if not GATE_FILE.exists():
+        raise ModuleNotFoundError(f"Missing production gate module: {GATE_FILE}")
+
+    spec = importlib.util.spec_from_file_location("memoria_consolidation_gate", GATE_FILE)
+    if spec is None or spec.loader is None:
+        raise ImportError(f"Unable to load gate module spec from {GATE_FILE}")
+
+    gate_module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(gate_module)
+    return gate_module.strict_promotion_gate
 
 
 class TestReplay10RealCases:
