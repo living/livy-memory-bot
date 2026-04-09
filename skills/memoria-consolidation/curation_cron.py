@@ -240,7 +240,7 @@ def _run_shadow_evolution_pipeline(
 
     existing_ledger = _load_reconciliation_ledger()
 
-    # Step 1: Deduplicate signals
+    # Step 1: Deduplicate signals (within-batch dedup)
     signal_dicts = [
         {
             "topic": d.topic,
@@ -256,11 +256,22 @@ def _run_shadow_evolution_pipeline(
         for s in deduplicated_signals
     }
 
-    # Build a lookup from decision key to SignalEvent
+    # Build a lookup from decision key to SignalEvent.
+    # Consistent key: (topic_ref, entity_key, "") to match decision lookup key
+    # (topic, entity_key, rule_id) — rule_id is stripped for the event lookup.
     event_by_key = {
         (e.topic_ref, e.payload.get("entity_key", ""), ""): e
         for e in events
     }
+
+    # Step 2: Reject candidates already in the historical ledger (7-day window)
+    # from deduplicator import make_fingerprint, is_duplicate
+    from deduplicator import make_fingerprint, is_duplicate
+    historical_dedup_keys = set()
+    for decision in decisions:
+        fp = make_fingerprint(decision.topic, decision.entity_key, decision.rule_id)
+        if is_duplicate(fp, existing_ledger):
+            historical_dedup_keys.add((decision.topic, decision.entity_key, decision.rule_id))
 
     results = []
     triage_results = []
@@ -268,12 +279,22 @@ def _run_shadow_evolution_pipeline(
 
     for decision in decisions:
         key = (decision.topic, decision.entity_key, decision.rule_id)
-        signal = event_by_key.get(key)
+        event_lookup_key = (decision.topic, decision.entity_key, "")
+        signal = event_by_key.get(event_lookup_key)
 
         if key not in dedup_keys:
             log_structured(
                 "DEBUG", correlation_id, "shadow_evolution",
-                "signal_deduplicated",
+                "signal_deduplicated_within_batch",
+                entity_key=decision.entity_key,
+                rule_id=decision.rule_id,
+            )
+            continue
+
+        if key in historical_dedup_keys:
+            log_structured(
+                "DEBUG", correlation_id, "shadow_evolution",
+                "signal_deduplicated_historical",
                 entity_key=decision.entity_key,
                 rule_id=decision.rule_id,
             )
@@ -518,12 +539,14 @@ def run_reconciliation_shadow_mode(correlation_id: str, topic_ref: str, topic_pa
 
     promoted_count = 0
     triage_count = 0
-    if decisions:
-        # Recompute minimal summary from gate outcomes for observability
-        # (shadow_results list is only populated when decisions exist)
-        for _d in decisions:
-            # No strict assumptions about availability; keep this conservative.
-            pass
+    if decisions and shadow_results:
+        for result in shadow_results:
+            if result.get("promotion_gate", {}).get("promoted"):
+                promoted_count += 1
+            tier = result.get("tier", "")
+            promoted = result.get("promotion_gate", {}).get("promoted", False)
+            if tier in ("A", "B") and not promoted:
+                triage_count += 1
 
     return {
         "topic": topic_ref,
@@ -567,6 +590,7 @@ def main():
 
     bus = SignalBus()
     bus.start_cycle()
+    bus.correlation_id = correlation_id  # Override with main()'s ID so logs + events share the same correlation_id
 
     curated_dir = CURATED_DIR
 
