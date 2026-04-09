@@ -37,6 +37,40 @@ def load_feedback(path: Path) -> list[dict]:
     return entries
 
 
+def get_feedback_buffer() -> list[dict]:
+    """Expose structured feedback buffer for confidence calibrator ingestion.
+
+    Returns raw feedback entries from FEEDBACK_LOG (JSONL).
+    This function is intentionally read-only and deterministic.
+    """
+    return load_feedback(FEEDBACK_LOG)
+
+
+def build_calibration_feedback(entries: list[dict]) -> list[dict]:
+    """Normalize feedback entries into calibrator schema.
+
+    Calibrator schema:
+    - decision: "promote" | "defer"
+    - outcome:  "up" | "down"
+
+    Mapping from feedback log fields:
+    - action -> decision (only promote/defer retained)
+    - rating -> outcome (only up/down retained)
+
+    Entries without required valid pairs are skipped.
+    """
+    normalized: list[dict] = []
+    for entry in entries:
+        decision = entry.get("action")
+        outcome = entry.get("rating")
+        if decision not in {"promote", "defer"}:
+            continue
+        if outcome not in {"up", "down"}:
+            continue
+        normalized.append({"decision": decision, "outcome": outcome})
+    return normalized
+
+
 def compute_scores(entries: list[dict]) -> dict[str, dict]:
     """
     Agrupa entries por action, conta up/down/null.
