@@ -134,7 +134,7 @@ class TestIsDuplicateAPI:
         ledger = [
             {"fingerprint": "different_fingerprint", "decided_at": "2026-04-09T10:00:00Z"}
         ]
-        assert _is_duplicate(_is_duplicate("other_fingerprint", ledger), ledger) is False
+        assert _is_duplicate("other_fingerprint", ledger) is False
 
     def test_missing_fingerprint_in_ledger_returns_false(self):
         ledger = [
