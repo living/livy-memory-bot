@@ -140,6 +140,34 @@ def test_calibration_allows_more_than_20_samples():
     assert result["adjusted"] is True
 
 
+def test_calibration_counts_only_valid_decision_outcome_samples():
+    """Gating must count only entries with valid (decision, outcome) pairs."""
+    module = _load_calibrator_module()
+    calibrator = module.ConfidenceCalibrator(current_threshold=0.80, min_samples=20)
+
+    feedback = ([{"decision": "promote", "outcome": "up"}] * 19) + [{"foo": "bar"}]
+    result = calibrator.calibrate(feedback)
+
+    assert result["adjusted"] is False
+    assert result["reason"] == "insufficient_samples"
+    assert result["sample_size"] == 19
+
+
+def test_calibration_allows_20_valid_even_with_invalid_rows_present():
+    """20 valid samples should pass gate even when invalid rows are present."""
+    module = _load_calibrator_module()
+    calibrator = module.ConfidenceCalibrator(current_threshold=0.80, min_samples=20)
+
+    feedback = (
+        [{"decision": "promote", "outcome": "up"}] * 20
+        + [{"decision": "promote"}, {"outcome": "up"}, {"x": 1}]
+    )
+    result = calibrator.calibrate(feedback)
+
+    assert result["adjusted"] is True
+    assert result["sample_size"] == 20
+
+
 # ---------------------------------------------------------------------------
 # Accuracy calculation
 # ---------------------------------------------------------------------------

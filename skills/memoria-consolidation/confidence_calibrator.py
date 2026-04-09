@@ -23,6 +23,43 @@ DEFAULT_CHANGELOG_PATH = Path(
 )
 
 
+def _normalize_entry(entry: dict[str, Any]) -> dict[str, Any] | None:
+    """Normalize a raw feedback entry to calibrator schema.
+
+    Accepts two schemas:
+    - Calibrator schema: {decision, outcome}
+    - Feedback-log schema: {action, rating}
+
+    Returns None for entries that lack required valid pairs.
+    """
+    # Calibrator schema: {decision, outcome}
+    decision = entry.get("decision")
+    outcome = entry.get("outcome")
+    if decision is not None and outcome is not None:
+        if decision in ("promote", "defer") and outcome in ("up", "down"):
+            return {"decision": decision, "outcome": outcome}
+        return None
+
+    # Feedback-log schema: {action, rating}
+    action = entry.get("action")
+    rating = entry.get("rating")
+    if action is not None and rating is not None:
+        if action in ("promote", "defer") and rating in ("up", "down"):
+            return {"decision": action, "outcome": rating}
+
+    return None
+
+
+def _filter_valid(entries: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Return normalized valid entries in {decision, outcome} schema."""
+    normalized: list[dict[str, Any]] = []
+    for entry in entries:
+        row = _normalize_entry(entry)
+        if row is not None:
+            normalized.append(row)
+    return normalized
+
+
 def load_feedback_buffer(path: Path) -> list[dict[str, Any]]:
     """Load feedback entries from JSONL file.
 
@@ -127,8 +164,12 @@ class ConfidenceCalibrator:
         return correct / total
 
     def calibrate(self, feedback_entries: list[dict[str, Any]]) -> dict[str, Any]:
-        """Calibrate threshold from feedback entries with guardrails."""
-        sample_size = len(feedback_entries)
+        """Calibrate threshold from feedback entries with guardrails.
+
+        Only entries with valid (decision, outcome) pairs are counted.
+        """
+        valid_entries = _filter_valid(feedback_entries)
+        sample_size = len(valid_entries)
         baseline = self.current_threshold
 
         if sample_size < self.min_samples:
@@ -141,7 +182,7 @@ class ConfidenceCalibrator:
                 "adjustment": 0.0,
             }
 
-        accuracy = self._compute_accuracy(feedback_entries)
+        accuracy = self._compute_accuracy(valid_entries)
 
         # Deterministic target movement:
         # if accuracy > threshold => decrease threshold (more strict)
@@ -166,8 +207,9 @@ class ConfidenceCalibrator:
         }
 
     def calibrate_from_buffer(self, feedback_buffer_path: Path) -> dict[str, Any]:
-        entries = load_feedback_buffer(feedback_buffer_path)
-        return self.calibrate(entries)
+        raw_entries = load_feedback_buffer(feedback_buffer_path)
+        normalized_entries = _filter_valid(raw_entries)
+        return self.calibrate(normalized_entries)
 
     def calibrate_and_log(self, feedback_entries: list[dict[str, Any]]) -> dict[str, Any]:
         """Calibrate and append changelog entry only when adaptation is allowed."""

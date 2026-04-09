@@ -118,6 +118,39 @@ def test_calibrate_from_feedback_buffer_insufficient_samples(tmp_path):
     assert result["reason"] == "insufficient_samples"
 
 
+def test_calibrate_from_feedback_buffer_normalizes_action_rating_schema(tmp_path):
+    """calibrate_from_buffer must normalize raw action/rating logs into decision/outcome."""
+    module = _load_calibrator_module()
+    feedback_file = tmp_path / "raw-feedback-buffer.jsonl"
+
+    lines = ['{"action": "promote", "rating": "up"}\n' for _ in range(20)]
+    feedback_file.write_text("".join(lines))
+
+    calibrator = module.ConfidenceCalibrator(current_threshold=0.80, min_samples=20)
+    result = calibrator.calibrate_from_buffer(feedback_file)
+
+    assert result["adjusted"] is True
+    assert result["sample_size"] == 20
+    assert result["accuracy"] == 1.0
+
+
+def test_calibrate_from_feedback_buffer_ignores_invalid_rows_for_min_samples(tmp_path):
+    """Min-samples gate must use valid normalized rows, not total JSONL lines."""
+    module = _load_calibrator_module()
+    feedback_file = tmp_path / "mixed-raw-feedback-buffer.jsonl"
+
+    valid_lines = ['{"action": "promote", "rating": "up"}\n' for _ in range(19)]
+    invalid_lines = ['{"action": "promote"}\n', '{"action": "other", "rating": "up"}\n']
+    feedback_file.write_text("".join(valid_lines + invalid_lines))
+
+    calibrator = module.ConfidenceCalibrator(current_threshold=0.80, min_samples=20)
+    result = calibrator.calibrate_from_buffer(feedback_file)
+
+    assert result["adjusted"] is False
+    assert result["reason"] == "insufficient_samples"
+    assert result["sample_size"] == 19
+
+
 # ---------------------------------------------------------------------------
 # learn_from_feedback.py integration: expose feedback buffer
 # ---------------------------------------------------------------------------
