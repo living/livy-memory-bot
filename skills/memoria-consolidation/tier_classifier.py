@@ -46,6 +46,13 @@ def classify_risk_tier(payload: dict[str, Any]) -> Literal["A", "B", "C"]:
     Returns:
         "A", "B", or "C"
     """
+    has_conflict_key = "active_conflict" in payload
+    has_divergence_key = "historical_divergence_alert" in payload
+
+    # Fail-safe: missing risk keys must not allow Tier A/B.
+    if not (has_conflict_key and has_divergence_key):
+        return "C"
+
     cc = _clamp(payload.get("causal_completeness", 0.0))
     sources = max(0, int(payload.get("evidence_cross_sources", 0)))
     has_conflict = bool(payload.get("active_conflict", False))
