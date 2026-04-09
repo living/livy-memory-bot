@@ -14,7 +14,12 @@ import pytest
 # Load the 10 historical R005 cases as fixture
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 REPLAY_FIXTURE = FIXTURES_DIR / "replay_r005_cases.json"
-GATE_FILE = Path(__file__).resolve().parents[1] / "skills" / "memoria-consolidation" / "gate.py"
+CLASSIFIER_FILE = (
+    Path(__file__).resolve().parents[1]
+    / "skills"
+    / "memoria-consolidation"
+    / "tier_classifier.py"
+)
 
 
 @pytest.fixture
@@ -29,12 +34,12 @@ def replay_cases():
 @pytest.fixture
 def strict_gate():
     """Import the production gate module (will fail until implemented)."""
-    if not GATE_FILE.exists():
-        raise ModuleNotFoundError(f"Missing production gate module: {GATE_FILE}")
+    if not CLASSIFIER_FILE.exists():
+        raise ModuleNotFoundError(f"Missing production classifier module: {CLASSIFIER_FILE}")
 
-    spec = importlib.util.spec_from_file_location("memoria_consolidation_gate", GATE_FILE)
+    spec = importlib.util.spec_from_file_location("memoria_consolidation_tier_classifier", CLASSIFIER_FILE)
     if spec is None or spec.loader is None:
-        raise ImportError(f"Unable to load gate module spec from {GATE_FILE}")
+        raise ImportError(f"Unable to load classifier module spec from {CLASSIFIER_FILE}")
 
     gate_module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(gate_module)
