@@ -8,6 +8,7 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+from urllib import error as urllib_error
 
 
 DEFAULT_AUDIT_LOG_PATH = Path(__file__).resolve().parents[2] / "memory" / "triage-decisions.jsonl"
@@ -75,7 +76,11 @@ class TriageBridge:
 
         try:
             sent = self._post_to_mattermost(triage_payload)
-        except Exception:
+        except urllib_error.HTTPError:
+            # Let HTTPError bubble through so callers can distinguish
+            # timeout-like conditions (504) from transient failures.
+            raise
+        except urllib_error.URLError:
             sent = False
 
         decision = {

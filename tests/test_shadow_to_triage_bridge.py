@@ -313,6 +313,43 @@ class TestTriageBridge:
             record = json.loads(f.readlines()[-1])
         assert record["webhook_status"] == "failed"
 
+    def test_triage_bridge_re_raises_http_504(self, triage_payload, audit_log_path):
+        """Bridge must preserve timeout semantics by re-raising HTTP 504 errors."""
+        import urllib.error
+
+        module = _bridge_module()
+        BridgeClass = module.TriageBridge
+        bridge = BridgeClass(
+            webhook_url="https://mattermost.example.com/hooks/fake",
+            audit_log_path=audit_log_path,
+        )
+
+        with patch.object(bridge, "_post_to_mattermost") as mock_post:
+            mock_post.side_effect = urllib.error.HTTPError(
+                url="https://mattermost.example.com/hooks/fake",
+                code=504,
+                msg="Gateway Timeout",
+                hdrs={},
+                fp=None,
+            )
+            with pytest.raises(urllib.error.HTTPError) as exc_info:
+                bridge.route_for_triage(triage_payload)
+
+        assert exc_info.value.code == 504
+
+    def test_triage_bridge_bubbles_unexpected_exceptions(self, triage_payload, audit_log_path):
+        """Bridge must not swallow unexpected exceptions from routing internals."""
+        module = _bridge_module()
+        BridgeClass = module.TriageBridge
+        bridge = BridgeClass(
+            webhook_url="https://mattermost.example.com/hooks/fake",
+            audit_log_path=audit_log_path,
+        )
+
+        with patch.object(bridge, "_post_to_mattermost", side_effect=RuntimeError("boom")):
+            with pytest.raises(RuntimeError, match="boom"):
+                bridge.route_for_triage(triage_payload)
+
 
 # ─── Telegram Override Handler Tests ─────────────────────────────────────────
 
@@ -391,6 +428,33 @@ class TestTelegramOverrideHandler:
 
         with pytest.raises(ValueError, match="signal_id"):
             handler.parse_override("hold::no_signal_id")
+
+    def test_parse_rejects_signal_id_with_whitespace(self):
+        """signal_id must be a stable token and reject whitespace."""
+        module = _handler_module()
+        HandlerClass = module.TelegramOverrideHandler
+        handler = HandlerClass(audit_log_path=":memory:")
+
+        with pytest.raises(ValueError, match="signal_id"):
+            handler.parse_override("hold:sig 2026 001:reason")
+
+    def test_parse_rejects_signal_id_with_unsafe_chars(self):
+        """signal_id should reject punctuation outside conservative pattern."""
+        module = _handler_module()
+        HandlerClass = module.TelegramOverrideHandler
+        handler = HandlerClass(audit_log_path=":memory:")
+
+        with pytest.raises(ValueError, match="signal_id"):
+            handler.parse_override("hold:sig/2026?001:reason")
+
+    def test_parse_accepts_conservative_signal_id_pattern(self):
+        """signal_id should allow alnum with internal - _ . separators."""
+        module = _handler_module()
+        HandlerClass = module.TelegramOverrideHandler
+        handler = HandlerClass(audit_log_path=":memory:")
+
+        result = handler.parse_override("hold:sig-2026_04.20-001:reason")
+        assert result["signal_id"] == "sig-2026_04.20-001"
 
     def test_apply_hold_writes_audit_log(self, tmp_path):
         """Applying hold override must append to triage-decisions.jsonl append-only."""

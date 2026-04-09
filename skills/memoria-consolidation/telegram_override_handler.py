@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import json
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 
 DEFAULT_AUDIT_LOG_PATH = Path(__file__).resolve().parents[2] / "memory" / "triage-decisions.jsonl"
+SIGNAL_ID_RE = re.compile(r"^[A-Za-z0-9]+(?:[-_.][A-Za-z0-9]+)*$")
 
 
 class TelegramOverrideHandler:
@@ -23,6 +25,8 @@ class TelegramOverrideHandler:
             raise ValueError(f"Unknown override action: {action}")
         if not signal_id.strip():
             raise ValueError("signal_id is required")
+        if not SIGNAL_ID_RE.fullmatch(signal_id):
+            raise ValueError("signal_id format is invalid")
         if not reason.strip():
             raise ValueError("reason is required")
 
@@ -78,11 +82,12 @@ class TelegramOverrideHandler:
             "reason": reason,
             "override_type": override_type,
         }
+        should_log = str(self.audit_log_path) != ":memory:"
         self._append_audit_log(record)
 
         return {
             "applied": True,
-            "logged": True,
+            "logged": should_log,
             "action": action,
             "signal_id": signal_id,
         }
