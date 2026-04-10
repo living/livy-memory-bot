@@ -286,6 +286,91 @@ When copying tests between worktrees, verify the API signatures match the target
 - `get_headers()` not `get_supabase_headers()`
 - default `infer_mode` mode is `"keyword"`, not `"semantic"`
 
+## Memory Vault — Karpathy-style Autonomous Wiki
+
+> **Design doc:** `docs/superpowers/specs/2026-04-10-memory-vault-design.md`
+> **Status:** approved 2026-04-10 by Lincoln Quinan Junior
+
+### Arquitetura
+- **Vault paralelo:** `memory/vault/` (Obsidian-native, 100% autônomo)
+- **Não quebra fluxo atual:** `memory/curated/` permanece intacto na Fase 1
+- **Fronteira:** raw imutável = TLDV/Signal/GitHub/Trello; internals podem ser retrabalhados
+
+### Estrutura do vault
+```
+memory/vault/
+├── index.md                    # catálogo navegável (auto-atualizado)
+├── log.md                      # timeline append-only
+├── AGENTS.md                   # schema de manutenção do vault
+├── entities/                   # páginas de entidade (projetos, pessoas, sistemas)
+├── decisions/                  # decisões com contexto, impacto, status
+├── concepts/                   # conceitos recorrentes
+├── evidence/                   # fact-check com fonte oficial
+├── lint-reports/               # saídas de lint cycles
+└── .cache/fact-check/          # TTL cache Context7 (24h)
+```
+
+### Confiança e Evidência
+| Score | Condição |
+|---|---|
+| 🟢 high | 2+ fontes oficiais independentes ou 1 oficial + 1 corroborada |
+| 🟡 medium | 1 fonte oficial OU 2+ sinais indiretos |
+| 🔴 low | 1 sinal indireto ou inferência |
+| ⚫ unverified | sem evidência (não写入 vault) |
+
+### Context7 Policy (prioridade de verificação)
+1. `openclaw config.get` / `exec` (estado real)
+2. API calls diretas (Supabase, GitHub, TLDV)
+3. Docs oficiais em `~/.openclaw/docs/`
+4. Fixtures/exports locais
+
+### Obsidian Client (privado, via git worktree)
+- `memory/vault/` = git worktree branch `vault/` do repo `living/livy-memory-bot`
+- **Plugins recomendados:**
+  | Plugin | Uso |
+  |---|---|
+  | **Obsidian Git** | auto-commit após mudanças do agente |
+  | **Dataview** | queries dinâmicas sobre frontmatter |
+  | **Graph View** | visualizar rede de entidades e links |
+  | **Templater** | template de frontmatter consistente |
+  | **QuickAdd** | criar páginas de decisão com estrutura padronizada |
+  | **Metaedit** | editar frontmatter sem raw markdown |
+  | **Admonition** | callouts tipadas (⚠️ aviso, ✅ resolved, 🔴 critical) |
+  | **Heatmap Calendar** | visualizar frequência de updates por página |
+  | **Outliner** | organização hierárquica de páginas de decisão |
+  | **Icon Shortcodes** | emojis consistentes como prefixos visuais |
+
+### Ciclos autônomos
+1. **Ingest** — raw sources → entidades/decisões → 5–15 páginas
+2. **Query-as-Write** — insights úteis viram páginas (com confirmação)
+3. **Lint** — contradições, órfãos, stale claims (>7d re-verify)
+4. **Repair** — reconcilia contradições automaticamente
+
+### TDD (3 suites, dados reais)
+```bash
+# Ordem: teste → script → ✅
+test_entity_creation → vault/entity_create.py → ✅
+test_fact_check     → vault/fact_check.py    → ✅
+test_lint           → vault/lint.py          → ✅
+test_security.py    → vault/security.py     → ✅
+vault/seed.py       → primeiro seed real
+vault/ingest.py     → primeiro ciclo real
+```
+
+### Segurança
+- Agente **nunca** escreve fora de `memory/vault/`
+- `test_security.py` valida: injeção de paths, escrita fora boundary, frente para trás
+- Budget: max 3 verificações Context7 por ingest cycle
+- `unverified` confidence: **nunca**写入 vault
+
+### Fase 1 milestones (2 semanas)
+- ✅ 8+ entity pages com evidence oficial
+- ✅ lint detecta 0 contradições
+- ✅ `index.md` e `log.md` atualizam automaticamente
+- ✅ nenhum dado escrito fora de `memory/vault/`
+
+---
+
 ## meetings-tldv Skill
 
 - **Skill:** `skills/meetings-tldv/` — queries Supabase TLDV (meeting_memories table)
