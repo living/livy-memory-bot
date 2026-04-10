@@ -62,7 +62,7 @@ Standalone page.
         encoding="utf-8",
     )
 
-    # Contradiction example
+    # Contradiction example — wikilink provides feature anchor for grouping
     (root / "decisions" / "2026-04-01-enable-feature.md").write_text(
         """---
 entity: Feature Flag
@@ -76,7 +76,7 @@ draft: false
 ---
 # Enable Feature
 
-Decision: Feature X is enabled.
+Decision: Feature X is enabled. [[feature-x]]
 """,
         encoding="utf-8",
     )
@@ -94,7 +94,7 @@ draft: false
 ---
 # Disable Feature
 
-Decision: Feature X is disabled.
+Decision: Feature X is disabled. [[feature-x]]
 """,
         encoding="utf-8",
     )
@@ -133,7 +133,16 @@ class TestContradictions:
     def test_detects_enabled_vs_disabled_contradiction(self, lint_module, sample_vault):
         report = lint_module.detect_contradictions(sample_vault)
         assert isinstance(report, list)
-        assert any("enabled" in r["a"].lower() and "disabled" in r["b"].lower() for r in report)
+
+        def has_enabled_disabled_pair(row: dict) -> bool:
+            a_text = row.get("a", "").lower()
+            b_text = row.get("b", "").lower()
+            return (
+                ("enabled" in a_text and "disabled" in b_text)
+                or ("disabled" in a_text and "enabled" in b_text)
+            )
+
+        assert any(has_enabled_disabled_pair(r) for r in report)
 
     def test_no_false_positive_when_same_semantic(self, lint_module, tmp_path):
         root = tmp_path / "memory" / "vault"
@@ -144,6 +153,33 @@ class TestContradictions:
         report = lint_module.detect_contradictions(root)
         assert report == []
 
+    def test_no_false_positive_cross_feature(self, lint_module, tmp_path):
+        """enabled in Feature A and disabled in Feature B are NOT contradictory."""
+        root = tmp_path / "memory" / "vault"
+        (root / "decisions").mkdir(parents=True, exist_ok=True)
+        (root / "decisions" / "d1.md").write_text(
+            "Decision: Feature A is enabled. Migration complete.", encoding="utf-8"
+        )
+        (root / "decisions" / "d2.md").write_text(
+            "Decision: Feature B is disabled. Not ready for production.", encoding="utf-8"
+        )
+        report = lint_module.detect_contradictions(root)
+        assert report == [], "Cross-feature enabled/disabled should not be flagged as contradiction"
+
+    def test_no_cross_feature_false_positive(self, lint_module, tmp_path):
+        """Enabled/disabled only contradict for the same feature/subject."""
+        root = tmp_path / "memory" / "vault"
+        (root / "decisions").mkdir(parents=True, exist_ok=True)
+        (root / "decisions" / "d1.md").write_text(
+            "Decision: Feature A is enabled.", encoding="utf-8"
+        )
+        (root / "decisions" / "d2.md").write_text(
+            "Decision: Feature B is disabled.", encoding="utf-8"
+        )
+
+        report = lint_module.detect_contradictions(root)
+        assert report == [], "different features should not be flagged as contradiction"
+
 
 # ------------------------------------------------------------------
 # 2. Orphans
@@ -153,14 +189,35 @@ class TestOrphans:
 
     def test_detects_orphan_pages(self, lint_module, sample_vault):
         orphans = lint_module.detect_orphans(sample_vault)
-        # entity-b has no inbound links
+        # entity-a: no inbound links from any page (entity-b has no wikilink to entity-a)
         names = {o["page"] for o in orphans}
-        assert "entity-b" in names
+        assert "entity-a" in names, "entity-a has no inbound links, must be orphan"
 
     def test_linked_page_not_orphan(self, lint_module, sample_vault):
         orphans = lint_module.detect_orphans(sample_vault)
         names = {o["page"] for o in orphans}
-        assert "entity-a" not in names
+        # entity-b has inbound link from entity-a
+        assert "entity-b" not in names, "entity-b has inbound link from entity-a, must not be orphan"
+
+    def test_orphan_means_zero_inbound_links(self, lint_module, tmp_path):
+        """Orphan = page that no other page links TO."""
+        root = tmp_path / "memory" / "vault"
+        for d in ("entities", "decisions", "concepts"):
+            (root / d).mkdir(parents=True, exist_ok=True)
+
+        # page-x has outgoing link to page-y, but no one links TO page-x
+        (root / "entities" / "page-x.md").write_text(
+            "# Page X\n\nLinks: [[page-y]]\n", encoding="utf-8"
+        )
+        # page-y has an incoming link from page-x
+        (root / "entities" / "page-y.md").write_text(
+            "# Page Y\n\nNo links here.\n", encoding="utf-8"
+        )
+
+        orphans = lint_module.detect_orphans(root)
+        names = {o["page"] for o in orphans}
+        assert "page-x" in names, "page-x has no inbound links, must be orphan"
+        assert "page-y" not in names, "page-y has inbound link from page-x, must not be orphan"
 
 
 # ------------------------------------------------------------------

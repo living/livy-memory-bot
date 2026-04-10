@@ -25,21 +25,57 @@ def _all_pages(vault_root: Path) -> list[Path]:
     return pages
 
 
+def _extract_feature(text: str) -> str | None:
+    """Extract a feature/subject token used to group contradiction candidates."""
+    low = text.lower()
+
+    # Prefer explicit feature naming: "feature x", "feature-flag", etc.
+    m = re.search(r"\bfeature\s+([a-z0-9_-]+)\b", low)
+    if m:
+        return m.group(1)
+
+    # Fallback: first wikilink target can act as subject anchor.
+    links = _extract_wikilinks(text)
+    if links:
+        return links[0].lower()
+
+    return None
+
+
 def detect_contradictions(vault_root: Path = VAULT_ROOT) -> list[dict]:
     """
-    Minimal contradiction detector:
-    Looks for opposite keywords in decision texts (enabled vs disabled).
+    Contradiction detector grouped by subject/feature.
+    Only flags enabled vs disabled when both decisions share the same feature subject.
     """
-    decisions = sorted((vault_root / "decisions").glob("*.md")) if (vault_root / "decisions").exists() else []
-    entries = [p.read_text(encoding="utf-8") for p in decisions]
+    decisions_dir = vault_root / "decisions"
+    if not decisions_dir.exists():
+        return []
+
+    decisions = sorted(decisions_dir.glob("*.md"))
+    entries: list[tuple[Path, str]] = [(p, p.read_text(encoding="utf-8")) for p in decisions]
+
+    # Group by feature subject
+    from collections import defaultdict
+    groups: dict[str, list[tuple[Path, str]]] = defaultdict(list)
+    for path, text in entries:
+        feature = _extract_feature(text)
+        if feature is not None:
+            groups[feature].append((path, text))
 
     contradictions: list[dict] = []
-    for i, a in enumerate(entries):
-        for b in entries[i + 1:]:
-            a_low = a.lower()
-            b_low = b.lower()
-            if ("enabled" in a_low and "disabled" in b_low) or ("disabled" in a_low and "enabled" in b_low):
-                contradictions.append({"a": a, "b": b, "kind": "enabled_vs_disabled"})
+    for feature, group_entries in groups.items():
+        enabled_texts = []
+        disabled_texts = []
+        for _, text in group_entries:
+            tl = text.lower()
+            if "enabled" in tl:
+                enabled_texts.append(text)
+            if "disabled" in tl:
+                disabled_texts.append(text)
+        if enabled_texts and disabled_texts:
+            for a, b in [(e, d) for e in enabled_texts for d in disabled_texts]:
+                # Use full text or just the meaningful body, not frontmatter-only truncation
+                contradictions.append({"a": a, "b": b, "kind": "enabled_vs_disabled", "feature": feature})
     return contradictions
 
 
@@ -55,18 +91,25 @@ def _extract_wikilinks(text: str) -> list[str]:
 
 def detect_orphans(vault_root: Path = VAULT_ROOT) -> list[dict]:
     """
-    Minimal orphan heuristic (Phase 1B):
-    entity page with zero wikilinks in its own content.
+    Orphan detector: entity page with zero INBOUND links from other pages.
     """
     entities_dir = vault_root / "entities"
     if not entities_dir.exists():
         return []
 
+    entity_names = {p.stem for p in sorted(entities_dir.glob("*.md"))}
+    inbound = {name: 0 for name in entity_names}
+
+    for page in _all_pages(vault_root):
+        src = page.stem
+        for link_name in _extract_wikilinks(_read(page)):
+            if link_name in inbound and link_name != src:
+                inbound[link_name] += 1
+
     orphans: list[dict] = []
-    for page in sorted(entities_dir.glob("*.md")):
-        links = _extract_wikilinks(_read(page))
-        if len(links) == 0:
-            orphans.append({"page": page.stem, "inbound_links": 0})
+    for name in sorted(entity_names):
+        if inbound[name] == 0:
+            orphans.append({"page": name, "inbound_links": 0})
     return orphans
 
 
@@ -79,7 +122,7 @@ def is_stale(last_verified: str, now: datetime | None = None) -> bool:
     if now is None:
         now = datetime.now(timezone.utc)
     try:
-        dt = datetime.fromisoformat(last_verified)
+        dt = datetime.fromisoformat(f"{last_verified.strip()}" + "T00:00:00+00:00")
     except Exception:
         return True
     # compare by date, 7+ days considered stale
