@@ -145,6 +145,7 @@ def collect_source_coverage(vault_root: Path) -> dict[str, Any]:
 
 
 def check_relation_completeness(vault_root: Path) -> dict[str, Any]:
+    """Validate relationship edges against domain minimum + lineage completeness."""
     errors: list[str] = []
     valid_edges = 0
     invalid_edges = 0
@@ -163,6 +164,8 @@ def check_relation_completeness(vault_root: Path) -> dict[str, Any]:
                 to_id = edge.get("to_id")
                 role = edge.get("role")
                 confidence = edge.get("confidence")
+                lineage_run_id = edge.get("lineage_run_id")
+                sources = edge.get("sources")
 
                 if not from_id or not is_valid_id_prefix(from_id):
                     edge_errors.append(f"{rel_file.name}[{idx}].from_id")
@@ -172,6 +175,12 @@ def check_relation_completeness(vault_root: Path) -> dict[str, Any]:
                     edge_errors.append(f"{rel_file.name}[{idx}].role")
                 if confidence is not None and confidence not in CONFIDENCE_LEVELS:
                     edge_errors.append(f"{rel_file.name}[{idx}].confidence")
+
+                if not isinstance(lineage_run_id, str) or not lineage_run_id.strip():
+                    edge_errors.append(f"{rel_file.name}[{idx}].lineage_run_id")
+
+                if not isinstance(sources, list) or len(sources) == 0:
+                    edge_errors.append(f"{rel_file.name}[{idx}].sources")
 
                 if edge_errors:
                     invalid_edges += 1
@@ -230,6 +239,12 @@ def detect_mismatches(vault_root: Path) -> dict[str, Any]:
         file_type = fm.get("type")
         if not file_type:
             mismatches.append(f"{path.name}:missing_type")
+
+        id_canonical = fm.get("id_canonical")
+        if not id_canonical:
+            mismatches.append(f"{path.name}:missing_id_canonical")
+        elif not is_valid_id_prefix(id_canonical):
+            mismatches.append(f"{path.name}:invalid_id_canonical")
 
         if path.parent.name == "decisions":
             confidence = fm.get("confidence")

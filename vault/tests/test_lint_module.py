@@ -124,6 +124,14 @@ Mentions concept [[streaming-architecture]].
     return root
 
 
+@pytest.fixture
+def domain_lint_module():
+    import sys
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    import vault.quality.domain_lint as dl
+    return dl
+
+
 # ------------------------------------------------------------------
 # 1. Contradictions
 # ------------------------------------------------------------------
@@ -285,3 +293,57 @@ class TestLintReportOutput:
         log = (sample_vault / "log.md").read_text(encoding="utf-8").lower()
         assert "lint" in log
         assert "contradictions" in log
+
+
+# ------------------------------------------------------------------
+# 6. Domain completeness (quality/domain_lint.py)
+# ------------------------------------------------------------------
+
+class TestDomainLintCompleteness:
+
+    def test_validate_vault_file_flags_missing_id_canonical(self, domain_lint_module, tmp_path):
+        root = tmp_path / "memory" / "vault"
+        (root / "decisions").mkdir(parents=True, exist_ok=True)
+        page = root / "decisions" / "missing-id.md"
+        page.write_text(
+            """---
+entity: decision:missing-id
+type: decision
+confidence: high
+sources:
+  - source_type: github_api
+    source_ref: https://github.com/living/livy-memory-bot/issues/1
+    retrieved_at: 2026-04-10T12:00:00Z
+    mapper_version: test-v1
+---
+# Missing ID
+""",
+            encoding="utf-8",
+        )
+
+        errors = domain_lint_module.validate_vault_file(page)
+        assert "missing_id_canonical" in errors
+
+    def test_validate_vault_file_flags_invalid_id_canonical_prefix(self, domain_lint_module, tmp_path):
+        root = tmp_path / "memory" / "vault"
+        (root / "entities").mkdir(parents=True, exist_ok=True)
+        page = root / "entities" / "bad-id.md"
+        page.write_text(
+            """---
+entity: Person Example
+type: person
+id_canonical: invalidprefix-john
+confidence: high
+sources:
+  - source_type: github_api
+    source_ref: https://github.com/john
+    retrieved_at: 2026-04-10T12:00:00Z
+    mapper_version: test-v1
+---
+# Person
+""",
+            encoding="utf-8",
+        )
+
+        errors = domain_lint_module.validate_vault_file(page)
+        assert any(err.startswith("invalid_id_prefix:") for err in errors)
