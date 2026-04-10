@@ -179,6 +179,93 @@ def build_repo_project_edge(
 
 
 # ---------------------------------------------------------------------------
+# Person -> Meeting / Card edges
+# ---------------------------------------------------------------------------
+
+
+def build_person_meeting_edge(
+    person_id: str,
+    meeting_id: str,
+    role: str,
+    source: dict,
+    lineage_run_id: str,
+    since: str | None = None,
+    until: str | None = None,
+    window_days: int | None = None,
+    from_source_key: str | None = None,
+    to_source_key: str | None = None,
+) -> dict:
+    """Build a person -> meeting edge.
+
+    Allowed roles for person->meeting:
+    - participant
+    - decision_maker
+    """
+    allowed_roles = {"participant", "decision_maker"}
+    if role not in allowed_roles:
+        raise ValueError(f"role must be one of {allowed_roles!r}, got {role!r}")
+
+    edge = _build_edge(
+        from_id=person_id,
+        to_id=meeting_id,
+        role=role,
+        source=source,
+        lineage_run_id=lineage_run_id,
+        since=since,
+        until=until,
+        window_days=window_days,
+    )
+
+    if from_source_key is not None:
+        edge["from_source_key"] = from_source_key
+    if to_source_key is not None:
+        edge["to_source_key"] = to_source_key
+
+    return edge
+
+
+def build_person_card_edge(
+    person_id: str,
+    card_id: str,
+    role: str,
+    source: dict,
+    lineage_run_id: str,
+    since: str | None = None,
+    until: str | None = None,
+    window_days: int | None = None,
+    from_source_key: str | None = None,
+    to_source_key: str | None = None,
+) -> dict:
+    """Build a person -> card edge.
+
+    Allowed roles for person->card:
+    - assignee
+    - participant
+    """
+    allowed_roles = {"assignee", "participant"}
+    if role not in allowed_roles:
+        raise ValueError(f"role must be one of {allowed_roles!r}, got {role!r}")
+
+    edge = _build_edge(
+        from_id=person_id,
+        to_id=card_id,
+        role=role,
+        source=source,
+        lineage_run_id=lineage_run_id,
+        since=since,
+        until=until,
+        window_days=window_days,
+    )
+
+    if from_source_key is not None:
+        edge["from_source_key"] = from_source_key
+    if to_source_key is not None:
+        edge["to_source_key"] = to_source_key
+
+    return edge
+
+
+# ---------------------------------------------------------------------------
 # Inferred person -> project edges via repo participation
 # ---------------------------------------------------------------------------
 

@@ -18,6 +18,8 @@ from vault.domain.relationship_builder import (
     build_commenter_edge,
     build_repo_project_edge,
     build_person_project_inference_edges,
+    build_person_meeting_edge,
+    build_person_card_edge,
     build_window_origin_hint,
 )
 
@@ -287,6 +289,104 @@ class TestBuildPersonProjectInference:
         )
         assert len(edges) == 1
         assert edges[0]["to_id"] == "project:livy-memory"
+
+
+class TestBuildPersonMeetingEdge:
+    """Person -> Meeting relationship edges."""
+
+    def test_allows_participant_role(self):
+        result = build_person_meeting_edge(
+            person_id="person:lincolnq",
+            meeting_id="meeting:daily-2026-04-10",
+            role="participant",
+            source=_source(),
+            lineage_run_id="run-2026-04-10",
+        )
+        assert result["from_id"] == "person:lincolnq"
+        assert result["to_id"] == "meeting:daily-2026-04-10"
+        assert result["role"] == "participant"
+
+    def test_allows_decision_maker_role(self):
+        result = build_person_meeting_edge(
+            person_id="person:lincolnq",
+            meeting_id="meeting:daily-2026-04-10",
+            role="decision_maker",
+            source=_source(),
+            lineage_run_id="run-2026-04-10",
+        )
+        assert result["role"] == "decision_maker"
+
+    def test_rejects_invalid_meeting_role(self):
+        with pytest.raises(ValueError, match="role must be one of"):
+            build_person_meeting_edge(
+                person_id="person:lincolnq",
+                meeting_id="meeting:daily-2026-04-10",
+                role="assignee",
+                source=_source(),
+                lineage_run_id="run-2026-04-10",
+            )
+
+    def test_sets_optional_source_keys(self):
+        result = build_person_meeting_edge(
+            person_id="person:lincolnq",
+            meeting_id="meeting:daily-2026-04-10",
+            role="participant",
+            source=_source(),
+            lineage_run_id="run-2026-04-10",
+            from_source_key="github:lincolnq",
+            to_source_key="tldv:meeting:123",
+        )
+        assert result["from_source_key"] == "github:lincolnq"
+        assert result["to_source_key"] == "tldv:meeting:123"
+
+
+class TestBuildPersonCardEdge:
+    """Person -> Card relationship edges."""
+
+    def test_allows_assignee_role(self):
+        result = build_person_card_edge(
+            person_id="person:lincolnq",
+            card_id="card:trello-123",
+            role="assignee",
+            source=_source(),
+            lineage_run_id="run-2026-04-10",
+        )
+        assert result["from_id"] == "person:lincolnq"
+        assert result["to_id"] == "card:trello-123"
+        assert result["role"] == "assignee"
+
+    def test_allows_participant_role(self):
+        result = build_person_card_edge(
+            person_id="person:lincolnq",
+            card_id="card:trello-123",
+            role="participant",
+            source=_source(),
+            lineage_run_id="run-2026-04-10",
+        )
+        assert result["role"] == "participant"
+
+    def test_rejects_invalid_card_role(self):
+        with pytest.raises(ValueError, match="role must be one of"):
+            build_person_card_edge(
+                person_id="person:lincolnq",
+                card_id="card:trello-123",
+                role="decision_maker",
+                source=_source(),
+                lineage_run_id="run-2026-04-10",
+            )
+
+    def test_sets_optional_source_keys(self):
+        result = build_person_card_edge(
+            person_id="person:lincolnq",
+            card_id="card:trello-123",
+            role="assignee",
+            source=_source(),
+            lineage_run_id="run-2026-04-10",
+            from_source_key="github:lincolnq",
+            to_source_key="trello:card:123",
+        )
+        assert result["from_source_key"] == "github:lincolnq"
+        assert result["to_source_key"] == "trello:card:123"
 
 
 class TestWindowDaysOriginHint:
