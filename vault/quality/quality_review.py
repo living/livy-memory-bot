@@ -49,25 +49,59 @@ def _parse_frontmatter(text: str) -> dict[str, str]:
 
 
 def _parse_sources(text: str) -> list[dict[str, str]]:
+    """Parse source records from markdown YAML frontmatter.
+
+    Supports both canonical and legacy field names:
+    - canonical:  source_type / source_ref / retrieved_at / mapper_version
+    - legacy:     type     / ref     / retrieved   (pre-2026-04-10)
+
+    The parser detects which format is in use by checking for "source_type" or "type"
+    in the first source block found.
+    """
     sources: list[dict[str, str]] = []
     lines = text.splitlines()
     i = 0
+
     while i < len(lines):
         line = lines[i].strip()
-        if line.startswith("- type:"):
-            source_type = line.split(":", 1)[1].strip()
+        # Support both "- source_type:" (canonical) and "- type:" (legacy)
+        is_source_block = line.startswith("- source_type:") or line.startswith("- type:")
+        if is_source_block:
+            if line.startswith("- source_type:"):
+                source_type = line.split(":", 1)[1].strip()
+            else:
+                source_type = line.split(":", 1)[1].strip()
             source_ref = ""
+            retrieved_at = ""
+            mapper_version = ""
             j = i + 1
             while j < len(lines):
                 nxt = lines[j].strip()
-                if nxt.startswith("- type:"):
+                # Detect start of next source block or end of frontmatter
+                if nxt.startswith("- source_type:") or nxt.startswith("- type:"):
                     break
-                if nxt.startswith("ref:"):
+                if nxt == "---" or nxt.startswith("## ") or nxt.startswith("# "):
+                    break
+                # Support canonical and legacy field names
+                if nxt.startswith("source_ref:"):
                     source_ref = nxt.split(":", 1)[1].strip()
-                if nxt.startswith("---"):
-                    break
+                elif nxt.startswith("ref:"):
+                    source_ref = nxt.split(":", 1)[1].strip()
+                elif nxt.startswith("retrieved_at:"):
+                    retrieved_at = nxt.split(":", 1)[1].strip()
+                elif nxt.startswith("retrieved:"):
+                    retrieved_at = nxt.split(":", 1)[1].strip()
+                elif nxt.startswith("mapper_version:"):
+                    mapper_version = nxt.split(":", 1)[1].strip().strip('"')
                 j += 1
-            sources.append({"source_type": source_type, "source_ref": source_ref})
+            record: dict[str, str] = {"source_type": source_type}
+            if source_ref:
+                record["source_ref"] = source_ref
+            if retrieved_at:
+                record["retrieved_at"] = retrieved_at
+            if mapper_version:
+                record["mapper_version"] = mapper_version
+            sources.append(record)
         i += 1
     return sources
 

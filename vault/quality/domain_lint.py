@@ -58,7 +58,12 @@ def _parse_frontmatter(text: str) -> dict[str, Any]:
 
 
 def _parse_sources_from_text(text: str) -> list[dict]:
-    """Parse source records from markdown text."""
+    """Parse source records from markdown text.
+
+    Supports both canonical and legacy source key names:
+    - canonical: source_type/source_ref/retrieved_at/mapper_version
+    - legacy:    type/ref/retrieved
+    """
     sources: list[dict] = []
     in_sources = False
     current_source: dict[str, str] = {}
@@ -70,16 +75,26 @@ def _parse_sources_from_text(text: str) -> list[dict]:
             current_source = {}
             continue
         if in_sources:
-            if stripped.startswith("- type:"):
+            if stripped.startswith("- source_type:"):
                 if current_source:
                     sources.append(current_source)
                 current_source = {"source_type": stripped.split(":", 1)[1].strip()}
+            elif stripped.startswith("- type:"):
+                if current_source:
+                    sources.append(current_source)
+                current_source = {"source_type": stripped.split(":", 1)[1].strip()}
+            elif stripped.startswith("source_ref:"):
+                current_source["source_ref"] = stripped.split(":", 1)[1].strip()
             elif stripped.startswith("ref:"):
                 current_source["source_ref"] = stripped.split(":", 1)[1].strip()
+            elif stripped.startswith("retrieved_at:"):
+                current_source["retrieved_at"] = stripped.split(":", 1)[1].strip()
             elif stripped.startswith("retrieved:"):
                 current_source["retrieved_at"] = stripped.split(":", 1)[1].strip()
-            elif stripped.startswith("mapper_version:") or (stripped and not stripped.startswith("-") and ":" not in stripped):
-                # End of sources block or non-source line
+            elif stripped.startswith("mapper_version:"):
+                current_source["mapper_version"] = stripped.split(":", 1)[1].strip().strip('"')
+            elif stripped == "---" or stripped.startswith("## ") or stripped.startswith("# "):
+                # End of sources/frontmatter block
                 if current_source:
                     sources.append(current_source)
                     current_source = {}
@@ -125,6 +140,9 @@ def _validate_source_record(source: dict, idx: int) -> list[str]:
 
     if "retrieved_at" not in source:
         errors.append(f"{prefix}.missing_retrieved_at")
+
+    if "mapper_version" not in source:
+        errors.append(f"{prefix}.missing_mapper_version")
 
     return errors
 
