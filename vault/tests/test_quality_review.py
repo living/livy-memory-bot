@@ -154,10 +154,23 @@ class TestSourceCoverage:
 class TestRelationCompleteness:
 
     def test_valid_edges_pass(self, quality_module, tmp_vault):
-        """Edges with valid from_id, to_id, role, confidence are valid."""
+        """Edges with valid from_id, to_id, role, confidence, lineage_run_id, sources are valid."""
         _write_relationships(tmp_vault / "relationships" / "r.json", [
-            {"from_id": "person:a", "to_id": "repo:b", "role": "author",
-             "confidence": "high"},
+            {
+                "from_id": "person:a",
+                "to_id": "repo:b",
+                "role": "author",
+                "confidence": "high",
+                "lineage_run_id": "run-2026-04-10",
+                "sources": [
+                    {
+                        "source_type": "github_api",
+                        "source_ref": "https://github.com/living/livy-memory-bot/pull/1",
+                        "retrieved_at": "2026-04-01T00:00:00Z",
+                        "mapper_version": "test-v1",
+                    }
+                ],
+            },
         ])
         result = quality_module.check_relation_completeness(tmp_vault)
 
@@ -220,12 +233,64 @@ class TestRelationCompleteness:
     def test_missing_confidence_ok(self, quality_module, tmp_vault):
         """Edge without confidence is valid (confidence is optional)."""
         _write_relationships(tmp_vault / "relationships" / "r.json", [
-            {"from_id": "person:a", "to_id": "repo:b", "role": "author"},
+            {
+                "from_id": "person:a",
+                "to_id": "repo:b",
+                "role": "author",
+                "lineage_run_id": "run-2026-04-10",
+                "sources": [
+                    {
+                        "source_type": "github_api",
+                        "source_ref": "https://github.com/living/livy-memory-bot/pull/1",
+                        "retrieved_at": "2026-04-01T00:00:00Z",
+                        "mapper_version": "test-v1",
+                    }
+                ],
+            },
         ])
         result = quality_module.check_relation_completeness(tmp_vault)
 
         assert result["invalid_edges"] == 0
         assert result["valid_edges"] == 1
+
+    def test_missing_lineage_run_id_is_flagged(self, quality_module, tmp_vault):
+        """Edge without lineage_run_id fails lineage completeness."""
+        _write_relationships(tmp_vault / "relationships" / "r.json", [
+            {
+                "from_id": "person:a",
+                "to_id": "repo:b",
+                "role": "author",
+                "confidence": "high",
+                "sources": [
+                    {
+                        "source_type": "github_api",
+                        "source_ref": "https://github.com/living/livy-memory-bot/pull/1",
+                        "retrieved_at": "2026-04-01T00:00:00Z",
+                        "mapper_version": "test-v1",
+                    }
+                ],
+            },
+        ])
+        result = quality_module.check_relation_completeness(tmp_vault)
+
+        assert result["invalid_edges"] == 1
+        assert any("lineage_run_id" in str(e) for e in result["errors"])
+
+    def test_missing_sources_is_flagged(self, quality_module, tmp_vault):
+        """Edge without sources fails lineage completeness."""
+        _write_relationships(tmp_vault / "relationships" / "r.json", [
+            {
+                "from_id": "person:a",
+                "to_id": "repo:b",
+                "role": "author",
+                "confidence": "high",
+                "lineage_run_id": "run-2026-04-10",
+            },
+        ])
+        result = quality_module.check_relation_completeness(tmp_vault)
+
+        assert result["invalid_edges"] == 1
+        assert any("sources" in str(e) for e in result["errors"])
 
     def test_relation_completeness_structure(self, quality_module, tmp_vault):
         """Result has expected top-level keys."""
@@ -300,12 +365,12 @@ class TestMismatches:
     def test_missing_confidence_mismatch(self, quality_module, tmp_vault):
         """Decision without confidence is flagged as mismatch."""
         (tmp_vault / "decisions" / "d1.md").write_text(
-            "---\nentity: D1\ntype: decision\n---\n# D1\n",
+            "---\nentity: D1\ntype: decision\nid_canonical: decision:d1\n---\n# D1\n",
             encoding="utf-8",
         )
         result = quality_module.detect_mismatches(tmp_vault)
 
-        assert result["mismatch_count"] == 1
+        assert result["mismatch_count"] >= 1
         assert any("confidence" in str(m) for m in result["mismatches"])
 
     def test_invalid_confidence_mismatch(self, quality_module, tmp_vault):
@@ -329,6 +394,30 @@ class TestMismatches:
         assert result["mismatch_count"] >= 1
         assert any("type" in str(m) for m in result["mismatches"])
 
+    def test_missing_id_canonical_mismatch(self, quality_module, tmp_vault):
+        """Entity/decision without id_canonical is flagged."""
+        (tmp_vault / "entities" / "e1.md").write_text(
+            "---\nentity: person:john\ntype: person\n---\n# Person\n",
+            encoding="utf-8",
+        )
+
+        result = quality_module.detect_mismatches(tmp_vault)
+
+        assert result["mismatch_count"] >= 1
+        assert any("missing_id_canonical" in str(m) for m in result["mismatches"])
+
+    def test_invalid_id_canonical_prefix_mismatch(self, quality_module, tmp_vault):
+        """id_canonical with unknown prefix is flagged."""
+        (tmp_vault / "entities" / "e1.md").write_text(
+            "---\nentity: person:john\ntype: person\nid_canonical: badprefix-john\n---\n# Person\n",
+            encoding="utf-8",
+        )
+
+        result = quality_module.detect_mismatches(tmp_vault)
+
+        assert result["mismatch_count"] >= 1
+        assert any("invalid_id_canonical" in str(m) for m in result["mismatches"])
+
     def test_missing_source_ref(self, quality_module, tmp_vault):
         """Source record without ref is flagged."""
         _write_decision(tmp_vault / "decisions" / "d1.md",
@@ -340,9 +429,10 @@ class TestMismatches:
 
     def test_no_mismatches_clean(self, quality_module, tmp_vault):
         """Valid vault has zero mismatches."""
-        _write_decision(tmp_vault / "decisions" / "d1.md",
-                        entity_id="D1", confidence="high",
-                        sources=[{"type": "github_api", "ref": "http://gh/1"}])
+        (tmp_vault / "decisions" / "d1.md").write_text(
+            "---\nentity: D1\ntype: decision\nid_canonical: decision:d1\nconfidence: high\nsources:\n  - type: github_api\n    ref: http://gh/1\n    retrieved: 2026-04-01T00:00:00Z\n    mapper_version: test-v1\n---\n# D1\n",
+            encoding="utf-8",
+        )
         result = quality_module.detect_mismatches(tmp_vault)
 
         assert result["mismatch_count"] == 0

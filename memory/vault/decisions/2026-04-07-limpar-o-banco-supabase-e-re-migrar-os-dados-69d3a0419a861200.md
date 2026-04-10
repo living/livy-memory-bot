@@ -1,0 +1,44 @@
+---
+entity: Limpar o banco Supabase e re-migrar os dados do MySQL de forma mais controlada,
+  corrigindo FKs e removendo registros dup
+type: decision
+confidence: medium
+sources:
+- source_type: signal_event
+  source_ref: migration-derived:2026-04-07-limpar-o-banco-supabase-e-re-migrar-os-dados-69d3a0419a861200.md
+  retrieved_at: 2026-04-10 13:00:21+00:00
+  mapper_version: signal-ingest-v1
+- source_type: tldv_api
+  source_ref: https://tldv.io/meeting/69d3a0419a861200135c6d50
+  retrieved_at: 2026-04-10 00:00:00+00:00
+  mapper_version: signal-ingest-v1
+  note: Status Kaba/BAT/BOT
+last_verified: 2026-04-07
+verification_log: []
+last_touched_by: livy-agent
+draft: false
+id_canonical: decision:2026-04-07-limpar-o-banco-supabase-e-re-migrar-os-dados-69d3a0419a861200
+source_keys: &id001
+- https://tldv.io/meeting/69d3a0419a861200135c6d50
+- migration-derived:2026-04-07-limpar-o-banco-supabase-e-re-migrar-os-dados-69d3a0419a861200.md
+first_seen_at: '2026-04-10T15:01:20Z'
+last_seen_at: '2026-04-10T15:01:20Z'
+lineage:
+  run_id: domain-elevation-wave-a
+  source_keys: *id001
+  transformed_at: '2026-04-10T15:01:20Z'
+  mapper_version: domain-elevation-v1
+  actor: elevate_to_domain_model
+---
+
+# Limpar o banco Supabase e re-migrar os dados do MySQL de forma mais controlada, corrigindo FKs e removendo registros duplicados/órfãos
+
+## Summary
+Limpar o banco Supabase e re-migrar os dados do MySQL de forma mais controlada, corrigindo FKs e removendo registros duplicados/órfãos
+
+## Evidence
+- https://tldv.io/meeting/69d3a0419a861200135c6d50
+
+## Links
+- Related entity: [[../entities/bat-conectabot-observability|bat-conectabot-observability]]
+- [[../entities/bat-conectabot|Bat Conectabot]]

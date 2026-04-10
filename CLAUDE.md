@@ -468,3 +468,75 @@ When copying tests between worktrees, verify the API signatures match the target
 - `infer_mode(question, meeting_id)` vs old `(question)` — always pass both args
 - `get_headers()` not `get_supabase_headers()`
 - default `infer_mode` mode is `"keyword"`, not `"semantic"`
+
+---
+
+## LLM Wiki Auto-Evolutiva — Wave A (2026-04-10)
+
+**Branch:** `feature/wave-a-domain-model-elevation`
+**Spec:** `docs/superpowers/specs/2026-04-10-llm-wiki-auto-evolutiva-design.md`
+**Plan:** `docs/superpowers/plans/2026-04-10-wave-a-domain-model-elevation-plan.md`
+
+### Ondas (sequenciais puras: A → B → C → D)
+- **A:** Confiabilidade do domain model (em progresso) ← ATUAL
+- **B:** Cobertura multi-fonte (TLDV + GitHub + claude-mem)
+- **C:** Observabilidade + rastreabilidade
+- **D:** Autoevolução operacional
+
+### Status Wave A (2026-04-10)
+- Design aprovado: ✅
+- Plano escrito: ✅
+- Branch criada: ✅ (`feature/wave-a-domain-model-elevation`)
+- Tasks: 8 (TDD-first, subagent-driven)
+
+### Tasks do Plano
+| # | Task | Status |
+|---|---|---|
+| 1 | Baseline audit + failing contract tests | pending |
+| 2 | Script TDD — elevate_to_domain_model | pending |
+| 3 | Domain writers em ingest (domain minimum fields) | pending |
+| 4 | Lint + quality gate upgrades | pending |
+| 5 | PoC migration (1 entity + 2 decisions + 1 concept) | pending |
+| 6 | Bulk migration (all vault pages) | pending |
+| 7 | Index/log consistency + docs | pending |
+| 8 | Final verification + PR readiness | pending |
+
+### Domain Model Contract (vigente)
+```yaml
+# Decision (domain minimum frontmatter)
+---
+id_canonical: decision:<slug>
+type: decision
+confidence: high|medium|low|unverified
+sources:              # canônico: source_type/source_ref/retrieved_at/mapper_version
+  - source_type: signal_event
+    source_ref: <url>
+    retrieved_at: 2026-04-10T00:00:00Z
+    mapper_version: "signal-ingest-v1"
+source_keys: []
+lineage:
+  run_id: "<uuid>"
+  transformed_at: 2026-04-10T00:00:00Z
+  mapper_version: "signal-ingest-v1"
+  actor: livy-agent
+relationships:
+  - role: author|reviewer|participant|decision_maker
+    entity_ref: person:<id>
+---
+```
+
+### Wave A — Operational Runbook
+
+```bash
+# Bulk elevation (all vault pages)
+python3 scripts/elevate_to_domain_model.py --scope all --verbose
+
+# Dry-run elevation (no writes)
+python3 scripts/elevate_to_domain_model.py --dry-run --scope all
+
+# Test suite
+python3 -m pytest vault/tests/ -q --tb=no
+```
+
+Backup location for migration artifacts:
+- `memory/vault/.migration-backup/`

@@ -9,6 +9,12 @@ from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 
+try:
+    from vault.slug_registry import resolve as _resolve_slug
+
+except ImportError:
+    _resolve_slug = lambda s: s  # type: ignore
+
 ROOT = Path(__file__).resolve().parents[1]
 VAULT_ROOT = ROOT / "memory" / "vault"
 
@@ -83,9 +89,16 @@ def _extract_wikilinks(text: str) -> list[str]:
     links = re.findall(r"\[\[([^\]|]+)(?:\|[^\]]+)?\]\]", text)
     cleaned = []
     for link in links:
-        name = Path(link.strip()).stem
-        if name:
+        # Normalize: extract just the filename component (handles ../entities/foo)
+        from pathlib import PurePosixPath
+        name = PurePosixPath(link.strip()).stem or PurePosixPath(link.strip()).name
+        if name and "/" not in name:
             cleaned.append(name)
+        elif name:
+            # strip path prefix to get just the filename
+            clean = name.split("/")[-1]
+            if clean:
+                cleaned.append(clean)
     return cleaned
 
 
@@ -102,9 +115,14 @@ def detect_orphans(vault_root: Path = VAULT_ROOT) -> list[dict]:
 
     for page in _all_pages(vault_root):
         src = page.stem
+        src_section = page.parent.name
         for link_name in _extract_wikilinks(_read(page)):
-            if link_name in inbound and link_name != src:
-                inbound[link_name] += 1
+            if link_name not in inbound:
+                continue
+            # Ignore only true self-links from the same entity page.
+            if src_section == "entities" and link_name == src:
+                continue
+            inbound[link_name] += 1
 
     orphans: list[dict] = []
     for name in sorted(entity_names):
@@ -159,7 +177,18 @@ def detect_coverage_gaps(vault_root: Path = VAULT_ROOT) -> list[dict]:
                 refs.add(link)
 
     gaps = [{"concept": c} for c in sorted(refs) if c not in existing]
-    return gaps
+
+    # Apply slug registry to resolve known aliases before reporting
+    resolved_gaps: list[dict] = []
+    for gap in gaps:
+        concept = gap.get("concept", "")
+        canonical = _resolve_slug(concept)
+        # If canonical resolves to an existing page, drop the gap
+        if canonical in existing:
+            continue
+        resolved_gaps.append({"concept": concept, "canonical": canonical})
+
+    return resolved_gaps
 
 
 def _report_markdown(now: datetime, contradictions: list[dict], orphans: list[dict], stale: list[dict], gaps: list[dict]) -> str:

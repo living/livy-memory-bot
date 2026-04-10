@@ -106,19 +106,17 @@ def _parse_sources_from_text(text: str) -> list[dict]:
     return sources
 
 
-def _validate_entity_id(entity_id: str) -> list[str]:
-    """Validate entity id_canonical format."""
+def _validate_id_canonical(entity_id: str) -> list[str]:
+    """Validate id_canonical format (prefix:slug)."""
     errors = []
     if not entity_id:
-        errors.append("empty_entity_id")
+        errors.append("missing_id_canonical")
         return errors
 
-    # Check prefix
     has_valid_prefix = any(entity_id.startswith(p) for p in ID_PREFIXES)
     if not has_valid_prefix:
         errors.append(f"invalid_id_prefix:{entity_id}")
 
-    # Check colon separator
     if ":" not in entity_id:
         errors.append(f"missing_colon_separator:{entity_id}")
 
@@ -198,6 +196,13 @@ def validate_vault_file(path: Path) -> list[str]:
     entity_type = fm.get("type", "")
     if not entity_type:
         errors.append("missing_type_field")
+
+    # Validate canonical id
+    id_canonical = fm.get("id_canonical", "")
+    if not id_canonical:
+        errors.append("missing_id_canonical")
+    else:
+        errors.extend(_validate_id_canonical(id_canonical))
 
     # Validate confidence
     confidence = fm.get("confidence")

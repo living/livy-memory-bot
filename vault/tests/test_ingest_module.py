@@ -329,3 +329,123 @@ class TestIngestPipeline:
             and f.name != "signal-events.jsonl"
         ]
         assert not outside_vault
+
+
+# ------------------------------------------------------------------
+# 6. Domain-minimum frontmatter (spec §3.4)
+# ------------------------------------------------------------------
+
+class TestDecisionDomainMinimumFrontmatter:
+
+    @staticmethod
+    def _parse_fm(text: str) -> dict:
+        import yaml
+        stripped = text.lstrip()
+        if not stripped.startswith("---"):
+            return {}
+        try:
+            end = stripped.index("\n---", 3)
+        except ValueError:
+            return {}
+        try:
+            return yaml.safe_load(stripped[3:end]) or {}
+        except Exception:
+            return {}
+
+    def test_decision_has_id_canonical_and_lineage_minimum(self, ingest_module, vault_root, monkeypatch):
+        monkeypatch.setattr("vault.ingest.VAULT_ROOT", vault_root)
+        decision = {
+            "signal_type": "decision",
+            "description": "Adotar modelo de domínio",
+            "evidence": "https://tldv.io/meeting/x",
+            "confidence": 0.8,
+            "origin_id": "domain-min-001",
+            "origin_url": "https://tldv.io/meeting/x",
+            "collected_at": "2026-04-10T12:00:00+00:00",
+        }
+        path = ingest_module.upsert_decision(decision)
+        fm = self._parse_fm(path.read_text(encoding="utf-8"))
+
+        assert "id_canonical" in fm
+        assert str(fm["id_canonical"]).startswith("decision:")
+        assert isinstance(fm.get("source_keys"), list) and len(fm.get("source_keys", [])) > 0
+        assert "first_seen_at" in fm
+        assert "last_seen_at" in fm
+
+        lineage = fm.get("lineage")
+        assert isinstance(lineage, dict)
+        for key in ("run_id", "source_keys", "transformed_at", "mapper_version", "actor"):
+            assert key in lineage
+
+    def test_decision_lineage_source_keys_is_non_empty_list(self, ingest_module, vault_root, monkeypatch):
+        monkeypatch.setattr("vault.ingest.VAULT_ROOT", vault_root)
+        decision = {
+            "signal_type": "decision",
+            "description": "Emitir lineage source_keys",
+            "evidence": "url",
+            "confidence": 0.8,
+            "origin_id": "domain-min-002",
+            "origin_url": "url",
+            "collected_at": "2026-04-10T12:00:00+00:00",
+        }
+        path = ingest_module.upsert_decision(decision)
+        fm = self._parse_fm(path.read_text(encoding="utf-8"))
+        sk = fm.get("lineage", {}).get("source_keys")
+        assert isinstance(sk, list) and len(sk) > 0
+
+    def test_decision_has_non_empty_sources(self, ingest_module, vault_root, monkeypatch):
+        monkeypatch.setattr("vault.ingest.VAULT_ROOT", vault_root)
+        decision = {
+            "signal_type": "decision",
+            "description": "Fontes não vazias em decisões",
+            "evidence": "url",
+            "confidence": 0.8,
+            "origin_id": "sources-min-001",
+            "origin_url": "url",
+            "collected_at": "2026-04-10T12:00:00+00:00",
+        }
+        path = ingest_module.upsert_decision(decision)
+        fm = self._parse_fm(path.read_text(encoding="utf-8"))
+        sources = fm.get("sources")
+        assert isinstance(sources, list) and len(sources) > 0, "sources must be a non-empty list"
+        src = sources[0]
+        assert "source_type" in src
+        assert "source_ref" in src
+        assert "retrieved_at" in src
+        assert "mapper_version" in src
+
+
+class TestConceptDomainMinimumFrontmatter:
+
+    @staticmethod
+    def _parse_fm(text: str) -> dict:
+        import yaml
+        stripped = text.lstrip()
+        if not stripped.startswith("---"):
+            return {}
+        try:
+            end = stripped.index("\n---", 3)
+        except ValueError:
+            return {}
+        try:
+            return yaml.safe_load(stripped[3:end]) or {}
+        except Exception:
+            return {}
+
+    def test_concept_has_id_canonical(self, ingest_module, vault_root, monkeypatch):
+        monkeypatch.setattr("vault.ingest.VAULT_ROOT", vault_root)
+        topic = {
+            "description": "Patrimônio Líquido",
+            "evidence": "url",
+            "confidence": 0.6,
+            "origin_id": "concept-min-001",
+            "origin_url": "url",
+            "collected_at": "2026-04-10T12:00:00+00:00",
+        }
+        path = ingest_module.upsert_concept(topic)
+        fm = self._parse_fm(path.read_text(encoding="utf-8"))
+        assert "id_canonical" in fm
+        assert str(fm["id_canonical"]).startswith("concept:")
+        assert isinstance(fm.get("source_keys"), list) and len(fm.get("source_keys", [])) > 0
+        assert "first_seen_at" in fm
+        assert "last_seen_at" in fm
