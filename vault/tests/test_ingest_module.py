@@ -174,6 +174,34 @@ class TestSignalClassification:
         assert result is not None
         assert result["signal_type"] == "topic_mentioned"
 
+    def test_topic_mentioned_written_to_concepts_dir(self, ingest_module, vault_root, monkeypatch, tmp_path):
+        """topic_mentioned signals must be written as concept pages."""
+        import json
+        monkeypatch.setattr("vault.ingest.VAULT_ROOT", vault_root)
+
+        events_file = tmp_path / "topics.jsonl"
+        event = {
+            "event_id": "evt-top1",
+            "signal_type": "topic_mentioned",
+            "payload": {
+                "description": "Patrimônio Líquido",
+                "evidence": "https://tldv.io/meeting/xxx",
+                "confidence": 0.6,
+            },
+            "origin_id": "meeting-top1",
+            "origin_url": "https://tldv.io/meeting/xxx",
+            "collected_at": "2026-04-07T13:00:00+00:00",
+        }
+        with events_file.open("w", encoding="utf-8") as f:
+            f.write(json.dumps(event) + "\n")
+
+        summary = ingest_module.run_ingest(events_file)
+        assert summary["topics"] >= 1
+        concepts_dir = vault_root / "concepts"
+        assert concepts_dir.exists()
+        concept_files = list(concepts_dir.glob("*.md"))
+        assert len(concept_files) >= 1, "topic_mentioned signal must create a concept page"
+
     def test_unknown_signal_type_returns_none(self, ingest_module):
         ev = {"signal_type": "unknown_type", "payload": {}, "origin_url": "url"}
         result = ingest_module.extract_signal(ev)

@@ -106,15 +106,25 @@ draft: false
 """
 
 
+def _stable_suffix(value: str, default: str = "evt") -> str:
+    slug = _slugify(value)[:16]
+    return slug or default
+
+
 def upsert_decision(decision: dict) -> Path:
     decisions_dir = VAULT_ROOT / "decisions"
     decisions_dir.mkdir(parents=True, exist_ok=True)
 
     collected_at = decision.get("collected_at") or datetime.now(timezone.utc).isoformat()
     date_str = collected_at[:10]
-    slug = _slugify(decision.get("description", "decision"))[:64]
-    filename = f"{date_str}-{slug}.md"
+    base_slug = _slugify(decision.get("description", "decision"))[:44]
+    unique_suffix = _stable_suffix(decision.get("origin_id", ""), default="decision")
+    filename = f"{date_str}-{base_slug}-{unique_suffix}.md"
     path = decisions_dir / filename
+
+    # True upsert behavior for phase 1B: keep existing decision file stable
+    if path.exists():
+        return path
 
     conf = map_signal_confidence(decision.get("confidence"))
     frontmatter = _decision_frontmatter(decision, conf, date_str)
@@ -140,6 +150,57 @@ def upsert_decision(decision: dict) -> Path:
     body_lines.extend(links if links else ["- none"])
     body = "\n".join(body_lines) + "\n"
 
+    path.write_text(body, encoding="utf-8")
+    return path
+
+
+def _concept_frontmatter(topic: dict, conf: str, date_str: str) -> str:
+    desc = topic.get("description", "").replace("\n", " ").strip()
+    return f"""---
+entity: {desc[:120] or 'Concept'}
+type: concept
+confidence: {conf}
+sources:
+  - type: signal_event
+    ref: {topic.get('origin_url','')}
+    retrieved: {date_str}
+last_verified: {date_str}
+verification_log: []
+last_touched_by: livy-agent
+draft: false
+---
+"""
+
+
+def upsert_concept(topic: dict) -> Path:
+    concepts_dir = VAULT_ROOT / "concepts"
+    concepts_dir.mkdir(parents=True, exist_ok=True)
+
+    collected_at = topic.get("collected_at") or datetime.now(timezone.utc).isoformat()
+    date_str = collected_at[:10]
+    slug = _slugify(topic.get("description", "concept"))[:48]
+    unique_suffix = _stable_suffix(topic.get("origin_id", ""), default="topic")
+    path = concepts_dir / f"{slug}-{unique_suffix}.md"
+
+    if path.exists():
+        return path
+
+    conf = map_signal_confidence(topic.get("confidence"))
+    frontmatter = _concept_frontmatter(topic, conf, date_str)
+    body = "\n".join([
+        frontmatter,
+        f"# {topic.get('description', 'Concept')}",
+        "",
+        "## Summary",
+        topic.get("description", ""),
+        "",
+        "## Evidence",
+        f"- {topic.get('evidence', '')}",
+        "",
+        "## Links",
+        "- none",
+        "",
+    ])
     path.write_text(body, encoding="utf-8")
     return path
 
@@ -187,6 +248,7 @@ def _append_log(summary: dict) -> None:
 def run_ingest(events_path: Path | str = DEFAULT_EVENTS) -> dict:
     VAULT_ROOT.mkdir(parents=True, exist_ok=True)
     (VAULT_ROOT / "decisions").mkdir(parents=True, exist_ok=True)
+    (VAULT_ROOT / "concepts").mkdir(parents=True, exist_ok=True)
 
     events = load_events(events_path)
     deduped = deduplicate_events(events)
@@ -202,6 +264,7 @@ def run_ingest(events_path: Path | str = DEFAULT_EVENTS) -> dict:
             upsert_decision(signal)
             decisions_count += 1
         elif signal["signal_type"] == "topic_mentioned":
+            upsert_concept(signal)
             topics_count += 1
 
     summary = {
