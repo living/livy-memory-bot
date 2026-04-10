@@ -77,7 +77,7 @@ def _process_single_event(
             print(f"  [cache {status}] {sig_type} {signal.get('description', '')[:60]}")
 
         # Apply confidence gate
-        gate_overridden = "_gate_override" in signal
+        gate_overridden = False
         signal = _enforce_confidence_gate(signal)
         if "_gate_override" in signal:
             gate_overridden = True

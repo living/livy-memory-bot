@@ -258,7 +258,8 @@ class TestPerSourceIngestIndependence:
         )
 
         # Summary should include source type breakdown
-        assert "sources_processed" in summary or "source_counts" in summary or "source_metrics" in summary
+        assert "source_counts" in summary
+        assert isinstance(summary["source_counts"], dict)
 
     def test_missing_source_file_skipped_gracefully(self, pipeline_module, temp_workspace, monkeypatch):
         """Non-existent source file should be skipped without error."""
@@ -329,9 +330,11 @@ class TestPartialFailureTolerance:
             dry_run=False,
         )
 
-        # decisions + concepts should equal events_deduped (accounting for filter)
+        # decisions + concepts should reflect successful processed events
         total_written = summary["decisions_written"] + summary["concepts_written"]
-        # Each valid event maps to exactly one decision or concept
+        # In this fixture we expect at least one successful write.
+        assert total_written >= 1
+        # Writes cannot exceed deduped events.
         assert total_written <= summary["events_deduped"]
 
 
