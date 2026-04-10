@@ -250,6 +250,32 @@ Editar `~/.openclaw/cron/jobs.json` diretamente — `openclaw cron add` é basea
 
 Para implementar planos com múltiplas tarefas, usar `EnterWorktree` + agente por tarefa + review em duas fases (spec compliance + code quality).
 
+## Session Decisions — 2026-04-10 (Domain Modeling Living)
+
+Resumo consolidado da sessão de design/planejamento:
+- Modelagem **domain-first** obrigatória: `Person`, `Project`, `Repo`, `Meeting`, `Card`, `Decision`.
+- Relações canônicas com papéis: `author`, `reviewer`, `commenter`, `participant`, `assignee`, `decision_maker`.
+- Fontes independentes (GitHub/TLDV/Trello) devem convergir para o **mesmo contrato de domínio**.
+- Janela padrão de análise: **30 dias**; consultas estendidas: **90/180/355**.
+- Em PRs usar sempre datas `created_at` e `merged_at`.
+- Ingestão GitHub com escopo restrito por allowlist:
+  - `github.org_allowlist` (required)
+  - `github.repo_allowlist` (optional, priority)
+  - `github.repo_denylist` (optional)
+- Nunca ingerir todos os repositórios visíveis ao token.
+- Fluxos separados por cron (per-source), sem orquestrador único:
+  - `ingest-github` (hourly)
+  - `ingest-tldv` (cadência existente)
+  - `ingest-trello` (hourly/change-driven)
+- `Decision.project_ref` permanece opcional (intencional) para decisões cross-cutting.
+- `window_days` em arestas é **query-origin hint**, não constraint do grafo.
+- Dados fora da janela ativa não são deletados por ingestão; marcar `outside_active_window: true` e tratar via política de arquivo/consolidação.
+- Prioridades de engenharia: **TDD, resiliência, observabilidade, rastreabilidade**.
+- Artefatos oficiais da sessão:
+  - Spec: `docs/superpowers/specs/2026-04-10-domain-modeling-livy-design.md`
+  - Plan: `docs/superpowers/plans/2026-04-10-domain-modeling-livy-implementation.md`
+  - Session notes: `docs/superpowers/session-notes/2026-04-10-domain-modeling-session-summary.md`
+
 ### Running tests in skills/memoria-consolidation
 
 Unit tests: `cd <worktree-root> && python3 -m pytest skills/memoria-consolidation/test_reconciliation.py -q`
@@ -380,6 +406,43 @@ vault/ingest.py     → primeiro ciclo real
 - **Evidência mínima de conclusão:** sempre reportar comando e resultado (`python3 -m pytest vault/tests/ -q` → `94 passed`).
 - **Spec-sensitive tests:** quando corrigir semântica (ex: orphan=inbound), alinhar asserts dos testes com o comportamento canônico para evitar falsos vermelhos.
 - **PR hygiene:** aplicar minor fixes de quality review (unused imports / import placement) antes de abrir PR final.
+
+### Learning persistido — Domain Modeling Living + Vault Schema Fix (2026-04-10)
+- **Branch:** `feature/domain-modeling-ingestion-v1`
+- **PR:** `https://github.com/living/livy-memory-bot/pull/5`
+- **Validação final:** `python3 -m pytest vault/tests/ -q --tb=no` → `413 passed, 1 skipped`.
+- **Pipeline E2E:** `python3 -m vault.pipeline --dry-run -v` e `python3 -m vault.pipeline -v` OK; `gaps/orphans after lint = 0/0`.
+- **Regra de domínio consolidada:** `part_of` **não** é role canônica; usar apenas `author`, `reviewer`, `commenter`, `participant`, `assignee`, `decision_maker`.
+- **Guardrail anti-regressão:** sempre rodar `grep -R "part_of" vault/` antes de fechar task/PR de domínio.
+- **Subagent spawn guardrail:** em `runtime=subagent`, usar payload mínimo; não enviar campos ACP-only (`streamTo`, `attachments`, `attachAs`).
+- **GH CLI guardrail:** para PRs com markdown/backticks, usar `--body-file` (não inline), evitando command substitution/expansão de shell no corpo.
+
+### Vault Source Schema — Canonical Contract (2026-04-10)
+
+**Schema canônico de `sources` em frontmatter:**
+```yaml
+sources:
+  - source_type: signal_event    # não: type
+    source_ref: <url|event-id>   # não: ref
+    retrieved_at: 2026-04-10T00:00:00Z  # não: retrieved
+    mapper_version: "signal-ingest-v1"    # obrigatório
+```
+
+**Migration script:** `scripts/migrate_source_schema.py` — idempotente, com backup automático em `memory/vault/.migration-backup/`.
+- Cobertura: decisions/ + entities/ + concepts/
+- Compatível retroativamente: parsers de `quality_review` e `domain_lint` aceitam ambos os formatos.
+
+**Regra operacional:** novos writes via `vault/ingest.py` EMITEM schema canônico; parsers de LINT/QUALITY ACEITAM ambos. Migração do acervo histórico via script.
+
+**Validação pós-migração:**
+```bash
+python3 -m pytest vault/tests/ -q --tb=no  # 420 passed
+python3 - <<'PY'
+from vault.quality.domain_lint import run_domain_lint
+r = run_domain_lint(Path('memory/vault'))
+print(r['summary'])  # valid=True, total_errors=0
+PY
+```
 
 ---
 

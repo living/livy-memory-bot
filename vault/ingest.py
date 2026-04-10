@@ -90,14 +90,28 @@ def extract_signal(event: dict) -> dict | None:
 
 def _decision_frontmatter(decision: dict, conf: str, date_str: str) -> str:
     desc = decision.get("description", "").replace("\n", " ").strip()
+    # Canonical source record: source_type / source_ref / retrieved_at / mapper_version
+    collected_at = decision.get("collected_at") or ""
+    # Normalise to UTC ISO timestamp; strip timezone offset for Z-suffix
+    if collected_at:
+        try:
+            from datetime import datetime
+            dt = datetime.fromisoformat(collected_at)
+            retrieved_at = dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+        except Exception:
+            retrieved_at = f"{date_str}T00:00:00Z"
+    else:
+        retrieved_at = f"{date_str}T00:00:00Z"
+    source_ref = decision.get("origin_url") or decision.get("origin_id") or ""
     return f"""---
 entity: {desc[:120] or 'Decision'}
 type: decision
 confidence: {conf}
 sources:
-  - type: signal_event
-    ref: {decision.get('origin_url','')}
-    retrieved: {date_str}
+  - source_type: signal_event
+    source_ref: {source_ref}
+    retrieved_at: {retrieved_at}
+    mapper_version: "signal-ingest-v1"
 last_verified: {date_str}
 verification_log: []
 last_touched_by: livy-agent
@@ -156,14 +170,27 @@ def upsert_decision(decision: dict) -> Path:
 
 def _concept_frontmatter(topic: dict, conf: str, date_str: str) -> str:
     desc = topic.get("description", "").replace("\n", " ").strip()
+    # Canonical source record: source_type / source_ref / retrieved_at / mapper_version
+    collected_at = topic.get("collected_at") or ""
+    if collected_at:
+        try:
+            from datetime import datetime
+            dt = datetime.fromisoformat(collected_at)
+            retrieved_at = dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+        except Exception:
+            retrieved_at = f"{date_str}T00:00:00Z"
+    else:
+        retrieved_at = f"{date_str}T00:00:00Z"
+    source_ref = topic.get("origin_url") or topic.get("origin_id") or ""
     return f"""---
 entity: {desc[:120] or 'Concept'}
 type: concept
 confidence: {conf}
 sources:
-  - type: signal_event
-    ref: {topic.get('origin_url','')}
-    retrieved: {date_str}
+  - source_type: signal_event
+    source_ref: {source_ref}
+    retrieved_at: {retrieved_at}
+    mapper_version: "signal-ingest-v1"
 last_verified: {date_str}
 verification_log: []
 last_touched_by: livy-agent
