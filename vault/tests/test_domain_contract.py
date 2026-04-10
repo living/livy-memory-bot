@@ -7,6 +7,7 @@ def _source() -> dict:
         "source_type": "github_api",
         "source_ref": "https://github.com/living/livy-memory-bot/pull/10",
         "retrieved_at": "2026-04-10T10:12:00Z",
+        "mapper_version": "github-enrich-v1",
     }
 
 
@@ -318,6 +319,14 @@ class TestSourceValidation:
         edge["sources"][0].pop("source_ref")
         errors = validate_relationship(edge)
         assert "sources[0].source_ref" in errors
+
+    def test_source_requires_mapper_version(self):
+        from vault.domain.canonical_types import validate_decision
+
+        entity = minimal_decision()
+        entity["sources"][0].pop("mapper_version")
+        errors = validate_decision(entity)
+        assert "sources[0].mapper_version" in errors
 
 
 class TestRegression:

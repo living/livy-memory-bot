@@ -55,6 +55,7 @@ SOURCE_FIELDS = frozenset([
     "source_type",
     "source_ref",
     "retrieved_at",
+    "mapper_version",
 ])
 
 
@@ -109,6 +110,11 @@ def _check_source_record(source: dict, idx: int) -> list[str]:
 
     if "retrieved_at" not in source:
         errors.append(f"{p}retrieved_at")
+
+    if "mapper_version" not in source:
+        errors.append(f"{p}mapper_version")
+    elif not isinstance(source["mapper_version"], str) or not source["mapper_version"].strip():
+        errors.append(f"{p}mapper_version_type")
 
     return errors
 
