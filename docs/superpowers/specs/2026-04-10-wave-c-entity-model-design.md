@@ -26,7 +26,7 @@ Karpathy LLM Wiki entra como **referência semântica** (estrutura, curadoria, l
 | Entidade | ID Canônico | Source Key | Status |
 |---|---|---|---|
 | `person` | `person:{slug}` | `github:{login}`, `tldv:participant:{id}`, `trello:member:{id}` | existente, reforçada |
-| `meeting` | `meeting:{slug}` | `tldv:{meeting_id}` | **nova** |
+| `meeting` | `meeting:{slug}` | `tldv:{meeting_id_source}` | **nova** |
 | `card` | `card:{slug}` | `trello:{board_id}:{card_id}` | **nova** |
 | `repo` | `repo:{slug}` | `github:{owner}/{name}` | existente |
 
@@ -87,7 +87,7 @@ Quando meeting/card trouxer vínculo de pessoa:
 
 **Fase C3 — Operação, lint e curadoria contínua**
 
-- Integra como estágios feature-flag no `vault.pipeline`
+- Integra como estágios feature-flag no `vault.pipeline` (flags sugeridas: `WAVE_C_C1_ENABLED`, `WAVE_C_C2_ENABLED`, `WAVE_C_C3_ENABLED`; defaults: C1=true, C2=false, C3=false)
 - Relatório de qualidade: meetings/cards ingeridos, persons fortalecidas, conflitos de identidade
 - Lint/repair: órfãos, role inválida, falta de lineage/source_mapper, schema drift
 
@@ -107,6 +107,7 @@ Quando meeting/card trouxer vínculo de pessoa:
 4. **Role taxonomy** segue contrato atual (sem `part_of`)
 5. **Idempotência** — reprocessar lote não duplica entidades/edges
 6. **Feature-flag por estágio** — C1 pode rodar antes de C2 sem quebra
+7. **Idempotência do strengthen** — `source_keys` derivadas são deduplicadas e incremento de confiança é idempotente (re-run não acumula acima do teto)
 
 ---
 
@@ -160,6 +161,7 @@ Quando meeting/card trouxer vínculo de pessoa:
 | Termo | Definição |
 |---|---|
 | `source_key` | Identificador opaco de origem: `{provider}:{ref}` |
+| `meeting_id_source` | Campo canônico da entidade meeting (espelha `meeting_id` do TLDV) |
 | `id_canonical` | Identificador estável do vault: `{entity_type}:{slug}` |
 | `identity resolve` | Encontrar/mergear entidades por `source_key` ou sinais cruzados |
 | `strengthen` | Adicionar `source_keys` derivados + incrementar confiança de person |
