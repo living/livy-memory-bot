@@ -34,6 +34,14 @@ class IdentityResult:
     candidates: list[dict] = field(default_factory=list)
 
 
+def _get_source_keys(entity: dict) -> list[str]:
+    """Extract source_keys from entity, returning empty list if absent."""
+    keys = entity.get("source_keys")
+    if isinstance(keys, list):
+        return keys
+    return []
+
+
 def normalize_email(email: str) -> str:
     """Normalize email for comparison.
 
@@ -121,6 +129,13 @@ def resolve_identity(
     # Unambiguous: exactly one candidate matched (by github, email, or both).
     if len(unique_by_id) == 1:
         only_match = next(iter(unique_by_id.values()))
+        # Guardrail per spec §3.5: auto-merge requires >= 2 source_keys.
+        # If entity has fewer, flag for review (needs more cross-source evidence).
+        if len(_get_source_keys(only_match)) < 2:
+            return IdentityResult(
+                action=MergeAction.REVIEW,
+                candidates=[only_match],
+            )
         return IdentityResult(
             action=MergeAction.MERGE,
             canonical_id=only_match.get("id_canonical"),

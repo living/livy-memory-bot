@@ -13,6 +13,16 @@ def _source() -> dict:
     }
 
 
+def _lineage() -> dict:
+    return {
+        "run_id": "wave-b-20260410",
+        "source_keys": ["github:lincolnqjunior", "tldv:email:lincoln@livingnet.com.br"],
+        "transformed_at": "2026-04-10T10:12:00Z",
+        "mapper_version": "wave-b-person-v1",
+        "actor": "livy-agent",
+    }
+
+
 def minimal_person() -> dict:
     return {
         "id_canonical": "person:lincolnqjunior",
@@ -23,6 +33,7 @@ def minimal_person() -> dict:
         "first_seen_at": "2026-03-01T10:00:00Z",
         "last_seen_at": "2026-04-10T10:00:00Z",
         "confidence": "high",
+        "lineage": _lineage(),
     }
 
 
@@ -34,6 +45,7 @@ def minimal_project() -> dict:
         "status": "active",
         "aliases": ["Livy"],
         "confidence": "medium",
+        "lineage": _lineage(),
     }
 
 
@@ -46,6 +58,7 @@ def minimal_repo() -> dict:
         "default_branch": "main",
         "archived": False,
         "project_ref": "project:livy-memory",
+        "lineage": _lineage(),
     }
 
 
@@ -133,6 +146,14 @@ class TestPerson:
         errors = validate_person(entity)
         assert "confidence_allowed" in errors
 
+    def test_person_requires_lineage(self):
+        from vault.domain.canonical_types import validate_person
+
+        entity = minimal_person()
+        entity.pop("lineage")
+        errors = validate_person(entity)
+        assert "lineage" in errors
+
 
 class TestProject:
     def test_valid_project(self):
@@ -164,6 +185,14 @@ class TestProject:
         errors = validate_project(entity)
         assert "confidence_allowed" in errors
 
+    def test_project_requires_lineage(self):
+        from vault.domain.canonical_types import validate_project
+
+        entity = minimal_project()
+        entity.pop("lineage")
+        errors = validate_project(entity)
+        assert "lineage" in errors
+
 
 class TestRepo:
     def test_valid_repo(self):
@@ -186,6 +215,14 @@ class TestRepo:
         entity["org"] = "living"
         errors = validate_repo(entity)
         assert "unknown_field:org" in errors
+
+    def test_repo_requires_lineage(self):
+        from vault.domain.canonical_types import validate_repo
+
+        entity = minimal_repo()
+        entity.pop("lineage")
+        errors = validate_repo(entity)
+        assert "lineage" in errors
 
 
 class TestMeeting:

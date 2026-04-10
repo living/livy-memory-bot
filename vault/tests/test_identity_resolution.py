@@ -36,11 +36,12 @@ class TestMergeOnExactGithubLogin:
     """Merge candidates when github_login matches exactly."""
 
     def test_exact_github_login_match_returns_merge(self):
-        """Exact github_login match → auto-merge."""
+        """Exact github_login match with multi-source evidence → auto-merge."""
         existing = {
             "id_canonical": "person:lincolnq",
             "github_login": "lincolnq",
             "email": "old@example.com",
+            "source_keys": ["github:lincolnq", "tldv:lincoln@livingnet.com.br"],
         }
         incoming = {
             "id_canonical": "person:lincolnq-v2",
@@ -50,6 +51,17 @@ class TestMergeOnExactGithubLogin:
         result = resolve_identity(existing, incoming)
         assert isinstance(result, IdentityResult)
         assert result.action == MergeAction.MERGE
+
+    def test_exact_match_with_single_source_key_returns_review(self):
+        """Spec guardrail: unambiguous match with <2 source_keys must be review."""
+        existing = {
+            "id_canonical": "person:lincolnq",
+            "github_login": "lincolnq",
+            "source_keys": ["github:lincolnq"],
+        }
+        incoming = {"github_login": "lincolnq"}
+        result = resolve_identity(existing, incoming)
+        assert result.action == MergeAction.REVIEW
 
     def test_github_login_case_sensitive(self):
         """GitHub login matching is case-sensitive."""
@@ -64,15 +76,22 @@ class TestMergeOnNormalizedEmail:
     """Merge candidates when normalized email matches."""
 
     def test_email_case_insensitive_match_returns_merge(self):
-        """Normalized email match (different case) → auto-merge."""
-        existing = {"github_login": None, "email": "User@Example.COM"}
+        """Normalized email match (different case) + multi-source evidence → auto-merge."""
+        existing = {
+            "github_login": None,
+            "email": "User@Example.COM",
+            "source_keys": ["github:user", "tldv:user@example.com"],
+        }
         incoming = {"github_login": None, "email": "user@example.com"}
         result = resolve_identity(existing, incoming)
         assert result.action == MergeAction.MERGE
 
     def test_email_whitespace_stripped_match_returns_merge(self):
-        """Normalized email match (whitespace) → auto-merge."""
-        existing = {"email": "  user@example.com  "}
+        """Normalized email match (whitespace) + multi-source evidence → auto-merge."""
+        existing = {
+            "email": "  user@example.com  ",
+            "source_keys": ["github:user", "tldv:user@example.com"],
+        }
         incoming = {"email": "user@example.com"}
         result = resolve_identity(existing, incoming)
         assert result.action == MergeAction.MERGE
@@ -123,11 +142,12 @@ class TestAmbiguousIdentity:
         assert result.action == MergeAction.REVIEW
 
     def test_single_match_returns_merge(self):
-        """Single unambiguous match → auto-merge."""
+        """Single unambiguous match + multi-source evidence → auto-merge."""
         existing = {
             "id_canonical": "person:lincolnq",
             "github_login": "lincolnq",
             "email": "lincoln@livingnet.com.br",
+            "source_keys": ["github:lincolnq", "tldv:lincoln@livingnet.com.br"],
         }
         incoming = {
             "github_login": "lincolnq",
@@ -167,7 +187,11 @@ class TestIdentityResult:
 
     def test_merge_result_has_canonical_id(self):
         """MERGE result includes the canonical id of existing entity."""
-        existing = {"id_canonical": "person:lincolnq", "github_login": "lincolnq"}
+        existing = {
+            "id_canonical": "person:lincolnq",
+            "github_login": "lincolnq",
+            "source_keys": ["github:lincolnq", "tldv:lincoln@livingnet.com.br"],
+        }
         incoming = {"github_login": "lincolnq"}
         result = resolve_identity(existing, incoming)
         assert isinstance(result, IdentityResult)

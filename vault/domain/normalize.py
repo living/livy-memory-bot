@@ -170,6 +170,13 @@ def normalize_github_pr_to_entity(
         "source_keys": source_keys,
         "first_seen_at": merged_at,
         "last_seen_at": merged_at,
+        "lineage": {
+            "run_id": generate_lineage_run_id(mapper_version),
+            "source_keys": source_keys,
+            "transformed_at": now,
+            "mapper_version": mapper_version,
+            "actor": "livy-agent",
+        },
     }
 
     return entity
@@ -216,6 +223,14 @@ def normalize_github_repo_to_entity(
         entity["project_ref"] = project_ref
     if source_keys:
         entity["source_keys"] = source_keys
+
+    entity["lineage"] = {
+        "run_id": generate_lineage_run_id(mapper_version),
+        "source_keys": source_keys,
+        "transformed_at": _utc_now(),
+        "mapper_version": mapper_version,
+        "actor": "livy-agent",
+    }
 
     return entity
 
