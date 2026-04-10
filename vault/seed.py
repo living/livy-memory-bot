@@ -16,6 +16,16 @@ ENTITY_MAP = {
     "livy-memory-agent.md": ("livy-memory-agent", "Livy Memory Agent", "Agente de memória agêntica da Living."),
 }
 
+REQUIRED_DIRS = [
+    "entities",
+    "decisions",
+    "concepts",
+    "evidence",
+    "lint-reports",
+    ".cache/fact-check",
+    "schema",
+]
+
 
 def _frontmatter(title: str, source_file: str) -> str:
     today = datetime.now(timezone.utc).date().isoformat()
@@ -35,10 +45,15 @@ draft: false
 """
 
 
+def ensure_structure() -> None:
+    VAULT.mkdir(parents=True, exist_ok=True)
+    for rel in REQUIRED_DIRS:
+        (VAULT / rel).mkdir(parents=True, exist_ok=True)
+
+
 def seed_entities() -> list[tuple[str, str]]:
     entities_dir = VAULT / "entities"
-    entities_dir.mkdir(parents=True, exist_ok=True)
-    created = []
+    entries: list[tuple[str, str]] = []
 
     for source_name, (slug, title, summary) in ENTITY_MAP.items():
         source_path = CURATED / source_name
@@ -46,15 +61,28 @@ def seed_entities() -> list[tuple[str, str]]:
             continue
 
         out = entities_dir / f"{slug}.md"
-        body = _frontmatter(title, source_name) + f"\n# {title}\n\n## Resumo\n{summary}\n\n## Fonte primária\n- [[../curated/{source_name}|{source_name}]]\n"
-        out.write_text(body, encoding="utf-8")
-        created.append((slug, title))
+        if not out.exists():
+            body = _frontmatter(title, source_name) + (
+                f"\n# {title}\n\n## Resumo\n{summary}\n\n"
+                f"## Fonte primária\n- [[memory/curated/{source_name}|{source_name}]]\n"
+            )
+            out.write_text(body, encoding="utf-8")
 
-    return created
+        entries.append((slug, title))
+
+    return entries
+
+
+def _count_md_files(path: Path) -> int:
+    return sum(1 for p in path.glob("*.md") if p.name != ".gitkeep")
 
 
 def write_index(entries: list[tuple[str, str]]) -> None:
     today = datetime.now(timezone.utc).date().isoformat()
+    decisions_count = _count_md_files(VAULT / "decisions")
+    evidence_count = _count_md_files(VAULT / "evidence")
+    lint_reports = sorted((VAULT / "lint-reports").glob("*.md"), reverse=True)
+
     lines = [
         "# Vault Index",
         "",
@@ -65,14 +93,20 @@ def write_index(entries: list[tuple[str, str]]) -> None:
 
     lines.extend([
         "",
-        "## Decisions (0)",
+        f"## Decisions ({decisions_count})",
         "",
-        "## Evidence (0)",
+        f"## Evidence ({evidence_count})",
         "",
         "## Lint Reports",
-        "- none",
-        "",
     ])
+
+    if lint_reports:
+        for report in lint_reports[:5]:
+            lines.append(f"- [[lint-reports/{report.stem}|{report.name}]]")
+    else:
+        lines.append("- none")
+
+    lines.append("")
     (VAULT / "index.md").write_text("\n".join(lines), encoding="utf-8")
 
 
@@ -93,7 +127,7 @@ def append_log(entries: list[tuple[str, str]]) -> None:
 
 
 def main() -> None:
-    VAULT.mkdir(parents=True, exist_ok=True)
+    ensure_structure()
     created = seed_entities()
     write_index(created)
     append_log(created)
