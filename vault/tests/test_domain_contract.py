@@ -1,6 +1,8 @@
 """Tests for canonical domain contract validators aligned 1:1 with final spec."""
 from __future__ import annotations
 
+import pytest
+
 
 def _source() -> dict:
     return {
@@ -327,6 +329,24 @@ class TestSourceValidation:
         entity["sources"][0].pop("mapper_version")
         errors = validate_decision(entity)
         assert "sources[0].mapper_version" in errors
+
+    @pytest.mark.parametrize("bad_source", ["bad-source", None, 123])
+    def test_decision_sources_reject_non_dict_items(self, bad_source):
+        from vault.domain.canonical_types import validate_decision
+
+        entity = minimal_decision()
+        entity["sources"] = [bad_source]
+        errors = validate_decision(entity)
+        assert "sources[0].record_type" in errors
+
+    @pytest.mark.parametrize("bad_source", ["bad-source", None, 123])
+    def test_relationship_sources_reject_non_dict_items(self, bad_source):
+        from vault.domain.canonical_types import validate_relationship
+
+        edge = minimal_relationship()
+        edge["sources"] = [bad_source]
+        errors = validate_relationship(edge)
+        assert "sources[0].record_type" in errors
 
 
 class TestRegression:

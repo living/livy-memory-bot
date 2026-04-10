@@ -92,13 +92,17 @@ def _unknown_fields(entity: dict, allowed: set) -> list[str]:
     return [f"unknown_field:{f}" for f in sorted(set(entity.keys()) - allowed)]
 
 
-def _check_source_record(source: dict, idx: int) -> list[str]:
+def _check_source_record(source: Any, idx: int) -> list[str]:
     """Validate a single source record embedded in Decision or Relationship.
 
     Returns a list of error strings with idx prefix, or [] if valid.
     """
     errors: list[str] = []
     p = f"sources[{idx}]."
+
+    if not isinstance(source, dict):
+        errors.append(f"{p}record_type")
+        return errors
 
     if "source_type" not in source:
         errors.append(f"{p}source_type")
