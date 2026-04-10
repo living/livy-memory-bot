@@ -191,20 +191,217 @@ Quando meeting/card trouxer vínculo de pessoa:
 
 ---
 
-## 7. Risco e Mitigação
+## 7. Observabilidade
 
-| Risco | Prob. | Impacto | Mitigação |
-|---|---|---|---|
-| Regressão no resolver de person | média | alto | testes existentes cobrem; add regression suite |
-| Duplicação de entidades por idempotência | baixa | médio | testes de dedup obrigatórios em C1 |
-| Trello API rate limit | baixa | médio | lookback curto (7d) + throttle |
-| Conflito de identidade não tratado | baixa | médio | guardrail REVIEW; monitorar frequência |
-| Schema drift em novo ingestor | baixa | baixo | validação canônica em cada upsert |
+### 7.1 Métricas Operacionais (emittidas a cada run)
+
+| Métrica | Tipo | Descrição |
+|---|---|---|
+| `wave_c.ingest.meetings.total` | counter | meetings lidos do TLDV por run |
+| `wave_c.ingest.meetings.created` | counter | meetings criados (upsert new) |
+| `wave_c.ingest.meetings.updated` | counter | meetings atualizados |
+| `wave_c.ingest.cards.total` | counter | cards lidos do Trello por run |
+| `wave_c.ingest.cards.created` | counter | cards criados |
+| `wave_c.ingest.cards.updated` | counter | cards atualizados |
+| `wave_c.edges.person_meeting.created` | counter | edges `person→meeting` gerados |
+| `wave_c.edges.person_card.created` | counter | edges `person→card` gerados |
+| `wave_c.strengthen.persons.updated` | counter | persons fortalecidas |
+| `wave_c.strengthen.source_keys.added` | counter | source_keys derivadas adicionadas |
+| `wave_c.conflict.review.total` | counter | conflitos enviados para REVIEW |
+| `wave_c.error.ingest.total` | counter | erros no ingest (por source: tldv, trello) |
+| `wave_c.run.duration_ms` | histogram | duração total do run |
+
+### 7.2 Logs de Auditoria (append-only)
+
+Cada run emite um evento estruturado em `memory/vault/wave-c-runs/{run_id}.json`:
+
+```json
+{
+  "run_id": "wc-2026-04-10T14:30:00Z",
+  "phase": "C1",
+  "started_at": "2026-04-10T14:30:00Z",
+  "ended_at": "2026-04-10T14:31:23Z",
+  "duration_ms": 83200,
+  "source": "tldv|trello",
+  "lookback_days": 7,
+  "results": {
+    "meetings_ingested": 12,
+    "meetings_created": 4,
+    "meetings_updated": 8,
+    "cards_ingested": 38,
+    "cards_created": 11,
+    "cards_updated": 27,
+    "errors": [],
+    "skipped": []
+  },
+  "quality": {
+    "validation_errors": 0,
+    "dedup_skipped": 5,
+    "review_queue": 0
+  }
+}
+```
+
+### 7.3 Alertas
+
+| Trigger | Severidade | Ação |
+|---|---|---|
+| `error.ingest` > 0 por 3 runs consecutivos | 🔴 CRÍTICO | pausar ingest + notificar canal `memory` |
+| `conflict.review.total` growing > 10/ dia | 🟡 WARN | agendar curadoria manual |
+| run duration > 5min sem feature-flag | 🟡 WARN | investigar source API latência |
+| `wave_c.strengthen.persons.updated` = 0 por 7 dias | ⚠️ INFO | pode indicar ausência de meetings/cards novos |
 
 ---
 
-## 8. Histórico de Revisões
+## 8. Rastreabilidade (Lineage)
+
+### 8.1 Campos de Lineage por Estágio
+
+Todo entity/edge escrito pelo Wave C carrega lineage completo:
+
+```yaml
+# Exemplo: meeting entity
+id_canonical: "meeting:2026-04-10-daily-status"
+meeting_id_source: "daily-2026-04-10"
+source_keys:
+  - "tldv:daily-2026-04-10"
+  - "mapper:wave-c-meeting-ingest-v1"
+first_seen_at: "2026-04-10T14:30:00Z"
+last_seen_at: "2026-04-10T14:30:00Z"
+confidence: "medium"
+lineage:
+  run_id: "wc-2026-04-10T14:30:00Z"
+  phase: "C1"
+  source: "tldv"
+  lookback_days: 7
+  mapper_version: "wave-c-meeting-ingest-v1"
+  actor: "livy-agent"
+  transformed_at: "2026-04-10T14:30:00Z"
+```
+
+```yaml
+# Exemplo: edge person→meeting
+from_id: "person:robert-silva"
+to_id: "meeting:daily-2026-04-10"
+role: "participant"
+from_source_key: "github:robert-silva"
+to_source_key: "tldv:daily-2026-04-10"
+confidence: "high"
+lineage:
+  run_id: "wc-2026-04-10T14:30:00Z"
+  phase: "C2"
+  mapper_version: "wave-c-relationship-builder-v1"
+  actor: "livy-agent"
+  transformed_at: "2026-04-10T14:31:00Z"
+```
+
+### 8.2 Rastreamento de Run
+
+- `run_id` = ISO timestamp do início do run (UTC)
+- Permite cross-reference entre: logs de run, entidades escritas, métricas, e events no `claude-mem`
+- Run files em `memory/vault/wave-c-runs/` funcionam como audit log imutável
+
+---
+
+## 9. Resiliência
+
+### 9.1 Tratamento de Erros por Camada
+
+| Camada | Estratégia | Comportamento em Falha |
+|---|---|---|
+| **TLDV/Supabase fetch** | retry exponencial com jitter (max 3) | loga erro, continua com dados disponíveis |
+| **Trello API fetch** | retry exponencial com jitter (max 3) + rate limit backoff | loga erro, continua com dados disponíveis |
+| **Upsert entity** | validação pré-upsert (schema canônico) | entidade rejeitada com erro; run continua |
+| **Edge creation** | validação de role + from/to existence | edge rejeitado; entidade pai não afetada |
+| **Strengthen pass** | idempotência por source_key | re-run não duplica nem estaca |
+| **Pipeline global** | feature-flag por estágio | estágio com erro é desabilitado automaticamente após 3 failures |
+
+### 9.2 Circuit Breaker
+
+```
+Se Trello API retornar 429 ou 5xx por 2 runs consecutivos:
+  → desabilitar card ingest (WAVE_C_C1_CARD_ENABLED=false)
+  → alertar canal memory
+  → re-habilitar automaticamente após 1h ou manual
+```
+
+### 9.3 Dead Letter (Conflitos e Rejeições)
+
+Conflitos de identidade e validações rejeitadas são serializados em:
+
+```
+memory/vault/wave-c-runs/{run_id}.review-queue.jsonl
+```
+
+Formato:
+```json
+{"type": "identity_conflict", "source_key": "github:robert-silva", "candidates": [...], "run_id": "wc-...", "created_at": "..."}
+{"type": "validation_error", "entity": {...}, "errors": [...], "run_id": "wc-...", "created_at": "..."}
+```
+
+Revisão manual consume entries deste arquivo; entrada removida após resolução.
+
+### 9.4 Backfill e Reconciliation
+
+- **Backfill manual**: `python3 -m vault.pipeline --backfill wave-c --phase C1 --days 30`
+- Reconcile roda junto com consolidation (07h BRT): detecta entities sem `mapper_version` da Wave C e tenta recompletar lineage
+- Backfill respeita idempotência (não sobrescreve `last_seen_at`.backward)
+
+---
+
+## 10. Fact-Checking e Qualidade de Dados
+
+### 10.1 Validações na Ingesta (pré-upsert)
+
+| Check | Regra | Ação em Falha |
+|---|---|---|
+| `meeting_id` não vazio | string não vazio | reject entity |
+| `card_id` não vazio | string não vazio | reject entity |
+| `board_id` presente em card | string não vazio | reject entity |
+| `started_at` formato ISO | datetime parse | skip row, log warning |
+| `dateLastActivity` formato ISO | datetime parse | skip row, log warning |
+| Entity schema canônico | `validate_meeting()` / `validate_card()` | reject + emit validation_error |
+
+### 10.2 Consistência Cruzada (pós-upsert)
+
+| Check | Regra | Ação em Falha |
+|---|---|---|
+| Participant referenciável | person entity existe ou foi criada no mesmo run | cria person stub com `confidence=low` |
+| Assignee referenciável | person entity existe ou foi criada no mesmo run | cria person stub com `confidence=low` |
+| No duplicate source_key | source_key único por `id_canonical` | rejeita duplicata, log warning |
+| Edge consistency | `from_id` e `to_id` existem | não cria edge, log warning |
+| Role válido | role em `RELATIONSHIP_ROLES` | rejeita edge |
+
+### 10.3 Monitoramento de Qualidade Contínua
+
+- **Lint do vault** (daily): rodado junto com consolidation — detecta orphan edges, stale entities, missing lineage
+- **Métrica de cobertura**: `entities com lineage.run_id wave-c` / `total entities` — target ≥ 90% em 7 dias
+- **Drift detection**: se `mapper_version` da Wave C отсутствует em >10% das entidades de meeting/card num período de 7 dias, alertas de health check disparam
+
+---
+
+## 11. Risco e Mitigação (Expandido)
+
+| Risco | Prob. | Impacto | Mitigação |
+|---|---|---|---|
+| Regressão no resolver de person | média | alto | regression suite em C2; rodar suite completo antes de merge |
+| Duplicação de entidades por idempotência | baixa | médio | testes de dedup obrigatórios em C1 + idempotency check no lint |
+| Trello API rate limit | baixa | médio | backoff exponencial + circuit breaker; lookback curto (7d) |
+| Trello API 5xx / outage | baixa | alto | circuit breaker; alerta crítico se 3 failures consecutivos |
+| Supabase/TLDV API outage | baixa | alto | alerta crítico; run marcado como incompleto; não писать entidades parciais |
+| Conflito de identidade não tratado | baixa | médio | REVIEW queue + alerta se > 10 conflitos/dia |
+| Schema drift em novo ingestor | baixa | baixo | validação canônica em cada upsert + lint daily |
+| Dados obsoletos em person stub | baixa | médio | Reconciliation daily move stubs para REVIEW se sem sinais há 30d |
+| Fork de person entities por múltiplos sources | média | médio | guardrail ≥2 source_keys para auto-merge + lint de duplicatas |
+| Feature-flag em estado inconsistente entre runs | baixa | médio | flags lidas do config no início do run; jamais mutate in-flight |
+| Backfill sobrescreve dados legítimos | baixa | alto | idempotência por `last_seen_at`; re-run não reduz `confidence` |
+| Auditoria de run corrompida (disk full) | baixa | médio | atomic write: escrever em .tmp e renomear ao final |
+
+---
+
+## 12. Histórico de Revisões
 
 | Data | Autor | Mudança |
 |---|---|---|
 | 2026-04-10 | Livy Memory | Initial draft (brainstormed with Lincoln) |
+| 2026-04-10 | Livy Memory | Expandido com §7 observabilidade, §8 rastreabilidade, §9 resiliência, §10 fact-checking, §11 riscos expandido |
