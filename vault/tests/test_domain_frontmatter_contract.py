@@ -48,7 +48,7 @@ def parse_frontmatter(text: str) -> dict:
     fm_text = stripped[3:end]
     try:
         return yaml.safe_load(fm_text) or {}
-    except (yaml.parser.ParserError, yaml.scanner.ScannerError):
+    except yaml.YAMLError:
         # Malformed YAML in some vault files — treat as no frontmatter,
         # so the contract tests correctly flag missing fields.
         return {}
@@ -99,15 +99,6 @@ DECISION_REQUIRED_LINEAGE_FIELDS = [
     "actor",
 ]
 
-# Fields that a single source record must contain
-SOURCE_RECORD_REQUIRED_FIELDS = [
-    "source_type",
-    "source_ref",
-    "retrieved_at",
-    "mapper_version",
-]
-
-
 # ---------------------------------------------------------------------------
 # Task 1 Step 1 — Entity pages require domain fields
 # ---------------------------------------------------------------------------
@@ -124,54 +115,17 @@ class TestEntityDomainContract:
     These fields are the minimum bar for domain model compliance.
     """
 
-    def test_entity_pages_have_id_canonical(self, vault_root):
-        """Every entity .md must declare an id_canonical field."""
+    @pytest.mark.parametrize("field", ENTITY_REQUIRED_DOMAIN_FIELDS)
+    def test_entity_pages_have_required_domain_fields(self, vault_root, field):
+        """Every entity .md must declare each required domain field."""
         missing = []
         for path in _entity_files(vault_root):
             fm = frontmatter_of(path)
-            if "id_canonical" not in fm:
+            if field not in fm:
                 missing.append(path.name)
         assert missing == [], (
-            f"Entity pages missing id_canonical: {missing}. "
-            "Every entity must carry 'id_canonical: <type>:<slug>'."
-        )
-
-    def test_entity_pages_have_source_keys(self, vault_root):
-        """Every entity .md must declare a source_keys list."""
-        missing = []
-        for path in _entity_files(vault_root):
-            fm = frontmatter_of(path)
-            if "source_keys" not in fm:
-                missing.append(path.name)
-            elif not isinstance(fm.get("source_keys"), list):
-                missing.append(f"{path.name} (source_keys is not a list)")
-        assert missing == [], (
-            f"Entity pages missing or mis-typed source_keys: {missing}. "
-            "Every entity must carry 'source_keys: [...]' with all provenance keys."
-        )
-
-    def test_entity_pages_have_first_seen_at(self, vault_root):
-        """Every entity .md must declare a first_seen_at ISO datetime."""
-        missing = []
-        for path in _entity_files(vault_root):
-            fm = frontmatter_of(path)
-            if "first_seen_at" not in fm:
-                missing.append(path.name)
-        assert missing == [], (
-            f"Entity pages missing first_seen_at: {missing}. "
-            "Every entity must carry 'first_seen_at: <ISO datetime>'."
-        )
-
-    def test_entity_pages_have_last_seen_at(self, vault_root):
-        """Every entity .md must declare a last_seen_at ISO datetime."""
-        missing = []
-        for path in _entity_files(vault_root):
-            fm = frontmatter_of(path)
-            if "last_seen_at" not in fm:
-                missing.append(path.name)
-        assert missing == [], (
-            f"Entity pages missing last_seen_at: {missing}. "
-            "Every entity must carry 'last_seen_at: <ISO datetime>'."
+            f"Entity pages missing {field}: {missing}. "
+            f"Every entity must carry '{field}' in frontmatter."
         )
 
     def test_entity_id_canonical_uses_valid_prefix(self, vault_root):
@@ -279,10 +233,10 @@ class TestDecisionLineageContract:
         for path in _decision_files(vault_root):
             fm = frontmatter_of(path)
             sources = fm.get("sources")
-            if sources is None or (isinstance(sources, list) and len(sources) == 0):
+            if not isinstance(sources, list) or len(sources) == 0:
                 missing_or_empty.append(path.name)
         assert missing_or_empty == [], (
-            f"Decision pages with missing/empty sources: {missing_or_empty}. "
+            f"Decision pages with missing/empty/invalid sources: {missing_or_empty}. "
             "Every decision must carry 'sources: [...]' with at least one record."
         )
 
@@ -291,7 +245,9 @@ class TestDecisionLineageContract:
         broken = []
         for path in _decision_files(vault_root):
             fm = frontmatter_of(path)
-            sources = fm.get("sources") or []
+            sources = fm.get("sources")
+            if not isinstance(sources, list):
+                continue
             for i, src in enumerate(sources):
                 if not isinstance(src, dict):
                     broken.append(f"{path.name}[{i}]: not a dict")
@@ -307,7 +263,9 @@ class TestDecisionLineageContract:
         missing = []
         for path in _decision_files(vault_root):
             fm = frontmatter_of(path)
-            sources = fm.get("sources") or []
+            sources = fm.get("sources")
+            if not isinstance(sources, list):
+                continue
             for i, src in enumerate(sources):
                 if isinstance(src, dict) and "source_ref" not in src:
                     missing.append(f"{path.name}[{i}]")
@@ -321,7 +279,9 @@ class TestDecisionLineageContract:
         missing = []
         for path in _decision_files(vault_root):
             fm = frontmatter_of(path)
-            sources = fm.get("sources") or []
+            sources = fm.get("sources")
+            if not isinstance(sources, list):
+                continue
             for i, src in enumerate(sources):
                 if isinstance(src, dict) and "retrieved_at" not in src:
                     missing.append(f"{path.name}[{i}]")
@@ -335,7 +295,9 @@ class TestDecisionLineageContract:
         missing = []
         for path in _decision_files(vault_root):
             fm = frontmatter_of(path)
-            sources = fm.get("sources") or []
+            sources = fm.get("sources")
+            if not isinstance(sources, list):
+                continue
             for i, src in enumerate(sources):
                 if isinstance(src, dict) and "mapper_version" not in src:
                     missing.append(f"{path.name}[{i}]")
@@ -376,7 +338,9 @@ class TestDecisionLineageContract:
         invalid = []
         for path in _decision_files(vault_root):
             fm = frontmatter_of(path)
-            sources = fm.get("sources") or []
+            sources = fm.get("sources")
+            if not isinstance(sources, list):
+                continue
             for i, src in enumerate(sources):
                 if isinstance(src, dict):
                     st = src.get("source_type", "")
