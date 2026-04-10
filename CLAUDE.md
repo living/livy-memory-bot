@@ -198,6 +198,33 @@ Auto-promotion allowed only if all are true:
 
 Else → triage (never promote).
 
+### Implementation status (2026-04-10)
+Shadow Evolution Pipeline V2 (Tasks 1-10) completed and merged to `master`.
+
+Key operational outcomes:
+- Full regression green: `pytest tests/ -q` → **182 passed**
+- Live shadow run verified: 59 signals, 10 decisions, 0 promoted, 0 applied
+- Append-only artifacts preserved (`signal-events.jsonl`, `reconciliation-ledger.jsonl`, `triage-decisions.jsonl`, `promotion-events.jsonl`)
+
+### Context7 endpoint fix (root-cause)
+If fact-check logs show `Context7 lookup failed: [Errno -2] Name or service not known`:
+- Cause on this host: `api.context7.com` returns DNS NXDOMAIN
+- Correct base URL: `https://context7.com/v1` (not `https://api.context7.com/v1`)
+- `fact_checker.py` default base URL already fixed accordingly.
+
+### Subagent runtime caveat
+For `sessions_spawn` with `runtime="subagent"`, do **not** pass ACP-only fields.
+Unsupported for subagent runtime:
+- `streamTo`
+- `attachments`
+- `attachAs`
+
+### Pytest collection conflict note
+Collection conflict resolved by renaming:
+- `scripts/test_reconciliation.py` → `scripts/test_reconciliation_scripts.py`
+
+This avoids duplicate module-name collision with:
+- `skills/memoria-consolidation/test_reconciliation.py`
 
 ## TLDV summaries schema (confirmado)
 
