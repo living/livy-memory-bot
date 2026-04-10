@@ -1,514 +1,465 @@
-"""
-Tests for vault/domain/canonical_types.py — canonical domain contract validators.
-
-Implements strict TDD: RED -> GREEN -> REFACTOR.
-Tests validate that each canonical entity type has required fields and valid structure.
-"""
+"""Tests for canonical domain contract validators aligned 1:1 with final spec."""
 from __future__ import annotations
 
-from datetime import datetime, timezone
 
-import pytest
+def _source() -> dict:
+    return {
+        "source_type": "github_api",
+        "source_ref": "https://github.com/living/livy-memory-bot/pull/10",
+        "retrieved_at": "2026-04-10T10:12:00Z",
+    }
 
-
-# ---------------------------------------------------------------------------
-# Fixtures — shared entity builders for convenience
-# ---------------------------------------------------------------------------
 
 def minimal_person() -> dict:
     return {
-        "id_canonical": "person:lincoln",
-        "name": "Lincoln Quinan Junior",
-        "github_login": "lincolnq",
+        "id_canonical": "person:lincolnqjunior",
+        "display_name": "Lincoln Quinan Junior",
+        "github_login": "lincolnqjunior",
         "email": "lincoln@livingnet.com.br",
-        "source_type": "tldv",
-        "source_ref": "meeting-123",
-        "retrieved_at": "2026-04-10T10:00:00+00:00",
-        "lineage_run_id": "run-001",
-        "mapper_version": "1.0.0",
+        "source_keys": ["github:lincolnqjunior", "tldv:email:lincoln@livingnet.com.br"],
+        "first_seen_at": "2026-03-01T10:00:00Z",
+        "last_seen_at": "2026-04-10T10:00:00Z",
+        "confidence": "high",
     }
 
 
 def minimal_project() -> dict:
     return {
         "id_canonical": "project:livy-memory",
-        "name": "Livy Memory Bot",
-        "source_type": "tldv",
-        "source_ref": "meeting-456",
-        "retrieved_at": "2026-04-10T10:00:00+00:00",
-        "lineage_run_id": "run-001",
-        "mapper_version": "1.0.0",
+        "slug": "livy-memory",
+        "name": "Livy Memory",
+        "status": "active",
+        "aliases": ["Livy"],
+        "confidence": "medium",
     }
 
 
 def minimal_repo() -> dict:
     return {
         "id_canonical": "repo:living/livy-memory-bot",
-        "name": "livy-memory-bot",
-        "org": "living",
         "full_name": "living/livy-memory-bot",
-        "source_type": "github",
-        "source_ref": "pr-789",
-        "retrieved_at": "2026-04-10T10:00:00+00:00",
-        "lineage_run_id": "run-001",
-        "mapper_version": "1.0.0",
+        "owner": "living",
+        "name": "livy-memory-bot",
+        "default_branch": "main",
+        "archived": False,
+        "project_ref": "project:livy-memory",
     }
 
 
 def minimal_meeting() -> dict:
     return {
         "id_canonical": "meeting:tldv-12345",
-        "name": "Daily Status",
-        "date": "2026-04-10",
-        "participants": ["person:lincoln"],
-        "source_type": "tldv",
-        "source_ref": "meeting-12345",
-        "retrieved_at": "2026-04-10T10:00:00+00:00",
-        "lineage_run_id": "run-001",
-        "mapper_version": "1.0.0",
+        "meeting_id_source": "tldv:12345",
+        "title": "Daily Status",
+        "started_at": "2026-04-10T09:00:00Z",
+        "ended_at": "2026-04-10T10:00:00Z",
+        "project_ref": "project:livy-memory",
     }
 
 
 def minimal_card() -> dict:
     return {
         "id_canonical": "card:trello-abc123",
-        "name": "Implement domain model",
-        "board_ref": "project:livy-memory",
-        "source_type": "trello",
-        "source_ref": "card-abc123",
-        "retrieved_at": "2026-04-10T10:00:00+00:00",
-        "lineage_run_id": "run-001",
-        "mapper_version": "1.0.0",
+        "card_id_source": "trello:abc123",
+        "title": "Implement canonical model",
+        "board": "MEM",
+        "list": "Doing",
+        "project_ref": "project:livy-memory",
+        "status": "in_progress",
     }
 
 
 def minimal_decision() -> dict:
     return {
         "id_canonical": "decision:arch-001",
-        "title": "Use domain-first architecture",
-        "evidence": ["https://tldv.io/meeting/123"],
-        "confidence": "medium",
-        "source_type": "tldv",
-        "source_ref": "meeting-123",
-        "retrieved_at": "2026-04-10T10:00:00+00:00",
-        "lineage_run_id": "run-001",
-        "mapper_version": "1.0.0",
+        "summary": "Adopt domain-first memory graph.",
+        "decision_date": "2026-04-10",
+        "project_ref": "project:livy-memory",
+        "confidence": "high",
+        "sources": [_source()],
+        "last_verified": "2026-04-10",
     }
 
 
 def minimal_relationship() -> dict:
     return {
-        "from": "person:lincoln",
-        "to": "repo:living/livy-memory-bot",
+        "from_id": "person:lincolnqjunior",
+        "to_id": "repo:living/livy-memory-bot",
         "role": "author",
-        "source_type": "github",
-        "source_ref": "pr-101",
-        "retrieved_at": "2026-04-10T10:00:00+00:00",
-        "lineage_run_id": "run-001",
-        "mapper_version": "1.0.0",
+        "since": "2026-04-01T00:00:00Z",
+        "until": None,
+        "window_days": 30,
+        "confidence": "high",
+        "sources": [_source()],
+        "lineage_run_id": "run-2026-04-10T10:12:00Z-github-enrich-v1",
     }
 
 
-# ---------------------------------------------------------------------------
-# Import — tests should fail here until module is created
-# ---------------------------------------------------------------------------
-
 def test_module_imports():
-    """Module must exist and be importable."""
     import vault.domain.canonical_types as ct  # noqa: F401
 
 
-# ---------------------------------------------------------------------------
-# Person validator
-# ---------------------------------------------------------------------------
-
-class TestValidatePerson:
-    def test_valid_person_passes(self):
+class TestPerson:
+    def test_valid_person(self):
         from vault.domain.canonical_types import validate_person
+
         assert validate_person(minimal_person()) is True
 
-    def test_person_requires_id_canonical(self):
+    def test_person_requires_source_keys(self):
         from vault.domain.canonical_types import validate_person
-        p = minimal_person()
-        del p["id_canonical"]
-        errors = validate_person(p)
-        assert errors  # returns list of field errors
 
-    def test_person_requires_name(self):
+        entity = minimal_person()
+        entity.pop("source_keys")
+        errors = validate_person(entity)
+        assert "source_keys" in errors
+
+    def test_person_rejects_legacy_name_field(self):
         from vault.domain.canonical_types import validate_person
-        p = minimal_person()
-        del p["name"]
-        errors = validate_person(p)
-        assert errors
 
-    def test_person_id_must_start_with_person_prefix(self):
+        entity = minimal_person()
+        entity.pop("display_name")
+        entity["name"] = "Legacy"
+        errors = validate_person(entity)
+        assert "unknown_field:name" in errors
+
+    def test_person_confidence_enum(self):
         from vault.domain.canonical_types import validate_person
-        p = minimal_person()
-        p["id_canonical"] = "user:wrong-prefix"
-        errors = validate_person(p)
-        assert errors
 
-    def test_person_accepts_optional_github_login(self):
-        from vault.domain.canonical_types import validate_person
-        p = minimal_person()
-        assert validate_person(p) is True
-
-    def test_person_accepts_optional_email(self):
-        from vault.domain.canonical_types import validate_person
-        p = minimal_person()
-        assert validate_person(p) is True
-
-    def test_person_rejects_unknown_field(self):
-        from vault.domain.canonical_types import validate_person
-        p = minimal_person()
-        p["unknown_field"] = "should-reject"
-        errors = validate_person(p)
-        assert errors
-
-    def test_person_requires_traceability_fields(self):
-        from vault.domain.canonical_types import validate_person
-        p = minimal_person()
-        for field in ("source_type", "source_ref", "retrieved_at", "lineage_run_id", "mapper_version"):
-            del p[field]
-        errors = validate_person(p)
-        assert errors
+        entity = minimal_person()
+        entity["confidence"] = "super-high"
+        errors = validate_person(entity)
+        assert "confidence_allowed" in errors
 
 
-# ---------------------------------------------------------------------------
-# Project validator
-# ---------------------------------------------------------------------------
-
-class TestValidateProject:
-    def test_valid_project_passes(self):
+class TestProject:
+    def test_valid_project(self):
         from vault.domain.canonical_types import validate_project
+
         assert validate_project(minimal_project()) is True
 
-    def test_project_requires_id_canonical(self):
+    def test_project_requires_slug(self):
         from vault.domain.canonical_types import validate_project
-        pj = minimal_project()
-        del pj["id_canonical"]
-        errors = validate_project(pj)
-        assert errors
 
-    def test_project_requires_name(self):
+        entity = minimal_project()
+        entity.pop("slug")
+        errors = validate_project(entity)
+        assert "slug" in errors
+
+    def test_project_rejects_wrong_field_key(self):
         from vault.domain.canonical_types import validate_project
-        pj = minimal_project()
-        del pj["name"]
-        errors = validate_project(pj)
-        assert errors
 
-    def test_project_id_must_start_with_project_prefix(self):
+        entity = minimal_project()
+        entity["project_name"] = "x"
+        errors = validate_project(entity)
+        assert "unknown_field:project_name" in errors
+
+    def test_project_confidence_enum(self):
         from vault.domain.canonical_types import validate_project
-        pj = minimal_project()
-        pj["id_canonical"] = "proj:wrong-prefix"
-        errors = validate_project(pj)
-        assert errors
 
-    def test_project_requires_traceability_fields(self):
-        from vault.domain.canonical_types import validate_project
-        pj = minimal_project()
-        for field in ("source_type", "source_ref", "retrieved_at", "lineage_run_id", "mapper_version"):
-            del pj[field]
-        errors = validate_project(pj)
-        assert errors
+        entity = minimal_project()
+        entity["confidence"] = "unknown"
+        errors = validate_project(entity)
+        assert "confidence_allowed" in errors
 
 
-# ---------------------------------------------------------------------------
-# Repo validator
-# ---------------------------------------------------------------------------
-
-class TestValidateRepo:
-    def test_valid_repo_passes(self):
+class TestRepo:
+    def test_valid_repo(self):
         from vault.domain.canonical_types import validate_repo
+
         assert validate_repo(minimal_repo()) is True
 
-    def test_repo_requires_id_canonical(self):
+    def test_repo_requires_owner(self):
         from vault.domain.canonical_types import validate_repo
-        r = minimal_repo()
-        del r["id_canonical"]
-        errors = validate_repo(r)
-        assert errors
 
-    def test_repo_requires_name(self):
+        entity = minimal_repo()
+        entity.pop("owner")
+        errors = validate_repo(entity)
+        assert "owner" in errors
+
+    def test_repo_rejects_legacy_org_field(self):
         from vault.domain.canonical_types import validate_repo
-        r = minimal_repo()
-        del r["name"]
-        errors = validate_repo(r)
-        assert errors
 
-    def test_repo_requires_org(self):
-        from vault.domain.canonical_types import validate_repo
-        r = minimal_repo()
-        del r["org"]
-        errors = validate_repo(r)
-        assert errors
-
-    def test_repo_id_must_start_with_repo_prefix(self):
-        from vault.domain.canonical_types import validate_repo
-        r = minimal_repo()
-        r["id_canonical"] = "repository:wrong-prefix"
-        errors = validate_repo(r)
-        assert errors
-
-    def test_repo_requires_traceability_fields(self):
-        from vault.domain.canonical_types import validate_repo
-        r = minimal_repo()
-        for field in ("source_type", "source_ref", "retrieved_at", "lineage_run_id", "mapper_version"):
-            del r[field]
-        errors = validate_repo(r)
-        assert errors
+        entity = minimal_repo()
+        entity["org"] = "living"
+        errors = validate_repo(entity)
+        assert "unknown_field:org" in errors
 
 
-# ---------------------------------------------------------------------------
-# Meeting validator
-# ---------------------------------------------------------------------------
-
-class TestValidateMeeting:
-    def test_valid_meeting_passes(self):
+class TestMeeting:
+    def test_valid_meeting(self):
         from vault.domain.canonical_types import validate_meeting
+
         assert validate_meeting(minimal_meeting()) is True
 
-    def test_meeting_requires_id_canonical(self):
+    def test_meeting_requires_meeting_id_source(self):
         from vault.domain.canonical_types import validate_meeting
-        m = minimal_meeting()
-        del m["id_canonical"]
-        errors = validate_meeting(m)
-        assert errors
 
-    def test_meeting_requires_name(self):
+        entity = minimal_meeting()
+        entity.pop("meeting_id_source")
+        errors = validate_meeting(entity)
+        assert "meeting_id_source" in errors
+
+    def test_meeting_rejects_legacy_date_field(self):
         from vault.domain.canonical_types import validate_meeting
-        m = minimal_meeting()
-        del m["name"]
-        errors = validate_meeting(m)
-        assert errors
 
-    def test_meeting_requires_date(self):
-        from vault.domain.canonical_types import validate_meeting
-        m = minimal_meeting()
-        del m["date"]
-        errors = validate_meeting(m)
-        assert errors
-
-    def test_meeting_date_must_be_iso_format(self):
-        from vault.domain.canonical_types import validate_meeting
-        m = minimal_meeting()
-        m["date"] = "not-a-date"
-        errors = validate_meeting(m)
-        assert errors
-
-    def test_meeting_id_must_start_with_meeting_prefix(self):
-        from vault.domain.canonical_types import validate_meeting
-        m = minimal_meeting()
-        m["id_canonical"] = "mtg:wrong-prefix"
-        errors = validate_meeting(m)
-        assert errors
-
-    def test_meeting_requires_traceability_fields(self):
-        from vault.domain.canonical_types import validate_meeting
-        m = minimal_meeting()
-        for field in ("source_type", "source_ref", "retrieved_at", "lineage_run_id", "mapper_version"):
-            del m[field]
-        errors = validate_meeting(m)
-        assert errors
+        entity = minimal_meeting()
+        entity["date"] = "2026-04-10"
+        errors = validate_meeting(entity)
+        assert "unknown_field:date" in errors
 
 
-# ---------------------------------------------------------------------------
-# Card validator
-# ---------------------------------------------------------------------------
-
-class TestValidateCard:
-    def test_valid_card_passes(self):
+class TestCard:
+    def test_valid_card(self):
         from vault.domain.canonical_types import validate_card
+
         assert validate_card(minimal_card()) is True
 
-    def test_card_requires_id_canonical(self):
+    def test_card_requires_card_id_source(self):
         from vault.domain.canonical_types import validate_card
-        c = minimal_card()
-        del c["id_canonical"]
-        errors = validate_card(c)
-        assert errors
 
-    def test_card_requires_name(self):
+        entity = minimal_card()
+        entity.pop("card_id_source")
+        errors = validate_card(entity)
+        assert "card_id_source" in errors
+
+    def test_card_rejects_legacy_name_field(self):
         from vault.domain.canonical_types import validate_card
-        c = minimal_card()
-        del c["name"]
-        errors = validate_card(c)
-        assert errors
 
-    def test_card_id_must_start_with_card_prefix(self):
-        from vault.domain.canonical_types import validate_card
-        c = minimal_card()
-        c["id_canonical"] = "item:wrong-prefix"
-        errors = validate_card(c)
-        assert errors
-
-    def test_card_requires_traceability_fields(self):
-        from vault.domain.canonical_types import validate_card
-        c = minimal_card()
-        for field in ("source_type", "source_ref", "retrieved_at", "lineage_run_id", "mapper_version"):
-            del c[field]
-        errors = validate_card(c)
-        assert errors
+        entity = minimal_card()
+        entity["name"] = "legacy"
+        errors = validate_card(entity)
+        assert "unknown_field:name" in errors
 
 
-# ---------------------------------------------------------------------------
-# Decision validator
-# ---------------------------------------------------------------------------
-
-class TestValidateDecision:
-    def test_valid_decision_passes(self):
+class TestDecision:
+    def test_valid_decision(self):
         from vault.domain.canonical_types import validate_decision
+
         assert validate_decision(minimal_decision()) is True
 
-    def test_decision_requires_id_canonical(self):
+    def test_decision_requires_sources(self):
         from vault.domain.canonical_types import validate_decision
-        d = minimal_decision()
-        del d["id_canonical"]
-        errors = validate_decision(d)
-        assert errors
 
-    def test_decision_requires_title(self):
+        entity = minimal_decision()
+        entity.pop("sources")
+        errors = validate_decision(entity)
+        assert "sources" in errors
+
+    def test_decision_rejects_legacy_evidence_field(self):
         from vault.domain.canonical_types import validate_decision
-        d = minimal_decision()
-        del d["title"]
-        errors = validate_decision(d)
-        assert errors
 
-    def test_decision_requires_evidence_as_list(self):
+        entity = minimal_decision()
+        entity["evidence"] = ["legacy"]
+        errors = validate_decision(entity)
+        assert "unknown_field:evidence" in errors
+
+    def test_decision_confidence_enum(self):
         from vault.domain.canonical_types import validate_decision
-        d = minimal_decision()
-        d["evidence"] = "not-a-list"
-        errors = validate_decision(d)
-        assert errors
 
-    def test_decision_requires_confidence_in_allowed_set(self):
-        from vault.domain.canonical_types import validate_decision
-        d = minimal_decision()
-        d["confidence"] = "super-high"
-        errors = validate_decision(d)
-        assert errors
-
-    def test_decision_id_must_start_with_decision_prefix(self):
-        from vault.domain.canonical_types import validate_decision
-        d = minimal_decision()
-        d["id_canonical"] = "dec:wrong-prefix"
-        errors = validate_decision(d)
-        assert errors
-
-    def test_decision_requires_traceability_fields(self):
-        from vault.domain.canonical_types import validate_decision
-        d = minimal_decision()
-        for field in ("source_type", "source_ref", "retrieved_at", "lineage_run_id", "mapper_version"):
-            del d[field]
-        errors = validate_decision(d)
-        assert errors
+        entity = minimal_decision()
+        entity["confidence"] = "very_high"
+        errors = validate_decision(entity)
+        assert "confidence_allowed" in errors
 
 
-# ---------------------------------------------------------------------------
-# Relationship validator
-# ---------------------------------------------------------------------------
-
-class TestValidateRelationship:
-    def test_valid_relationship_passes(self):
+class TestRelationship:
+    def test_valid_relationship(self):
         from vault.domain.canonical_types import validate_relationship
+
         assert validate_relationship(minimal_relationship()) is True
 
-    def test_relationship_requires_from(self):
+    def test_relationship_requires_from_id(self):
         from vault.domain.canonical_types import validate_relationship
-        r = minimal_relationship()
-        del r["from"]
-        errors = validate_relationship(r)
-        assert errors
 
-    def test_relationship_requires_to(self):
+        edge = minimal_relationship()
+        edge.pop("from_id")
+        errors = validate_relationship(edge)
+        assert "from_id" in errors
+
+    def test_relationship_allowed_roles_only(self):
         from vault.domain.canonical_types import validate_relationship
-        r = minimal_relationship()
-        del r["to"]
-        errors = validate_relationship(r)
-        assert errors
 
-    def test_relationship_requires_role(self):
+        edge = minimal_relationship()
+        edge["role"] = "owner"
+        errors = validate_relationship(edge)
+        assert "role_allowed" in errors
+
+    def test_relationship_rejects_wrong_field_names(self):
         from vault.domain.canonical_types import validate_relationship
-        r = minimal_relationship()
-        del r["role"]
-        errors = validate_relationship(r)
-        assert errors
 
-    def test_relationship_role_must_be_allowed(self):
+        edge = minimal_relationship()
+        edge["from"] = edge.pop("from_id")
+        errors = validate_relationship(edge)
+        assert "from_id" in errors
+        assert "unknown_field:from" in errors
+
+    def test_relationship_requires_lineage_run_id(self):
         from vault.domain.canonical_types import validate_relationship
-        r = minimal_relationship()
-        r["role"] = "unknown-role"
-        errors = validate_relationship(r)
-        assert errors
 
-    def test_relationship_requires_traceability_fields(self):
+        edge = minimal_relationship()
+        edge.pop("lineage_run_id")
+        errors = validate_relationship(edge)
+        assert "lineage_run_id" in errors
+
+
+class TestSourceValidation:
+    def test_source_type_allowed_values(self):
+        from vault.domain.canonical_types import validate_decision
+
+        entity = minimal_decision()
+        entity["sources"][0]["source_type"] = "github"
+        errors = validate_decision(entity)
+        assert "sources[0].source_type_allowed" in errors
+
+    def test_source_requires_source_ref(self):
         from vault.domain.canonical_types import validate_relationship
-        r = minimal_relationship()
-        for field in ("source_type", "source_ref", "retrieved_at", "lineage_run_id", "mapper_version"):
-            del r[field]
-        errors = validate_relationship(r)
-        assert errors
+
+        edge = minimal_relationship()
+        edge["sources"][0].pop("source_ref")
+        errors = validate_relationship(edge)
+        assert "sources[0].source_ref" in errors
 
 
-# ---------------------------------------------------------------------------
-# Validation helpers
-# ---------------------------------------------------------------------------
+class TestRegression:
+    def test_person_confidence_is_optional(self):
+        from vault.domain.canonical_types import validate_person
 
-class TestIsValidIdPrefix:
-    def test_valid_prefix_person(self):
-        from vault.domain.canonical_types import is_valid_id_prefix
-        assert is_valid_id_prefix("person:lincoln")
+        entity = minimal_person()
+        entity.pop("confidence")
+        assert validate_person(entity) is True
 
-    def test_valid_prefix_project(self):
-        from vault.domain.canonical_types import is_valid_id_prefix
-        assert is_valid_id_prefix("project:livy-memory")
+    def test_person_confidence_enum_rejects_invalid(self):
+        from vault.domain.canonical_types import validate_person
 
-    def test_valid_prefix_repo(self):
-        from vault.domain.canonical_types import is_valid_id_prefix
-        assert is_valid_id_prefix("repo:living/livy-memory-bot")
+        entity = minimal_person()
+        entity["confidence"] = "medium-high"
+        errors = validate_person(entity)
+        assert "confidence_allowed" in errors
 
-    def test_valid_prefix_meeting(self):
-        from vault.domain.canonical_types import is_valid_id_prefix
-        assert is_valid_id_prefix("meeting:tldv-12345")
+    def test_person_rejects_invalid_source_keys_type(self):
+        from vault.domain.canonical_types import validate_person
 
-    def test_valid_prefix_card(self):
-        from vault.domain.canonical_types import is_valid_id_prefix
-        assert is_valid_id_prefix("card:trello-abc123")
+        entity = minimal_person()
+        entity["source_keys"] = "not-an-array"
+        errors = validate_person(entity)
+        assert "source_keys_type" in errors
 
-    def test_valid_prefix_decision(self):
-        from vault.domain.canonical_types import is_valid_id_prefix
-        assert is_valid_id_prefix("decision:arch-001")
+    def test_project_aliases_is_optional(self):
+        from vault.domain.canonical_types import validate_project
 
-    def test_invalid_prefix(self):
-        from vault.domain.canonical_types import is_valid_id_prefix
-        assert not is_valid_id_prefix("user:lincoln")
+        entity = minimal_project()
+        entity.pop("aliases")
+        entity.pop("status")
+        assert validate_project(entity) is True
 
-    def test_invalid_format_no_colon(self):
-        from vault.domain.canonical_types import is_valid_id_prefix
-        assert not is_valid_id_prefix("person-lincoln")
+    def test_repo_archived_is_optional_bool(self):
+        from vault.domain.canonical_types import validate_repo
 
-    def test_empty_id(self):
-        from vault.domain.canonical_types import is_valid_id_prefix
-        assert not is_valid_id_prefix("")
+        entity = minimal_repo()
+        entity.pop("archived")
+        entity.pop("default_branch")
+        assert validate_repo(entity) is True
 
-    def test_none_id(self):
-        from vault.domain.canonical_types import is_valid_id_prefix
-        assert not is_valid_id_prefix(None)
+    def test_repo_project_ref_is_optional(self):
+        from vault.domain.canonical_types import validate_repo
+
+        entity = minimal_repo()
+        entity.pop("project_ref")
+        assert validate_repo(entity) is True
+
+    def test_relationship_since_until_optional(self):
+        from vault.domain.canonical_types import validate_relationship
+
+        edge = minimal_relationship()
+        edge.pop("since")
+        edge.pop("until")
+        edge.pop("window_days")
+        assert validate_relationship(edge) is True
+
+    def test_relationship_confidence_required(self):
+        from vault.domain.canonical_types import validate_relationship
+
+        edge = minimal_relationship()
+        edge.pop("confidence")
+        errors = validate_relationship(edge)
+        assert "confidence" in errors
+
+    def test_relationship_role_invalid(self):
+        from vault.domain.canonical_types import validate_relationship
+
+        edge = minimal_relationship()
+        edge["role"] = "contributor"
+        errors = validate_relationship(edge)
+        assert "role_allowed" in errors
+
+    def test_decision_project_ref_is_optional(self):
+        from vault.domain.canonical_types import validate_decision
+
+        entity = minimal_decision()
+        entity.pop("project_ref")
+        assert validate_decision(entity) is True
+
+    def test_decision_confidence_is_optional(self):
+        from vault.domain.canonical_types import validate_decision
+
+        entity = minimal_decision()
+        entity.pop("confidence")
+        assert validate_decision(entity) is True
+
+    def test_decision_last_verified_required(self):
+        from vault.domain.canonical_types import validate_decision
+
+        entity = minimal_decision()
+        entity.pop("last_verified")
+        errors = validate_decision(entity)
+        assert "last_verified" in errors
+
+    def test_decision_multiple_sources_all_validated(self):
+        from vault.domain.canonical_types import validate_decision
+
+        entity = minimal_decision()
+        entity["sources"].append(_source())
+        entity["sources"][1]["source_type"] = "tldv_api"
+        assert validate_decision(entity) is True
+
+    def test_decision_second_source_invalid(self):
+        from vault.domain.canonical_types import validate_decision
+
+        entity = minimal_decision()
+        entity["sources"].append(_source())
+        entity["sources"][1]["source_type"] = "unknown_api"
+        errors = validate_decision(entity)
+        assert "sources[1].source_type_allowed" in errors
 
 
-class TestIsIsoDate:
-    def test_valid_iso_date(self):
+class TestHelpers:
+    def test_is_iso_date_valid_formats(self):
         from vault.domain.canonical_types import is_iso_date
+
         assert is_iso_date("2026-04-10")
-
-    def test_valid_iso_datetime(self):
-        from vault.domain.canonical_types import is_iso_date
+        assert is_iso_date("2026-04-10T10:00:00Z")
         assert is_iso_date("2026-04-10T10:00:00+00:00")
+        assert is_iso_date("2026-04-10T10:00:00+01:00")
 
-    def test_invalid_date(self):
+    def test_is_iso_date_rejects_invalid(self):
         from vault.domain.canonical_types import is_iso_date
+
         assert not is_iso_date("not-a-date")
-
-    def test_invalid_format(self):
-        from vault.domain.canonical_types import is_iso_date
         assert not is_iso_date("10/04/2026")
+        assert not is_iso_date("2026-13-01")
+        assert not is_iso_date(123)
+        assert not is_iso_date(None)
+
+    def test_is_valid_id_prefix_all_entity_types(self):
+        from vault.domain.canonical_types import is_valid_id_prefix
+
+        assert is_valid_id_prefix("person:lincolnqjunior")
+        assert is_valid_id_prefix("project:livy-memory")
+        assert is_valid_id_prefix("repo:living/livy-memory-bot")
+        assert is_valid_id_prefix("meeting:tldv-12345")
+        assert is_valid_id_prefix("card:trello-abc123")
+        assert is_valid_id_prefix("decision:arch-001")
+        assert not is_valid_id_prefix("user:lincoln")
+        assert not is_valid_id_prefix("person-lincoln")
+        assert not is_valid_id_prefix("")
+        assert not is_valid_id_prefix(None)

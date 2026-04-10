@@ -1,12 +1,6 @@
-"""
-vault/domain/canonical_types.py — Canonical domain contract validators.
-
-Defines typed validators for all Living domain entities and relationships.
-Each validator returns True on success or a list of field errors on failure.
-"""
+"""Canonical domain contract validators — aligned 1:1 with final spec."""
 from __future__ import annotations
 
-import re
 from datetime import datetime, timezone
 from typing import Any, Union
 
@@ -23,47 +17,46 @@ ID_PREFIXES = frozenset([
     "decision:",
 ])
 
-# Allowed source types across all entities
+# Allowed source_type values per spec
 SOURCE_TYPES = frozenset([
-    "github",
-    "tldv",
-    "trello",
-    "manual",
-    "signal",
+    "github_api",
+    "tldv_api",
+    "trello_api",
+    "supabase_rest",
+    "signal_event",
+    "exec",
+    "openclaw_config",
+    "api_direct",
+    "curated_topic",
+    "observation",
+    "chat_history",
 ])
 
-# Relationship roles
+# Allowed relationship roles per spec
 RELATIONSHIP_ROLES = frozenset([
     "author",
     "reviewer",
     "commenter",
-    "member",
-    "contributor",
-    "owner",
     "participant",
     "assignee",
-    "creator",
-    "depends_on",
-    "implements",
-    "references",
+    "decision_maker",
 ])
 
-# Decision confidence levels
-DECISION_CONFIDENCES = frozenset([
+# Confidence enum per spec
+CONFIDENCE_LEVELS = frozenset([
     "high",
     "medium",
     "low",
     "unverified",
 ])
 
-# Required traceability fields shared by all entity types
-TRACEABILITY_FIELDS = frozenset([
+# Source record fields per spec
+SOURCE_FIELDS = frozenset([
     "source_type",
     "source_ref",
     "retrieved_at",
-    "lineage_run_id",
-    "mapper_version",
 ])
+
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -86,7 +79,6 @@ def is_iso_date(value: Any) -> bool:
             return True
         except ValueError:
             pass
-    # Also accept with 'Z' suffix
     try:
         datetime.fromisoformat(value.replace("Z", "+00:00"))
         return True
@@ -94,14 +86,31 @@ def is_iso_date(value: Any) -> bool:
         return False
 
 
-def _check_traceability(entity: dict) -> list[str]:
-    """Return list of missing traceability field names."""
-    return [f for f in TRACEABILITY_FIELDS if f not in entity]
+def _unknown_fields(entity: dict, allowed: set) -> list[str]:
+    """Return sorted list of unknown field error strings."""
+    return [f"unknown_field:{f}" for f in sorted(set(entity.keys()) - allowed)]
 
 
-def _error_list(*fields: str) -> list[str]:
-    """Construct a list of field error strings."""
-    return list(fields)
+def _check_source_record(source: dict, idx: int) -> list[str]:
+    """Validate a single source record embedded in Decision or Relationship.
+
+    Returns a list of error strings with idx prefix, or [] if valid.
+    """
+    errors: list[str] = []
+    p = f"sources[{idx}]."
+
+    if "source_type" not in source:
+        errors.append(f"{p}source_type")
+    elif source["source_type"] not in SOURCE_TYPES:
+        errors.append(f"{p}source_type_allowed")
+
+    if "source_ref" not in source:
+        errors.append(f"{p}source_ref")
+
+    if "retrieved_at" not in source:
+        errors.append(f"{p}retrieved_at")
+
+    return errors
 
 
 # ---------------------------------------------------------------------------
@@ -109,10 +118,14 @@ def _error_list(*fields: str) -> list[str]:
 # ---------------------------------------------------------------------------
 
 def validate_person(entity: dict) -> Union[bool, list[str]]:
-    """Validate a Person entity."""
+    """Validate a Person entity per spec.
+
+    Required:  id_canonical, source_keys, first_seen_at, last_seen_at
+    Optional:   display_name, github_login, email
+    Optional:  confidence (enum: high|medium|low|unverified)
+    """
     errors: list[str] = []
 
-    # Required fields
     if "id_canonical" not in entity:
         errors.append("id_canonical")
     elif not is_valid_id_prefix(entity["id_canonical"]):
@@ -120,30 +133,45 @@ def validate_person(entity: dict) -> Union[bool, list[str]]:
     elif not entity["id_canonical"].startswith("person:"):
         errors.append("id_canonical_prefix")
 
-    if "name" not in entity:
-        errors.append("name")
+    if "source_keys" not in entity:
+        errors.append("source_keys")
+    elif not isinstance(entity["source_keys"], list):
+        errors.append("source_keys_type")
 
-    # Optional but must be valid if present
-    if "github_login" in entity and not isinstance(entity["github_login"], str):
-        errors.append("github_login_type")
+    if "first_seen_at" not in entity:
+        errors.append("first_seen_at")
+    elif not is_iso_date(entity["first_seen_at"]):
+        errors.append("first_seen_at_format")
 
-    if "email" in entity and not isinstance(entity["email"], str):
-        errors.append("email_type")
+    if "last_seen_at" not in entity:
+        errors.append("last_seen_at")
+    elif not is_iso_date(entity["last_seen_at"]):
+        errors.append("last_seen_at_format")
 
-    # Unknown extra fields — allow traceability + optional fields
-    allowed = {"id_canonical", "name", "github_login", "email"} | TRACEABILITY_FIELDS
-    unknown = set(entity.keys()) - allowed
-    if unknown:
-        errors.extend(f"unknown_field:{u}" for u in sorted(unknown))
+    if "confidence" in entity and entity["confidence"] not in CONFIDENCE_LEVELS:
+        errors.append("confidence_allowed")
 
-    # Traceability
-    errors.extend(_check_traceability(entity))
+    allowed = {
+        "id_canonical",
+        "display_name",
+        "github_login",
+        "email",
+        "source_keys",
+        "first_seen_at",
+        "last_seen_at",
+        "confidence",
+    }
+    errors.extend(_unknown_fields(entity, allowed))
 
     return True if not errors else errors
 
 
 def validate_project(entity: dict) -> Union[bool, list[str]]:
-    """Validate a Project entity."""
+    """Validate a Project entity per spec.
+
+    Required:  id_canonical, slug, name
+    Optional:  status, aliases, confidence (enum)
+    """
     errors: list[str] = []
 
     if "id_canonical" not in entity:
@@ -151,17 +179,38 @@ def validate_project(entity: dict) -> Union[bool, list[str]]:
     elif not entity["id_canonical"].startswith("project:"):
         errors.append("id_canonical_prefix")
 
+    if "slug" not in entity:
+        errors.append("slug")
+    elif not isinstance(entity["slug"], str):
+        errors.append("slug_type")
+
     if "name" not in entity:
         errors.append("name")
+    elif not isinstance(entity["name"], str):
+        errors.append("name_type")
 
-    # Traceability
-    errors.extend(_check_traceability(entity))
+    if "confidence" in entity and entity["confidence"] not in CONFIDENCE_LEVELS:
+        errors.append("confidence_allowed")
+
+    allowed = {
+        "id_canonical",
+        "slug",
+        "name",
+        "status",
+        "aliases",
+        "confidence",
+    }
+    errors.extend(_unknown_fields(entity, allowed))
 
     return True if not errors else errors
 
 
 def validate_repo(entity: dict) -> Union[bool, list[str]]:
-    """Validate a Repo entity."""
+    """Validate a Repo entity per spec.
+
+    Required:  id_canonical, full_name, owner, name
+    Optional:  default_branch, archived, project_ref
+    """
     errors: list[str] = []
 
     if "id_canonical" not in entity:
@@ -169,20 +218,41 @@ def validate_repo(entity: dict) -> Union[bool, list[str]]:
     elif not entity["id_canonical"].startswith("repo:"):
         errors.append("id_canonical_prefix")
 
+    if "full_name" not in entity:
+        errors.append("full_name")
+    elif not isinstance(entity["full_name"], str):
+        errors.append("full_name_type")
+
+    if "owner" not in entity:
+        errors.append("owner")
+    elif not isinstance(entity["owner"], str):
+        errors.append("owner_type")
+
     if "name" not in entity:
         errors.append("name")
+    elif not isinstance(entity["name"], str):
+        errors.append("name_type")
 
-    if "org" not in entity:
-        errors.append("org")
-
-    # Traceability
-    errors.extend(_check_traceability(entity))
+    allowed = {
+        "id_canonical",
+        "full_name",
+        "owner",
+        "name",
+        "default_branch",
+        "archived",
+        "project_ref",
+    }
+    errors.extend(_unknown_fields(entity, allowed))
 
     return True if not errors else errors
 
 
 def validate_meeting(entity: dict) -> Union[bool, list[str]]:
-    """Validate a Meeting entity."""
+    """Validate a Meeting entity per spec.
+
+    Required:  id_canonical, meeting_id_source
+    Optional:  title, started_at, ended_at, project_ref
+    """
     errors: list[str] = []
 
     if "id_canonical" not in entity:
@@ -190,22 +260,36 @@ def validate_meeting(entity: dict) -> Union[bool, list[str]]:
     elif not entity["id_canonical"].startswith("meeting:"):
         errors.append("id_canonical_prefix")
 
-    if "name" not in entity:
-        errors.append("name")
+    if "meeting_id_source" not in entity:
+        errors.append("meeting_id_source")
+    elif not isinstance(entity["meeting_id_source"], str):
+        errors.append("meeting_id_source_type")
 
-    if "date" not in entity:
-        errors.append("date")
-    elif not is_iso_date(entity["date"]):
-        errors.append("date_format")
+    if "started_at" in entity and not is_iso_date(entity["started_at"]):
+        errors.append("started_at_format")
 
-    # Traceability
-    errors.extend(_check_traceability(entity))
+    if "ended_at" in entity and not is_iso_date(entity["ended_at"]):
+        errors.append("ended_at_format")
+
+    allowed = {
+        "id_canonical",
+        "meeting_id_source",
+        "title",
+        "started_at",
+        "ended_at",
+        "project_ref",
+    }
+    errors.extend(_unknown_fields(entity, allowed))
 
     return True if not errors else errors
 
 
 def validate_card(entity: dict) -> Union[bool, list[str]]:
-    """Validate a Card entity."""
+    """Validate a Card entity per spec.
+
+    Required:  id_canonical, card_id_source, title
+    Optional:  board, list, project_ref, status
+    """
     errors: list[str] = []
 
     if "id_canonical" not in entity:
@@ -213,17 +297,36 @@ def validate_card(entity: dict) -> Union[bool, list[str]]:
     elif not entity["id_canonical"].startswith("card:"):
         errors.append("id_canonical_prefix")
 
-    if "name" not in entity:
-        errors.append("name")
+    if "card_id_source" not in entity:
+        errors.append("card_id_source")
+    elif not isinstance(entity["card_id_source"], str):
+        errors.append("card_id_source_type")
 
-    # Traceability
-    errors.extend(_check_traceability(entity))
+    if "title" not in entity:
+        errors.append("title")
+    elif not isinstance(entity["title"], str):
+        errors.append("title_type")
+
+    allowed = {
+        "id_canonical",
+        "card_id_source",
+        "title",
+        "board",
+        "list",
+        "project_ref",
+        "status",
+    }
+    errors.extend(_unknown_fields(entity, allowed))
 
     return True if not errors else errors
 
 
 def validate_decision(entity: dict) -> Union[bool, list[str]]:
-    """Validate a Decision entity."""
+    """Validate a Decision entity per spec.
+
+    Required:  id_canonical, summary, decision_date, sources, last_verified
+    Optional:  project_ref, confidence (enum)
+    """
     errors: list[str] = []
 
     if "id_canonical" not in entity:
@@ -231,39 +334,98 @@ def validate_decision(entity: dict) -> Union[bool, list[str]]:
     elif not entity["id_canonical"].startswith("decision:"):
         errors.append("id_canonical_prefix")
 
-    if "title" not in entity:
-        errors.append("title")
+    if "summary" not in entity:
+        errors.append("summary")
+    elif not isinstance(entity["summary"], str):
+        errors.append("summary_type")
 
-    if "evidence" not in entity:
-        errors.append("evidence")
-    elif not isinstance(entity["evidence"], list):
-        errors.append("evidence_type")
+    if "decision_date" not in entity:
+        errors.append("decision_date")
+    elif not is_iso_date(entity["decision_date"]):
+        errors.append("decision_date_format")
 
-    if "confidence" not in entity:
-        errors.append("confidence")
-    elif entity["confidence"] not in DECISION_CONFIDENCES:
+    if "sources" not in entity:
+        errors.append("sources")
+    elif not isinstance(entity["sources"], list):
+        errors.append("sources_type")
+    else:
+        for idx, src in enumerate(entity["sources"]):
+            errors.extend(_check_source_record(src, idx))
+
+    if "last_verified" not in entity:
+        errors.append("last_verified")
+    elif not is_iso_date(entity["last_verified"]):
+        errors.append("last_verified_format")
+
+    if "confidence" in entity and entity["confidence"] not in CONFIDENCE_LEVELS:
         errors.append("confidence_allowed")
 
-    # Traceability
-    errors.extend(_check_traceability(entity))
+    allowed = {
+        "id_canonical",
+        "summary",
+        "decision_date",
+        "project_ref",
+        "confidence",
+        "sources",
+        "last_verified",
+    }
+    errors.extend(_unknown_fields(entity, allowed))
 
     return True if not errors else errors
 
 
 def validate_relationship(entity: dict) -> Union[bool, list[str]]:
-    """Validate a Relationship edge."""
+    """Validate a Relationship edge per spec.
+
+    Required:  from_id, to_id, role, confidence, sources, lineage_run_id
+    Optional:  since, until, window_days
+    """
     errors: list[str] = []
 
-    if "from" not in entity:
-        errors.append("from")
-    if "to" not in entity:
-        errors.append("to")
+    if "from_id" not in entity:
+        errors.append("from_id")
+    elif not isinstance(entity["from_id"], str):
+        errors.append("from_id_type")
+
+    if "to_id" not in entity:
+        errors.append("to_id")
+    elif not isinstance(entity["to_id"], str):
+        errors.append("to_id_type")
+
     if "role" not in entity:
         errors.append("role")
     elif entity["role"] not in RELATIONSHIP_ROLES:
         errors.append("role_allowed")
 
-    # Traceability
-    errors.extend(_check_traceability(entity))
+    if "confidence" not in entity:
+        errors.append("confidence")
+    elif entity["confidence"] not in CONFIDENCE_LEVELS:
+        errors.append("confidence_allowed")
+
+    if "sources" not in entity:
+        errors.append("sources")
+    elif not isinstance(entity["sources"], list):
+        errors.append("sources_type")
+    else:
+        for idx, src in enumerate(entity["sources"]):
+            errors.extend(_check_source_record(src, idx))
+
+    if "lineage_run_id" not in entity:
+        errors.append("lineage_run_id")
+    elif not isinstance(entity["lineage_run_id"], str):
+        errors.append("lineage_run_id_type")
+
+    allowed = {
+        "from_id",
+        "to_id",
+        "role",
+        "since",
+        "until",
+        "window_days",
+        "confidence",
+        "sources",
+        "lineage_run_id",
+    }
+    errors.extend(_unknown_fields(entity, allowed))
 
     return True if not errors else errors
