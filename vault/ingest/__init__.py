@@ -34,6 +34,11 @@ def load_events(path=DEFAULT_EVENTS):
     return _legacy.load_events(path)
 
 
+def map_signal_confidence(value):
+    _sync_globals()
+    return _legacy.map_signal_confidence(value)
+
+
 def deduplicate_events(events):
     _sync_globals()
     return _legacy.deduplicate_events(events)
