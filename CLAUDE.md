@@ -524,3 +524,19 @@ relationships:
     entity_ref: person:<id>
 ---
 ```
+
+### Wave A — Operational Runbook
+
+```bash
+# Bulk elevation (all vault pages)
+python3 scripts/elevate_to_domain_model.py --scope all --verbose
+
+# Dry-run elevation (no writes)
+python3 scripts/elevate_to_domain_model.py --dry-run --scope all
+
+# Test suite
+python3 -m pytest vault/tests/ -q --tb=no
+```
+
+Backup location for migration artifacts:
+- `memory/vault/.migration-backup/`
