@@ -90,10 +90,13 @@ ENTITY_REQUIRED_DOMAIN_FIELDS = [
     "last_seen_at",
 ]
 
-# Decision-specific lineage minimum (beyond generic entity fields)
+# Decision-specific lineage minimum (per spec §3.4)
 DECISION_REQUIRED_LINEAGE_FIELDS = [
-    "sources",
-    "last_verified",
+    "run_id",
+    "source_keys",
+    "transformed_at",
+    "mapper_version",
+    "actor",
 ]
 
 # Fields that a single source record must contain
@@ -207,14 +210,12 @@ class TestEntityDomainContract:
 class TestDecisionLineageContract:
     """Every decision page must carry the lineage minimum defined by the spec.
 
-    Required (per Wave A spec):
-      - id_canonical      — globally unique decision identifier
-      - sources           — non-empty list of source records
-      - sources[*].source_type       — official source type enum
-      - sources[*].source_ref       — URI/link to the source
-      - sources[*].retrieved_at     — ISO datetime of retrieval
-      - sources[*].mapper_version   — version string of the ingest mapper
-      - last_verified    — ISO date of last human/automated verification
+    Required lineage block (spec §3.4):
+      - lineage.run_id
+      - lineage.source_keys
+      - lineage.transformed_at
+      - lineage.mapper_version
+      - lineage.actor
 
     These fields provide the minimum traceability chain for every decision.
     """
@@ -229,6 +230,47 @@ class TestDecisionLineageContract:
         assert missing == [], (
             f"Decision pages missing id_canonical: {missing}. "
             "Every decision must carry 'id_canonical: decision:<slug>'."
+        )
+
+    def test_decision_pages_have_lineage_block(self, vault_root):
+        """Every decision .md must declare a lineage mapping."""
+        missing_or_invalid = []
+        for path in _decision_files(vault_root):
+            fm = frontmatter_of(path)
+            lineage = fm.get("lineage")
+            if not isinstance(lineage, dict):
+                missing_or_invalid.append(path.name)
+        assert missing_or_invalid == [], (
+            f"Decision pages missing/invalid lineage block: {missing_or_invalid}. "
+            "Every decision must carry 'lineage: {...}'."
+        )
+
+    @pytest.mark.parametrize("lineage_key", DECISION_REQUIRED_LINEAGE_FIELDS)
+    def test_decision_lineage_has_required_keys(self, vault_root, lineage_key):
+        """Every decision lineage block must contain all mandatory keys from spec §3.4."""
+        missing = []
+        for path in _decision_files(vault_root):
+            fm = frontmatter_of(path)
+            lineage = fm.get("lineage")
+            if not isinstance(lineage, dict) or lineage_key not in lineage:
+                missing.append(path.name)
+        assert missing == [], (
+            f"Decision pages with missing lineage.{lineage_key}: {missing}. "
+            f"Every decision must carry lineage.{lineage_key}."
+        )
+
+    def test_decision_lineage_source_keys_is_non_empty_list(self, vault_root):
+        """Every decision lineage.source_keys must be a non-empty list."""
+        empty_or_invalid = []
+        for path in _decision_files(vault_root):
+            fm = frontmatter_of(path)
+            lineage = fm.get("lineage")
+            source_keys = lineage.get("source_keys") if isinstance(lineage, dict) else None
+            if not isinstance(source_keys, list) or len(source_keys) == 0:
+                empty_or_invalid.append(path.name)
+        assert empty_or_invalid == [], (
+            "Decision pages with empty/missing lineage.source_keys: "
+            f"{empty_or_invalid}. lineage.source_keys must be a non-empty list."
         )
 
     def test_decision_pages_have_sources(self, vault_root):
