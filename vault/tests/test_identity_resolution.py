@@ -14,7 +14,7 @@ from vault.domain.identity_resolution import (
 class TestNormalizeEmail:
     """Email normalization for identity matching."""
 
-    def test_lowercase_domain(self):
+    def test_lowercase_email_for_matching(self):
         assert normalize_email("User@Example.COM") == "user@example.com"
 
     def test_strip_whitespace(self):
@@ -26,9 +26,8 @@ class TestNormalizeEmail:
     def test_already_normal(self):
         assert normalize_email("user@example.com") == "user@example.com"
 
-    def test_plusAddressing_stripped(self):
-        """Plus-addressing variants should normalize to same address."""
-        # Note: conservative approach - we normalize but don't strip +suffix
+    def test_plusAddressing_preserved(self):
+        """Plus-addressing suffix is preserved in conservative normalization."""
         assert normalize_email("user+tag@example.com") == "user+tag@example.com"
 
 
@@ -322,5 +321,50 @@ class TestResolveBySourceKey:
             }
         ]
         result = resolve_by_source_key(existing, "person", "github:robert")
-        # Guardrail: exact source_key match still triggers <2 check
         assert result.action == MergeAction.REVIEW
+
+    def test_resolve_duplicate_source_key_returns_review_with_candidates(self):
+        """Duplicate source_key across entities is ambiguous and must be reviewed."""
+        from vault.domain.identity_resolution import resolve_by_source_key
+        existing = [
+            {
+                "id_canonical": "meeting:daily-1",
+                "source_keys": ["tldv:daily-duplicate"],
+            },
+            {
+                "id_canonical": "meeting:daily-2",
+                "source_keys": ["tldv:daily-duplicate"],
+            },
+        ]
+        result = resolve_by_source_key(existing, "meeting", "tldv:daily-duplicate")
+        assert result.action == MergeAction.REVIEW
+        assert result.canonical_id is None
+        assert len(result.candidates) == 2
+
+    def test_resolve_invalid_entity_type_returns_review(self):
+        """Unknown entity_type is a contract violation and requires review."""
+        from vault.domain.identity_resolution import resolve_by_source_key
+        existing = [
+            {
+                "id_canonical": "meeting:daily-2026-04-10",
+                "source_keys": ["tldv:daily-2026-04-10"],
+            }
+        ]
+        result = resolve_by_source_key(existing, "unknown-type", "tldv:daily-2026-04-10")
+        assert result.action == MergeAction.REVIEW
+        assert result.canonical_id is None
+        assert len(result.candidates) == 1
+
+    def test_resolve_match_missing_id_canonical_returns_review(self):
+        """Exact match without id_canonical must not auto-merge."""
+        from vault.domain.identity_resolution import resolve_by_source_key
+        existing = [
+            {
+                # id_canonical intentionally missing
+                "source_keys": ["github:living/forge-platform"],
+            }
+        ]
+        result = resolve_by_source_key(existing, "repo", "github:living/forge-platform")
+        assert result.action == MergeAction.REVIEW
+        assert result.canonical_id is None
+        assert len(result.candidates) == 1
