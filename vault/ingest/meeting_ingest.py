@@ -12,6 +12,7 @@ from typing import Any
 import os
 
 from vault.domain.normalize import build_entity_with_traceability
+from vault.domain.canonical_types import is_iso_date
 
 MAPPER_VERSION = "wave-c-meeting-ingest-v1"
 DEFAULT_LOOKBACK_DAYS = 7
@@ -28,6 +29,7 @@ def _fetch_from_supabase(days: int = DEFAULT_LOOKBACK_DAYS) -> list[dict[str, An
     url = os.environ.get("SUPABASE_URL")
     key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
     if not url or not key:
+        print("[WARN] SUPABASE_URL or key not set; skipping fetch")
         return []
 
     cutoff = datetime.now(timezone.utc) - timedelta(days=days)
@@ -52,10 +54,18 @@ def normalize_meeting_record(raw: dict[str, Any]) -> dict[str, Any]:
       id_canonical, meeting_id_source, title, started_at, ended_at, project_ref
     """
     meeting_id = raw.get("meeting_id", "")
+    if not isinstance(meeting_id, str) or not meeting_id.strip():
+        raise ValueError("meeting_id is required")
+
     title = raw.get("title", "")
     started_at = raw.get("started_at")
     ended_at = raw.get("ended_at")
     project_ref = raw.get("project_ref")
+
+    if started_at is not None and not is_iso_date(started_at):
+        raise ValueError("started_at must be ISO date/datetime")
+    if ended_at is not None and not is_iso_date(ended_at):
+        raise ValueError("ended_at must be ISO date/datetime")
 
     # id_canonical format: meeting:{normalized_id}
     # Use the raw meeting_id directly, colons replaced with hyphens
@@ -94,11 +104,15 @@ def extract_participants(raw: dict[str, Any]) -> list[dict[str, Any]]:
     meeting_id = raw.get("meeting_id", "")
     out = []
     for p in participants:
-        pid = p.get("id", "unknown")
+        pid = p.get("id")
+        name = p.get("name") or p.get("display_name")
+        if not pid and not name:
+            continue
+        pid = pid or "unknown"
         out.append(
             {
                 "id": pid,
-                "name": p.get("name") or p.get("display_name", "unknown"),
+                "name": name or "unknown",
                 "email": p.get("email"),
                 "github_login": p.get("github_login"),
                 "source_key": f"tldv:participant:{meeting_id}:{pid}",
@@ -132,7 +146,10 @@ def fetch_and_build(
     entities = []
     all_participants = []
     for raw in raw_meetings:
-        entity = build_meeting_entity(raw, mapper_version)
+        try:
+            entity = build_meeting_entity(raw, mapper_version)
+        except ValueError:
+            continue
         entities.append(entity)
         participants = extract_participants(raw)
         all_participants.extend(participants)
