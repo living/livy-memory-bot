@@ -2,7 +2,7 @@
 
 Generates:
 - person -> repo edges: author, reviewer, commenter
-- repo -> project edges: part_of
+- repo -> project edges: participant
 - inferred person -> project edges via repo participation
 - window_days as query-origin metadata
 - full traceability stamps on every edge
@@ -165,11 +165,11 @@ def build_repo_project_edge(
     lineage_run_id: str,
     window_days: int | None = None,
 ) -> dict:
-    """Build a repo -> project edge with role=part_of."""
+    """Build a repo -> project edge with role=participant."""
     return _build_edge(
         from_id=repo_id,
         to_id=project_id,
-        role="part_of",
+        role="participant",
         source=source,
         lineage_run_id=lineage_run_id,
         since=None,

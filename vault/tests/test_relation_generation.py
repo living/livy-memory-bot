@@ -197,14 +197,14 @@ class TestBuildRepoProjectEdge:
         )
         assert result["to_id"] == "project:livy-memory"
 
-    def test_role_is_part_of(self):
+    def test_role_is_participant(self):
         result = build_repo_project_edge(
             repo_id="repo:living/livy-memory-bot",
             project_id="project:livy-memory",
             source=_source(),
             lineage_run_id="run-2026-04-10",
         )
-        assert result["role"] == "part_of"
+        assert result["role"] == "participant"
 
 
 class TestBuildPersonProjectInference:
