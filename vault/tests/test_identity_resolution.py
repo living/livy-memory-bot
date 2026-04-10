@@ -226,3 +226,101 @@ class TestIdentityResult:
         assert result.action == MergeAction.NO_MATCH
         assert result.canonical_id is None
         assert result.candidates == []
+
+
+class TestResolveBySourceKey:
+    """Generic resolver by exact source_key match (Wave C Phase C2)."""
+
+    def test_resolve_meeting_exact_match_returns_merge(self):
+        """Exact source_key match for meeting → MERGE (not MATCH)."""
+        from vault.domain.identity_resolution import resolve_by_source_key
+        existing = [
+            {
+                "id_canonical": "meeting:daily-2026-04-10",
+                "meeting_id_source": "daily-2026-04-10",
+                "source_keys": ["tldv:daily-2026-04-10"],
+                "confidence": "medium",
+            }
+        ]
+        result = resolve_by_source_key(existing, "meeting", "tldv:daily-2026-04-10")
+        assert result.action == MergeAction.MERGE
+        assert result.canonical_id == "meeting:daily-2026-04-10"
+
+    def test_resolve_meeting_no_match_returns_no_match(self):
+        """Non-existent source_key → NO_MATCH."""
+        from vault.domain.identity_resolution import resolve_by_source_key
+        existing = [
+            {"id_canonical": "meeting:other", "source_keys": ["tldv:other"]}
+        ]
+        result = resolve_by_source_key(existing, "meeting", "tldv:nonexistent")
+        assert result.action == MergeAction.NO_MATCH
+
+    def test_resolve_card_exact_match_returns_merge(self):
+        """Exact source_key match for card → MERGE (not MATCH)."""
+        from vault.domain.identity_resolution import resolve_by_source_key
+        existing = [
+            {
+                "id_canonical": "card:b1:abc123",
+                "card_id_source": "abc123",
+                "source_keys": ["trello:b1:abc123"],
+            }
+        ]
+        result = resolve_by_source_key(existing, "card", "trello:b1:abc123")
+        assert result.action == MergeAction.MERGE
+        assert result.canonical_id == "card:b1:abc123"
+
+    def test_resolve_card_no_match_returns_no_match(self):
+        """Non-existent card source_key → NO_MATCH."""
+        from vault.domain.identity_resolution import resolve_by_source_key
+        existing = [
+            {"id_canonical": "card:b1:xyz", "source_keys": ["trello:b1:xyz"]}
+        ]
+        result = resolve_by_source_key(existing, "card", "trello:b1:nonexistent")
+        assert result.action == MergeAction.NO_MATCH
+
+    def test_resolve_person_uses_exact_source_key_match(self):
+        """Person lookup by source_key → MERGE when exact match exists."""
+        from vault.domain.identity_resolution import resolve_by_source_key
+        existing = [
+            {
+                "id_canonical": "person:robert",
+                "github_login": "robert",
+                "source_keys": ["github:robert", "tldv:participant:daily:robert-p1"],
+            }
+        ]
+        result = resolve_by_source_key(existing, "person", "github:robert")
+        assert result.action == MergeAction.MERGE
+        assert result.canonical_id == "person:robert"
+
+    def test_resolve_repo_exact_match(self):
+        """Repo lookup by source_key → MERGE."""
+        from vault.domain.identity_resolution import resolve_by_source_key
+        existing = [
+            {
+                "id_canonical": "repo:living-forge",
+                "source_keys": ["github:living/forge-platform"],
+            }
+        ]
+        result = resolve_by_source_key(existing, "repo", "github:living/forge-platform")
+        assert result.action == MergeAction.MERGE
+        assert result.canonical_id == "repo:living-forge"
+
+    def test_resolve_empty_existing_returns_no_match(self):
+        """Empty existing list → NO_MATCH."""
+        from vault.domain.identity_resolution import resolve_by_source_key
+        result = resolve_by_source_key([], "meeting", "tldv:daily")
+        assert result.action == MergeAction.NO_MATCH
+
+    def test_resolve_person_single_source_key_guardrail_preserved(self):
+        """Person with <2 source_keys → REVIEW (guardrail preserved)."""
+        from vault.domain.identity_resolution import resolve_by_source_key
+        existing = [
+            {
+                "id_canonical": "person:robert",
+                "github_login": "robert",
+                "source_keys": ["github:robert"],  # only 1 source_key
+            }
+        ]
+        result = resolve_by_source_key(existing, "person", "github:robert")
+        # Guardrail: exact source_key match still triggers <2 check
+        assert result.action == MergeAction.REVIEW
