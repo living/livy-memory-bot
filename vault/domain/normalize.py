@@ -455,7 +455,7 @@ def normalize_github_repo_to_relationship(
     """Normalize a GitHub repo to a repo->project relationship edge.
 
     Generates:
-      - repo -> project  (role=part_of)
+      - repo -> project  (role=participant)
 
     Every edge carries lineage_run_id and a source record with all 4 required
     traceability fields.
@@ -487,7 +487,7 @@ def normalize_github_repo_to_relationship(
     return {
         "from_id": repo_id,
         "to_id": project_id,
-        "role": "part_of",
+        "role": "participant",
         "confidence": "high",
         "sources": [source],
         "lineage_run_id": lineage_run_id,

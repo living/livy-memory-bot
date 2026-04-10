@@ -40,7 +40,6 @@ RELATIONSHIP_ROLES = frozenset([
     "participant",
     "assignee",
     "decision_maker",
-    "part_of",
 ])
 
 # Confidence enum per spec
