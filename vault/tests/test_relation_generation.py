@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import pytest
 
+from vault.domain.canonical_types import validate_relationship
 from vault.domain.relationship_builder import (
     build_pr_author_edge,
     build_reviewer_edge,
@@ -326,7 +327,7 @@ class TestBuildPersonMeetingEdge:
                 lineage_run_id="run-2026-04-10",
             )
 
-    def test_sets_optional_source_keys(self):
+    def test_does_not_emit_top_level_source_keys(self):
         result = build_person_meeting_edge(
             person_id="person:lincolnq",
             meeting_id="meeting:daily-2026-04-10",
@@ -336,8 +337,18 @@ class TestBuildPersonMeetingEdge:
             from_source_key="github:lincolnq",
             to_source_key="tldv:meeting:123",
         )
-        assert result["from_source_key"] == "github:lincolnq"
-        assert result["to_source_key"] == "tldv:meeting:123"
+        assert "from_source_key" not in result
+        assert "to_source_key" not in result
+
+    def test_edge_passes_validate_relationship(self):
+        result = build_person_meeting_edge(
+            person_id="person:lincolnq",
+            meeting_id="meeting:daily-2026-04-10",
+            role="participant",
+            source=_source(),
+            lineage_run_id="run-2026-04-10",
+        )
+        assert validate_relationship(result) is True
 
 
 class TestBuildPersonCardEdge:
@@ -375,7 +386,7 @@ class TestBuildPersonCardEdge:
                 lineage_run_id="run-2026-04-10",
             )
 
-    def test_sets_optional_source_keys(self):
+    def test_does_not_emit_top_level_source_keys(self):
         result = build_person_card_edge(
             person_id="person:lincolnq",
             card_id="card:trello-123",
@@ -385,8 +396,18 @@ class TestBuildPersonCardEdge:
             from_source_key="github:lincolnq",
             to_source_key="trello:card:123",
         )
-        assert result["from_source_key"] == "github:lincolnq"
-        assert result["to_source_key"] == "trello:card:123"
+        assert "from_source_key" not in result
+        assert "to_source_key" not in result
+
+    def test_edge_passes_validate_relationship(self):
+        result = build_person_card_edge(
+            person_id="person:lincolnq",
+            card_id="card:trello-123",
+            role="assignee",
+            source=_source(),
+            lineage_run_id="run-2026-04-10",
+        )
+        assert validate_relationship(result) is True
 
 
 class TestWindowDaysOriginHint:

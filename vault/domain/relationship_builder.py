@@ -205,7 +205,7 @@ def build_person_meeting_edge(
     if role not in allowed_roles:
         raise ValueError(f"role must be one of {allowed_roles!r}, got {role!r}")
 
-    edge = _build_edge(
+    return _build_edge(
         from_id=person_id,
         to_id=meeting_id,
         role=role,
@@ -215,13 +215,6 @@ def build_person_meeting_edge(
         until=until,
         window_days=window_days,
     )
-
-    if from_source_key is not None:
-        edge["from_source_key"] = from_source_key
-    if to_source_key is not None:
-        edge["to_source_key"] = to_source_key
-
-    return edge
 
 
 def build_person_card_edge(
@@ -246,7 +239,7 @@ def build_person_card_edge(
     if role not in allowed_roles:
         raise ValueError(f"role must be one of {allowed_roles!r}, got {role!r}")
 
-    edge = _build_edge(
+    return _build_edge(
         from_id=person_id,
         to_id=card_id,
         role=role,
@@ -256,13 +249,6 @@ def build_person_card_edge(
         until=until,
         window_days=window_days,
     )
-
-    if from_source_key is not None:
-        edge["from_source_key"] = from_source_key
-    if to_source_key is not None:
-        edge["to_source_key"] = to_source_key
-
-    return edge
 
 
 # ---------------------------------------------------------------------------
