@@ -102,16 +102,39 @@ def _decision_frontmatter(decision: dict, conf: str, date_str: str) -> str:
             retrieved_at = f"{date_str}T00:00:00Z"
     else:
         retrieved_at = f"{date_str}T00:00:00Z"
+
     source_ref = decision.get("origin_url") or decision.get("origin_id") or ""
+    decision_slug = _slugify(decision.get("description", "decision"))
+    run_id_seed = decision.get("origin_id") or decision_slug
+    run_id = f"signal-ingest-v1:{_stable_suffix(run_id_seed, default='run')}"
+    source_keys = [
+        f"signal_event:{decision.get('origin_id', '')}" if decision.get("origin_id") else "signal_event:unknown",
+        source_ref,
+    ]
+
     return f"""---
 entity: {desc[:120] or 'Decision'}
 type: decision
+id_canonical: decision:{decision_slug}
 confidence: {conf}
+source_keys:
+  - signal_event:{decision.get('origin_id', '')}
+  - {source_ref}
+first_seen_at: {retrieved_at}
+last_seen_at: {retrieved_at}
 sources:
   - source_type: signal_event
     source_ref: {source_ref}
     retrieved_at: {retrieved_at}
     mapper_version: "signal-ingest-v1"
+lineage:
+  run_id: "{run_id}"
+  source_keys:
+    - "signal_event:{decision.get('origin_id', '')}"
+    - "{source_ref}"
+  transformed_at: "{retrieved_at}"
+  mapper_version: "signal-ingest-v1"
+  actor: "livy-agent"
 last_verified: {date_str}
 verification_log: []
 last_touched_by: livy-agent
@@ -182,10 +205,18 @@ def _concept_frontmatter(topic: dict, conf: str, date_str: str) -> str:
     else:
         retrieved_at = f"{date_str}T00:00:00Z"
     source_ref = topic.get("origin_url") or topic.get("origin_id") or ""
+    concept_slug = _slugify(topic.get("description", "concept"))
+
     return f"""---
 entity: {desc[:120] or 'Concept'}
 type: concept
+id_canonical: concept:{concept_slug}
 confidence: {conf}
+source_keys:
+  - signal_event:{topic.get('origin_id', '')}
+  - {source_ref}
+first_seen_at: {retrieved_at}
+last_seen_at: {retrieved_at}
 sources:
   - source_type: signal_event
     source_ref: {source_ref}
