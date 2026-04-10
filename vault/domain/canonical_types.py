@@ -40,6 +40,7 @@ RELATIONSHIP_ROLES = frozenset([
     "participant",
     "assignee",
     "decision_maker",
+    "part_of",  # repo -> project membership
 ])
 
 # Confidence enum per spec
