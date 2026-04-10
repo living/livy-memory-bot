@@ -219,6 +219,10 @@ Unsupported for subagent runtime:
 - `attachments`
 - `attachAs`
 
+**Learning (2026-04-10):** alguns templates de dispatch herdados de ACP podem manter esses campos por engano.
+Quando isso acontece, o spawn falha com: `streamTo is only supported for runtime=acp`.
+Sempre montar payload mínimo para subagent (`task`, `label`, `runtime`, `agentId`, `cwd`, `mode`, `timeout`).
+
 ### Pytest collection conflict note
 Collection conflict resolved by renaming:
 - `scripts/test_reconciliation.py` → `scripts/test_reconciliation_scripts.py`
@@ -368,6 +372,14 @@ vault/ingest.py     → primeiro ciclo real
 - ✅ lint detecta 0 contradições
 - ✅ `index.md` e `log.md` atualizam automaticamente
 - ✅ nenhum dado escrito fora de `memory/vault/`
+
+### Learning persistido — Fase 1B execution (2026-04-10)
+- **Fluxo que funcionou:** implementer → spec reviewer → fix loop → spec re-review → quality review.
+- **Gate obrigatório:** nunca avançar para quality review com spec gaps em aberto (corrigir e revalidar antes).
+- **Se subagent retornar incompleto/ruim:** assumir no session controller e continuar execução sem bloquear usuário.
+- **Evidência mínima de conclusão:** sempre reportar comando e resultado (`python3 -m pytest vault/tests/ -q` → `94 passed`).
+- **Spec-sensitive tests:** quando corrigir semântica (ex: orphan=inbound), alinhar asserts dos testes com o comportamento canônico para evitar falsos vermelhos.
+- **PR hygiene:** aplicar minor fixes de quality review (unused imports / import placement) antes de abrir PR final.
 
 ---
 
