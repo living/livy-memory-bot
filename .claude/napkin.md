@@ -8,58 +8,61 @@
 
 ## Execution & Validation (Highest Priority)
 
-1. **[2026-04-01] OpenClaw skills need YAML frontmatter with name + description**
-   Do instead: every skill dir needs `SKILL.md` starting with `---
-name: skill-name
-description: ...` — without it, `openclaw skills list` won't show the skill.
+1. **[2026-04-10] Domain pipeline de revisão: spec → fix → spec recheck → CQ**
+   Do instead: trate CQ como etapa final; se houver gap de spec (ex.: role fora do contrato), corrija e rode recheck antes de aprovar.
 
-2. **[2026-04-01] Supabase TLDV: `meetings` + `summaries`, NOT `meeting_memories`**
-   Do instead: query `meetings` (name, created_at, enrichment_context) + `summaries` (topics, decisions) — `meeting_memories` is a secondary vector store with only short summaries. Wrong table = no data.
+2. **[2026-04-10] Regra canônica de roles: `part_of` é proibido no domínio Living**
+   Do instead: use apenas `author`, `reviewer`, `commenter`, `participant`, `assignee`, `decision_maker`; rode `grep -R "part_of" vault/` antes de fechar PR.
 
-3. **[2026-04-05] Subagent-driven worktree: run pytest from inside skills dir**
-   Do instead: `cd skills/memoria-consolidation && python3 -m pytest test_reconciliation.py -q`
-   — running from worktree root fails with ModuleNotFoundError because Python can't find the hyphenated module.
+3. **[2026-04-10] Antes de declarar “done”, exigir evidência E2E completa**
+   Do instead: executar `python3 -m pytest vault/tests/ -q --tb=no` + `python3 -m vault.pipeline --dry-run -v` + `python3 -m vault.pipeline -v` e reportar números (ex.: 413 passed, gaps/orphans 0/0).
 
 4. **[2026-04-05] Always clean untracked test artifacts before finalizing PR**
-   Do instead: check `git status --short` for stray `a.txt`, `memory/reconciliation-report.md` etc. and `rm` them before push.
+   Do instead: check `git status --short` for stray artifacts and remove noise before push/PR.
 
-5. **[2026-04-05] Two-phase review loop: spec compliance THEN code quality**
-   Do instead: never start code quality review until spec compliance is ✅ — review findings differ in nature and order matters.
+5. **[2026-04-05] Subagent-driven worktree: run pytest from inside skills dir**
+   Do instead: `cd skills/memoria-consolidation && python3 -m pytest test_reconciliation.py -q` when validating hyphenated skill packages.
 
 6. **[2026-04-01] Three test suites exist — run all after any change**
-   Do instead: `python3 skills/X/test_X.py && python3 scripts/test_X.py && python3 scripts/test_security.py` — all three must pass before commit.
+   Do instead: `python3 skills/X/test_X.py && python3 scripts/test_X.py && python3 scripts/test_security.py`.
 
-5. **[2026-04-01] Token/secrets: fail-fast with ValueError**
-   Do instead: `token = os.getenv("X_TOKEN", ""); assert token, "X_TOKEN not set"` — never hardcode, never let it silently use wrong value.
+7. **[2026-04-01] OpenClaw skills need YAML frontmatter with name + description**
+   Do instead: every skill `SKILL.md` starts with valid frontmatter, or it won’t be discovered.
 
-6. **[2026-03-31] Always read identity files before any operation**
-   Do instead: read `.claude/SOUL.md` + `.claude/IDENTITY.md` first, then `MEMORY.md` as index.
+8. **[2026-04-01] Supabase TLDV: `meetings` + `summaries`, NOT `meeting_memories`**
+   Do instead: pull decisions/topics from canonical tables and treat `meeting_memories` as secondary.
 
-7. **[2026-03-31] MEMORY.md is an index, not a dump**
-   Do instead: never edit MEMORY.md directly for content — update topic files in `memory/curated/` instead.
+9. **[2026-04-01] Token/secrets: fail-fast with ValueError**
+   Do instead: assert required env vars up front; never hardcode credentials.
 
-8. **[2026-03-31] Topic files go in `memory/curated/`, not root**
-   Do instead: store curated project context in `memory/curated/<slug>.md` with YAML frontmatter.
+10. **[2026-03-31] MEMORY.md is an index, not a dump**
+   Do instead: keep MEMORY.md concise and push details to `memory/curated/<slug>.md`.
 
 ## Shell & Command Reliability
 
-1. **[2026-04-01] Python subprocesses don't inherit env vars — source + export first**
+1. **[2026-04-10] `gh pr create` with markdown/backticks must use `--body-file`**
+   Do instead: write PR text to temp file and call `gh pr create --body-file /tmp/pr.md` to avoid shell command substitution and mangled PR bodies.
+
+2. **[2026-04-10] Subagent spawns fail with ACP-only fields**
+   Do instead: for `runtime=subagent`, send minimal payload only; never include `streamTo`, `attachments`, `attachAs`.
+
+3. **[2026-04-01] Python subprocesses don't inherit env vars — source + export first**
    Do instead: `source ~/.openclaw/.env && export SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY && python3 script.py`.
 
-2. **[2026-04-01] Supabase REST API filter syntax differs from Python client**
-   Do instead: use dot notation — `field.ilike.*{value}*`, `field.eq.{value}`, `field.gte.{value}` — not Python client chaining.
+4. **[2026-04-01] Supabase REST API filter syntax differs from Python client**
+   Do instead: use dot notation — `field.ilike.*{value}*`, `field.eq.{value}`, `field.gte.{value}`.
 
-4. **[2026-04-01] Time-bounded cache needs manual implementation**
-   Do instead: use `dict[key] = (value, timestamp)` with TTL check — `lru_cache` has no TTL enforcement.
+5. **[2026-04-01] Time-bounded cache needs manual implementation**
+   Do instead: use `dict[key] = (value, timestamp)` with TTL checks.
 
-5. **[2026-03-31] Feedback poller runs via systemd, not manually**
-   Do instead: use `systemctl --user restart feedback-webhook.service` — manual execution creates duplicate processes causing 409 Conflict.
+6. **[2026-03-31] Feedback poller runs via systemd, not manually**
+   Do instead: use `systemctl --user restart feedback-webhook.service`.
 
-6. **[2026-03-31] Telegram callback_data use pipe separator, not colon**
-   Do instead: format `feedback|{action_id}|{filename}|up` — colon splits break filenames with dots.
+7. **[2026-03-31] Telegram callback_data use pipe separator, not colon**
+   Do instead: format `feedback|{action_id}|{filename}|up`.
 
-7. **[2026-03-31] Feedback poller: pkill before restart**
-   Do instead: always `pkill -f feedback_poller.py` before starting.
+8. **[2026-03-31] Feedback poller: pkill before restart**
+   Do instead: `pkill -f feedback_poller.py` before starting if needed.
 
 ## Telegram Feedback
 
