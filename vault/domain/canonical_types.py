@@ -161,6 +161,9 @@ def validate_person(entity: dict) -> Union[bool, list[str]]:
     if "confidence" in entity and entity["confidence"] not in CONFIDENCE_LEVELS:
         errors.append("confidence_allowed")
 
+    if "lineage" not in entity:
+        errors.append("lineage")
+
     allowed = {
         "id_canonical",
         "display_name",
@@ -170,6 +173,7 @@ def validate_person(entity: dict) -> Union[bool, list[str]]:
         "first_seen_at",
         "last_seen_at",
         "confidence",
+        "lineage",
     }
     errors.extend(_unknown_fields(entity, allowed))
 
@@ -202,6 +206,9 @@ def validate_project(entity: dict) -> Union[bool, list[str]]:
     if "confidence" in entity and entity["confidence"] not in CONFIDENCE_LEVELS:
         errors.append("confidence_allowed")
 
+    if "lineage" not in entity:
+        errors.append("lineage")
+
     allowed = {
         "id_canonical",
         "slug",
@@ -209,6 +216,7 @@ def validate_project(entity: dict) -> Union[bool, list[str]]:
         "status",
         "aliases",
         "confidence",
+        "lineage",
     }
     errors.extend(_unknown_fields(entity, allowed))
 
@@ -246,6 +254,9 @@ def validate_repo(entity: dict) -> Union[bool, list[str]]:
     if "source_keys" in entity and not isinstance(entity["source_keys"], list):
         errors.append("source_keys_type")
 
+    if "lineage" not in entity:
+        errors.append("lineage")
+
     allowed = {
         "id_canonical",
         "full_name",
@@ -255,6 +266,7 @@ def validate_repo(entity: dict) -> Union[bool, list[str]]:
         "archived",
         "project_ref",
         "source_keys",
+        "lineage",
     }
     errors.extend(_unknown_fields(entity, allowed))
 

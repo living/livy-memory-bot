@@ -61,3 +61,26 @@
 
 ## Lint Reports
 - `lint-reports/` — daily cycles
+
+## Wave B — Entity Model (person/project/repo)
+
+Canonical entity types added in `feature/wave-b-entity-model`.
+
+| Tipo | Dir | ID prefix | Fontes |
+|---|---|---|---|
+| person | `entities/person/` | `person:` | TLDV participants + GitHub contributors |
+| project | `entities/project/` | `project:` | TLDV topic_refs |
+| repo | `entities/repo/` | `repo:` | GitHub repos API |
+
+**Key modules:**
+- `vault/domain/canonical_types.py` — validators com lineage obrigatório
+- `vault/domain/identity_resolution.py` — merge auto se `source_keys >= 2`
+- `vault/domain/normalize.py` — normalizers com full traceability
+- `vault/ingest/person_ingest.py` — TLDV → person (30d lookback)
+- `vault/ingest/project_ingest.py` — TLDV topic_ref → project
+- `vault/backlinks.py` — relationships[] + linked_from[] schema
+- `vault/quality/entity_quality.py` — metrics: stale_rate, orphan_rate, merge_candidates
+- `vault/quality/entity_lint.py` — lineage completeness checker
+
+**Spec:** `docs/superpowers/specs/2026-04-10-wave-b-entity-model-design.md`
+**Plan:** `docs/superpowers/plans/2026-04-10-wave-b-entity-model-plan.md`
