@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import shutil
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable
@@ -34,6 +35,17 @@ def _sorted_unique(values: Iterable[str]) -> list[str]:
     return sorted({v for v in values if isinstance(v, str) and v.strip()})
 
 
+def _backup_name(path: Path) -> Path:
+    """Return a unique, never-overwriting backup path with a timestamp."""
+    ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+    candidate = path.with_name(f"{path.stem}.{ts}{path.suffix}")
+    i = 1
+    while candidate.exists():
+        candidate = path.with_name(f"{path.stem}.{ts}.{i}{path.suffix}")
+        i += 1
+    return candidate
+
+
 def scan_files(vault_root: Path, scope: str = "all") -> list[Path]:
     """Scan candidate markdown files for migration."""
     files: list[Path] = []
@@ -54,24 +66,28 @@ def scan_files(vault_root: Path, scope: str = "all") -> list[Path]:
 
 
 def parse_frontmatter(text: str) -> tuple[dict, str]:
-    """Parse markdown frontmatter and return (frontmatter, body)."""
+    """Parse markdown frontmatter and return (frontmatter, body).
+
+    Returns ({}, text) when there is no frontmatter block. Raises ValueError for malformed
+    frontmatter blocks.
+    """
     stripped = text.lstrip()
     if not stripped.startswith("---\n"):
         return {}, text
 
     try:
         end = stripped.index("\n---", 4)
-    except ValueError:
-        return {}, text
+    except ValueError as e:
+        raise ValueError("unterminated frontmatter block") from e
 
     fm_text = stripped[4:end]
     body = stripped[end + 4 :]
     try:
         data = yaml.safe_load(fm_text) or {}
-    except yaml.YAMLError:
-        data = {}
+    except yaml.YAMLError as e:
+        raise ValueError(f"invalid yaml frontmatter: {e}") from e
     if not isinstance(data, dict):
-        data = {}
+        raise ValueError("frontmatter must be a YAML mapping")
     return data, body.lstrip("\n")
 
 
@@ -136,9 +152,15 @@ def elevate_frontmatter(frontmatter: dict, path: Path) -> tuple[dict, bool]:
         if not isinstance(lineage, dict):
             lineage = {}
 
+        lineage_source_keys = lineage.get("source_keys")
+        if isinstance(lineage_source_keys, list):
+            lineage_normalized = _sorted_unique(lineage_source_keys)
+        else:
+            lineage_normalized = source_keys
+
         required_lineage = {
             "run_id": lineage.get("run_id") or "domain-elevation-wave-a",
-            "source_keys": lineage.get("source_keys") if isinstance(lineage.get("source_keys"), list) else source_keys,
+            "source_keys": lineage_normalized,
             "transformed_at": lineage.get("transformed_at") or now,
             "mapper_version": lineage.get("mapper_version") or "domain-elevation-v1",
             "actor": lineage.get("actor") or "elevate_to_domain_model",
@@ -152,15 +174,17 @@ def elevate_frontmatter(frontmatter: dict, path: Path) -> tuple[dict, bool]:
 
 
 def apply_with_backup(path: Path, new_text: str, vault_root: Path, dry_run: bool = False) -> Path | None:
-    """Backup original file and apply migrated text."""
+    """Backup original file and apply migrated text. Never overwrites an existing backup."""
     backup_path = vault_root / BACKUP_DIRNAME / path.relative_to(vault_root)
     if dry_run:
         return backup_path
 
     backup_path.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(path, backup_path)
+
+    unique_backup = _backup_name(backup_path)
+    shutil.copy2(path, unique_backup)
     path.write_text(new_text, encoding="utf-8")
-    return backup_path
+    return unique_backup
 
 
 def _dump_markdown(frontmatter: dict, body: str) -> str:
@@ -177,20 +201,44 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     vault_root = Path(args.vault_root)
+    if not vault_root.exists():
+        print(f"error: vault root does not exist: {vault_root}", file=sys.stderr)
+        return 1
+
     files = scan_files(vault_root, scope=args.scope)
 
     migrated = 0
     would_migrate = 0
     skipped = 0
+    errors = 0
 
     for md in files:
-        original = md.read_text(encoding="utf-8")
-        frontmatter, body = parse_frontmatter(original)
+        rel = md.relative_to(vault_root)
+        try:
+            original = md.read_text(encoding="utf-8")
+        except OSError as e:
+            print(f"error reading {rel}: {e}", file=sys.stderr)
+            errors += 1
+            continue
+
+        try:
+            frontmatter, body = parse_frontmatter(original)
+        except Exception as e:
+            print(f"error parsing {rel}: {e}", file=sys.stderr)
+            errors += 1
+            continue
+
         if not frontmatter:
             skipped += 1
             continue
 
-        elevated, changed = elevate_frontmatter(frontmatter, md)
+        try:
+            elevated, changed = elevate_frontmatter(frontmatter, md)
+        except Exception as e:
+            print(f"error elevating {rel}: {e}", file=sys.stderr)
+            errors += 1
+            continue
+
         if not changed:
             skipped += 1
             continue
@@ -199,11 +247,15 @@ def main(argv: list[str] | None = None) -> int:
         if args.dry_run:
             would_migrate += 1
         else:
-            apply_with_backup(md, new_text, vault_root=vault_root, dry_run=False)
+            try:
+                apply_with_backup(md, new_text, vault_root=vault_root, dry_run=False)
+            except Exception as e:
+                print(f"error backing up {rel}: {e}", file=sys.stderr)
+                errors += 1
+                continue
             migrated += 1
 
         if args.verbose:
-            rel = md.relative_to(vault_root)
             print(f"{'would_migrate' if args.dry_run else 'migrated'}: {rel}")
 
     print(f"scope: {args.scope}")
@@ -211,10 +263,11 @@ def main(argv: list[str] | None = None) -> int:
     print(f"would_migrate: {would_migrate}")
     print(f"migrated: {migrated}")
     print(f"skipped: {skipped}")
+    print(f"errors: {errors}")
     if not args.dry_run:
         print(f"backup_dir: {vault_root / BACKUP_DIRNAME}")
 
-    return 0
+    return 1 if errors else 0
 
 
 if __name__ == "__main__":
