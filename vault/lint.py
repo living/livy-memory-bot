@@ -5,6 +5,7 @@ Detects contradictions, orphan pages, stale claims, and coverage gaps.
 from __future__ import annotations
 
 import re
+from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -55,7 +56,6 @@ def detect_contradictions(vault_root: Path = VAULT_ROOT) -> list[dict]:
     entries: list[tuple[Path, str]] = [(p, p.read_text(encoding="utf-8")) for p in decisions]
 
     # Group by feature subject
-    from collections import defaultdict
     groups: dict[str, list[tuple[Path, str]]] = defaultdict(list)
     for path, text in entries:
         feature = _extract_feature(text)
