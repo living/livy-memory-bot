@@ -56,6 +56,33 @@ root:                       # Operational files (canonical)
 └── CLAUDE.md               # This file
 ```
 
+## Vault — Memory Vault (domain model)
+
+The vault lives at `memory/vault/` and implements a domain-first entity model.
+
+```
+vault/
+├── domain/           # Canonical entity types + validators
+│   ├── canonical_types.py     # validate_person/project/repo/meeting/card/decision
+│   ├── identity_resolution.py # MERGE/REVIEW/NO_MATCH por github_login/email
+│   ├── normalize.py           # build_source_record, generate_lineage_run_id
+│   └── relationship_builder.py # build_pr_author_edge, build_person_project_inference_edges
+ingest/             # Source → entity pipelines
+│   ├── github_ingest.py        # is_repo_in_scope, build_pr_query, is_within_window
+│   ├── person_ingest.py        # from_recent_meetings(days=30), participant_to_person
+│   └── project_ingest.py       # topic_ref_to_project, from_events
+backlinks.py        # build_relationship, build_linked_from
+quality/
+│   ├── domain_lint.py          # validate_vault_file, run_domain_lint
+│   ├── entity_lint.py         # lint_entities (lineage completeness)
+│   ├── entity_quality.py       # compute_entity_quality_metrics
+│   └── quality_review.py       # generate_quality_report, detect_identity_ambiguity
+```
+
+**Canonical entity types:** `person`, `project`, `repo`, `meeting`, `card`, `decision`, `concept`
+
+**Identity resolution guardrail:** auto-merge requires `>= 2 source_keys`.
+
 ## Topic Files
 
 Topic files in `memory/curated/` contain detailed project/agent context. They are referenced from `MEMORY.md`. Keep `MEMORY.md` under 200 lines — push details to topic files.
