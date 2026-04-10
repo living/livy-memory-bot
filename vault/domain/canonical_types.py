@@ -40,6 +40,7 @@ RELATIONSHIP_ROLES = frozenset([
     "participant",
     "assignee",
     "decision_maker",
+    "part_of",
 ])
 
 # Confidence enum per spec
@@ -219,7 +220,7 @@ def validate_repo(entity: dict) -> Union[bool, list[str]]:
     """Validate a Repo entity per spec.
 
     Required:  id_canonical, full_name, owner, name
-    Optional:  default_branch, archived, project_ref
+    Optional:  default_branch, archived, project_ref, source_keys
     """
     errors: list[str] = []
 
@@ -243,6 +244,9 @@ def validate_repo(entity: dict) -> Union[bool, list[str]]:
     elif not isinstance(entity["name"], str):
         errors.append("name_type")
 
+    if "source_keys" in entity and not isinstance(entity["source_keys"], list):
+        errors.append("source_keys_type")
+
     allowed = {
         "id_canonical",
         "full_name",
@@ -251,6 +255,7 @@ def validate_repo(entity: dict) -> Union[bool, list[str]]:
         "default_branch",
         "archived",
         "project_ref",
+        "source_keys",
     }
     errors.extend(_unknown_fields(entity, allowed))
 
