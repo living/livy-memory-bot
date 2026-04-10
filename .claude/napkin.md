@@ -93,5 +93,8 @@ description: ...` — without it, `openclaw skills list` won't show the skill.
 
 ## TLDV Pipeline
 
-1. **[2026-04-01] `enrichment_context` (PRs/Cards) é genérico — últimos 7 dias, não específico da reunião**
+1. **[2026-04-10] Runbook para decisões de daily: `meetings` → `summaries` em 3 passos**
+   Do instead: buscar `meetings` por `name ilike.*daily*|*status*` + `enriched_at=not.is.null`, filtrar por `created_at`, coletar `meeting_id`, e consultar `summaries` para `topics`/`decisions` (fonte canônica).
+
+2. **[2026-04-01] `enrichment_context` (PRs/Cards) é genérico — últimos 7 dias, não específico da reunião**
    Do instead: não treat PRs e Cards como Linked à reunião — são enrichment broad. `summaries.topics` e `summaries.decisions` são mais fiáveis.
