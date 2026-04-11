@@ -12,7 +12,7 @@ REQUIRED_FIELDS = {
 }
 
 
-TYPE_ALLOWED = {"entity", "decision", "concept", "evidence"}
+TYPE_ALLOWED = {"entity", "decision", "concept", "evidence", "meeting", "card"}
 CONF_ALLOWED = {"high", "medium", "low", "unverified"}
 
 

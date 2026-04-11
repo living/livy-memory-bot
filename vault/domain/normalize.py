@@ -255,11 +255,22 @@ def normalize_tldv_meeting_to_entity(
     project_ref = meeting.get("project_ref")
 
     id_canonical = _id_canonical("meeting", meeting_id.replace(":", "-"))
+    source_key = f"tldv:{meeting_id}"
+    now = _utc_now()
 
     entity: dict[str, Any] = {
         "id_canonical": id_canonical,
         "meeting_id_source": meeting_id,
         "title": title,
+        "source_keys": [source_key],
+        "sources": [
+            build_source_record(
+                source_type="tldv_api",
+                source_ref=source_key,
+                mapper_version=mapper_version,
+                retrieved_at=now,
+            )
+        ],
     }
 
     if started_at is not None:
@@ -293,11 +304,22 @@ def normalize_trello_card_to_entity(
     status = card.get("status")
 
     id_canonical = _id_canonical("card", card_id.replace(":", "-"))
+    source_key = f"trello:{card_id}"
+    now = _utc_now()
 
     entity: dict[str, Any] = {
         "id_canonical": id_canonical,
         "card_id_source": card_id,
         "title": title,
+        "source_keys": [source_key],
+        "sources": [
+            build_source_record(
+                source_type="trello_api",
+                source_ref=source_key,
+                mapper_version=mapper_version,
+                retrieved_at=now,
+            )
+        ],
     }
 
     if board is not None:

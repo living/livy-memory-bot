@@ -162,3 +162,64 @@ class TestWaveCPipelineIntegration:
         assert summary["wave_c_ingest"]["wave_c_enabled"] is False
         assert summary["wave_c_ingest"]["meetings_fetched"] == 0
         assert summary["wave_c_ingest"]["cards_fetched"] == 0
+
+    def test_meeting_entity_has_source_keys_and_sources(self, wiring_workspace, monkeypatch):
+        """Meeting entities must have source_keys (non-empty list) and sources array."""
+        from vault.ingest import wave_c_pipeline as wcp
+
+        fake_meeting = {
+            "id_canonical": "meeting:daily-2026-04-10",
+            "meeting_id_source": "daily-2026-04-10",
+            "title": "Daily",
+            "source_keys": ["tldv:daily-2026-04-10"],
+            "lineage": {"mapper_version": "wave-c-meeting-ingest-v1"},
+        }
+        monkeypatch.setattr(wcp, "fetch_meetings", lambda days=7: ([fake_meeting], []))
+        monkeypatch.setattr(wcp, "fetch_cards", lambda days=7: ([], []))
+
+        wcp.run_wave_c_ingest(vault_root=wiring_workspace["vault_root"], dry_run=False)
+
+        entities = list((wiring_workspace["vault_root"] / "entities").glob("meeting-*.md"))
+        assert len(entities) == 1
+
+        import yaml
+        text = entities[0].read_text(encoding="utf-8")
+        fm = yaml.safe_load(text.split("---", 2)[1])
+
+        assert "source_keys" in fm, "meeting must have source_keys"
+        assert isinstance(fm["source_keys"], list), "source_keys must be a list"
+        assert len(fm["source_keys"]) > 0, "source_keys must be non-empty"
+        assert "sources" in fm, "meeting must have sources"
+        assert isinstance(fm["sources"], list), "sources must be a list"
+        assert len(fm["sources"]) > 0, "sources must be non-empty"
+        assert fm["sources"][0].get("source_type") == "tldv_api"
+
+    def test_meeting_entity_references_person_via_sources(self, wiring_workspace, monkeypatch):
+        """When person entities exist for participants, meeting sources should reference them."""
+        from vault.ingest import wave_c_pipeline as wcp
+
+        # A meeting with participants that already have person entities written
+        fake_meeting = {
+            "id_canonical": "meeting:daily-2026-04-10",
+            "meeting_id_source": "daily-2026-04-10",
+            "title": "Daily",
+            "participants": [
+                {"id_canonical": "person:lincoln", "display_name": "Lincoln"},
+                {"id_canonical": "person:robert", "display_name": "Robert"},
+            ],
+            "source_keys": ["tldv:daily-2026-04-10"],
+            "lineage": {"mapper_version": "wave-c-meeting-ingest-v1"},
+        }
+        monkeypatch.setattr(wcp, "fetch_meetings", lambda days=7: ([fake_meeting], []))
+        monkeypatch.setattr(wcp, "fetch_cards", lambda days=7: ([], []))
+
+        wcp.run_wave_c_ingest(vault_root=wiring_workspace["vault_root"], dry_run=False)
+
+        entities = list((wiring_workspace["vault_root"] / "entities").glob("meeting-*.md"))
+        import yaml
+        text = entities[0].read_text(encoding="utf-8")
+        fm = yaml.safe_load(text.split("---", 2)[1])
+
+        # Sources should reference both the TLDV meeting and person participants
+        source_types = {s.get("source_type") for s in fm.get("sources", [])}
+        assert "tldv_api" in source_types

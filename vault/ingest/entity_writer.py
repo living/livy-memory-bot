@@ -12,6 +12,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from pathlib import Path
 import re
+import yaml
 
 
 def _slugify(text: str) -> str:
@@ -32,6 +33,10 @@ def _entity_path(vault_root: Path, entity: dict) -> Path:
         slug = _slugify(id_canonical.replace("meeting:", ""))
         return entities_dir / f"meeting-{slug}.md"
 
+    if id_canonical.startswith("person:"):
+        slug = _slugify(id_canonical.replace("person:", ""))
+        return entities_dir / f"person-{slug}.md"
+
     if id_canonical.startswith("card:"):
         # card:{board_id}:{card_id}
         rest = id_canonical.replace("card:", "")
@@ -45,6 +50,15 @@ def _entity_path(vault_root: Path, entity: dict) -> Path:
     # Fallback: generic
     slug = _slugify(id_canonical.replace(":", "-"))
     return entities_dir / f"entity-{slug}.md"
+
+
+def _render_sources_yaml_block(sources: list[dict]) -> list[str]:
+    """Render sources list as YAML lines suitable for frontmatter."""
+    if not sources:
+        return ["sources: []"]
+
+    dumped = yaml.safe_dump({"sources": sources}, sort_keys=False).strip()
+    return dumped.splitlines()
 
 
 def upsert_meeting(entity: dict, vault_root: Path | None = None) -> tuple[Path, bool]:
@@ -80,10 +94,19 @@ def upsert_meeting(entity: dict, vault_root: Path | None = None) -> tuple[Path, 
     source_ref = next((k for k in source_keys if k.startswith("tldv:")), "")
     mapper_version = entity.get("lineage", {}).get("mapper_version", MAPPER_VERSION)
 
+    sources = entity.get("sources") or []
+    if not sources and source_ref:
+        sources = [{
+            "source_type": "tldv_api",
+            "source_ref": source_ref,
+            "retrieved_at": now_iso,
+            "mapper_version": mapper_version,
+        }]
+
     # Frontmatter
     lines = [
         "---",
-        f"entity: {title or id_canonical}",
+        f"entity: \"{title or id_canonical}\"",
         "type: meeting",
         f"id_canonical: {id_canonical}",
         f"meeting_id_source: {meeting_id_source}",
@@ -98,6 +121,13 @@ def upsert_meeting(entity: dict, vault_root: Path | None = None) -> tuple[Path, 
         lines.append(f"ended_at: {ended_at}")
     if project_ref:
         lines.append(f"project_ref: {project_ref}")
+    lines.append("source_keys:")
+    if isinstance(source_keys, list) and source_keys:
+        for key in source_keys:
+            lines.append(f"  - {key}")
+    else:
+        lines.append("  - tldv:unknown")
+    lines.extend(_render_sources_yaml_block(sources))
     lines.extend([
         "last_verified: " + today,
         "verification_log: []",
@@ -122,6 +152,76 @@ def upsert_meeting(entity: dict, vault_root: Path | None = None) -> tuple[Path, 
     if project_ref:
         lines.append(f"- **Projeto:** {project_ref}")
     lines.append("")
+
+    path.write_text("\n".join(lines), encoding="utf-8")
+    return path, True
+
+
+def upsert_person(entity: dict, vault_root: Path | None = None) -> tuple[Path, bool]:
+    """Write (or skip) a canonical person entity.
+
+    Returns (path, written) where written=True if file was created,
+    False if skipped (already exists — idempotent).
+    """
+    if vault_root is None:
+        vault_root = Path(__file__).resolve().parents[2] / "memory" / "vault"
+
+    path = _entity_path(vault_root, entity)
+    if path.exists():
+        return path, False
+
+    entities_dir = vault_root / "entities"
+    entities_dir.mkdir(parents=True, exist_ok=True)
+
+    id_canonical = entity.get("id_canonical", "")
+    title = entity.get("display_name") or entity.get("entity") or id_canonical
+    confidence = entity.get("confidence", "medium")
+    source_keys = entity.get("source_keys", [])
+    sources = entity.get("sources") or []
+    now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    today = now_iso[:10]
+
+    if not sources and source_keys:
+        sources = [{
+            "source_type": "tldv_api",
+            "source_ref": source_keys[0],
+            "retrieved_at": now_iso,
+            "mapper_version": "wave-c-person-ingest-v1",
+        }]
+
+    lines = [
+        "---",
+        f"entity: \"{title}\"",
+        "type: person",
+        f"id_canonical: {id_canonical}",
+        f"confidence: {confidence}",
+        f"first_seen_at: {entity.get('first_seen_at', now_iso)}",
+        f"last_seen_at: {entity.get('last_seen_at', now_iso)}",
+    ]
+
+    if entity.get("github_login"):
+        lines.append(f"github_login: {entity.get('github_login')}")
+    if entity.get("email"):
+        lines.append(f"email: {entity.get('email')}")
+
+    lines.append("source_keys:")
+    if isinstance(source_keys, list) and source_keys:
+        for key in source_keys:
+            lines.append(f"  - {key}")
+    else:
+        lines.append("  - tldv:participant:unknown")
+
+    lines.extend(_render_sources_yaml_block(sources))
+    lines.extend([
+        "last_verified: " + today,
+        "verification_log: []",
+        "last_touched_by: livy-agent",
+        "draft: false",
+        "---",
+        "",
+        f"# {title}",
+        "",
+    ])
 
     path.write_text("\n".join(lines), encoding="utf-8")
     return path, True
@@ -161,9 +261,18 @@ def upsert_card(entity: dict, vault_root: Path | None = None) -> tuple[Path, boo
     source_ref = next((k for k in source_keys if k.startswith("trello:")), "")
     mapper_version = entity.get("lineage", {}).get("mapper_version", MAPPER_VERSION)
 
+    sources = entity.get("sources") or []
+    if not sources and source_ref:
+        sources = [{
+            "source_type": "trello_api",
+            "source_ref": source_ref,
+            "retrieved_at": now_iso,
+            "mapper_version": mapper_version,
+        }]
+
     lines = [
         "---",
-        f"entity: {title or id_canonical}",
+        f"entity: \"{title or id_canonical}\"",
         "type: card",
         f"id_canonical: {id_canonical}",
         f"card_id_source: {card_id_source}",
@@ -180,6 +289,13 @@ def upsert_card(entity: dict, vault_root: Path | None = None) -> tuple[Path, boo
         lines.append(f"project_ref: {project_ref}")
     if status:
         lines.append(f"status: {status}")
+    lines.append("source_keys:")
+    if isinstance(source_keys, list) and source_keys:
+        for key in source_keys:
+            lines.append(f"  - {key}")
+    else:
+        lines.append("  - trello:unknown")
+    lines.extend(_render_sources_yaml_block(sources))
     lines.extend([
         "last_verified: " + today,
         "verification_log: []",

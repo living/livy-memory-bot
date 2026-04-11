@@ -1,0 +1,16 @@
+{
+  "counters": {
+    "edges_created": 3,
+    "entities_processed": 2
+  },
+  "histograms": {
+    "entity_duration_ms": {
+      "count": 2,
+      "mean": 50.0,
+      "sum": 100.0
+    }
+  },
+  "phase": "C3",
+  "recorded_at": "2026-04-11T11:33:42.891103+00:00",
+  "run_id": "integration-test-20260411T113342891065Z-ff4fdae0"
+}

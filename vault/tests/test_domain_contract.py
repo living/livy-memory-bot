@@ -70,6 +70,15 @@ def minimal_meeting() -> dict:
         "started_at": "2026-04-10T09:00:00Z",
         "ended_at": "2026-04-10T10:00:00Z",
         "project_ref": "project:livy-memory",
+        "source_keys": ["tldv:12345"],
+        "sources": [
+            {
+                "source_type": "tldv_api",
+                "source_ref": "https://tldv.io/meetings/12345",
+                "retrieved_at": "2026-04-10T10:00:00Z",
+                "mapper_version": "wave-c-meeting-ingest-v1",
+            }
+        ],
     }
 
 
@@ -82,6 +91,15 @@ def minimal_card() -> dict:
         "list": "Doing",
         "project_ref": "project:livy-memory",
         "status": "in_progress",
+        "source_keys": ["trello:abc123"],
+        "sources": [
+            {
+                "source_type": "trello_api",
+                "source_ref": "https://trello.com/c/abc123",
+                "retrieved_at": "2026-04-10T10:00:00Z",
+                "mapper_version": "wave-c-card-ingest-v1",
+            }
+        ],
     }
 
 

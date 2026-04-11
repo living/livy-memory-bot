@@ -1,0 +1,15 @@
+{
+  "counters": {
+    "edges_created": 10,
+    "entities_processed": 5
+  },
+  "histograms": {
+    "entity_duration_ms": {
+      "count": 3,
+      "sum": 150.0
+    }
+  },
+  "phase": "C3",
+  "recorded_at": "2026-04-11T01:58:42.351888+00:00",
+  "run_id": "test-20260411T015842351868Z-579ea4ab"
+}

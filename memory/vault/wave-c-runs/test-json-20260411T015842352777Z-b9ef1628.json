@@ -1,0 +1,9 @@
+{
+  "counters": {
+    "test_counter": 42
+  },
+  "histograms": {},
+  "phase": "C3",
+  "recorded_at": "2026-04-11T01:58:42.352791+00:00",
+  "run_id": "test-json-20260411T015842352777Z-b9ef1628"
+}

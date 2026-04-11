@@ -11,6 +11,8 @@ from datetime import datetime, timezone, timedelta
 from typing import Any
 import os
 import sys
+import hashlib
+import json
 
 from vault.domain.normalize import build_entity_with_traceability
 from vault.domain.canonical_types import is_iso_date
@@ -46,6 +48,32 @@ def _fetch_from_supabase(days: int = DEFAULT_LOOKBACK_DAYS) -> list[dict[str, An
         .execute()
     )
     return resp.data or []
+
+
+def _transcript_fallback(raw: dict[str, Any]) -> tuple[str | None, str | None]:
+    """Pick transcript source with priority:
+    1) transcript_blob_path
+    2) whisper_transcript_json
+    3) whisper_transcript
+
+    Returns (transcript_source, transcript_ref).
+    """
+    blob_path = raw.get("transcript_blob_path")
+    if isinstance(blob_path, str) and blob_path.strip():
+        return "blob_path", blob_path.strip()
+
+    wt_json = raw.get("whisper_transcript_json")
+    if wt_json not in (None, [], ""):
+        payload = json.dumps(wt_json, ensure_ascii=False, sort_keys=True, default=str)
+        digest = hashlib.sha1(payload.encode("utf-8")).hexdigest()[:12]
+        return "inline_json", f"inline:whisper_transcript_json:{digest}"
+
+    wt_text = raw.get("whisper_transcript")
+    if isinstance(wt_text, str) and wt_text.strip():
+        digest = hashlib.sha1(wt_text.encode("utf-8")).hexdigest()[:12]
+        return "inline_text", f"inline:whisper_transcript:{digest}"
+
+    return None, None
 
 
 def normalize_meeting_record(raw: dict[str, Any]) -> dict[str, Any]:
@@ -92,6 +120,11 @@ def normalize_meeting_record(raw: dict[str, Any]) -> dict[str, Any]:
     if project_ref is not None:
         entity["project_ref"] = project_ref
 
+    transcript_source, transcript_ref = _transcript_fallback(raw)
+    if transcript_source and transcript_ref:
+        entity["transcript_source"] = transcript_source
+        entity["transcript_ref"] = transcript_ref
+
     return entity
 
 
@@ -105,16 +138,26 @@ def build_meeting_entity(
 
 
 def extract_participants(raw: dict[str, Any]) -> list[dict[str, Any]]:
-    """Extract participant records from a meeting dict."""
+    """Extract participant records from a meeting dict.
+
+    Priority:
+    1) raw['participants'] records (native participant payload)
+    2) Fallback to distinct speaker labels from whisper_transcript_json
+    """
     participants = raw.get("participants") or []
-    meeting_id = raw.get("meeting_id", "")
+    meeting_id = raw.get("meeting_id") or raw.get("id") or ""
     out = []
+    seen_ids: set[str] = set()
+
     for p in participants:
         pid = p.get("id")
         name = p.get("name") or p.get("display_name")
         if not pid and not name:
             continue
-        pid = pid or "unknown"
+        pid = str(pid or "unknown")
+        if pid in seen_ids:
+            continue
+        seen_ids.add(pid)
         out.append(
             {
                 "id": pid,
@@ -124,6 +167,37 @@ def extract_participants(raw: dict[str, Any]) -> list[dict[str, Any]]:
                 "source_key": f"tldv:participant:{meeting_id}:{pid}",
             }
         )
+
+    # Fallback: infer participants from transcript speakers when participants list is empty
+    if out:
+        return out
+
+    transcript_segments = raw.get("whisper_transcript_json") or []
+    if not isinstance(transcript_segments, list):
+        return out
+
+    speaker_seen: set[str] = set()
+    for seg in transcript_segments:
+        if not isinstance(seg, dict):
+            continue
+        speaker = seg.get("speaker")
+        if not isinstance(speaker, str) or not speaker.strip():
+            continue
+        normalized = speaker.strip()
+        slug = "speaker-" + "-".join(normalized.lower().split())
+        if slug in speaker_seen:
+            continue
+        speaker_seen.add(slug)
+        out.append(
+            {
+                "id": slug,
+                "name": normalized,
+                "email": None,
+                "github_login": None,
+                "source_key": f"tldv:participant:{meeting_id}:{slug}",
+            }
+        )
+
     return out
 
 
