@@ -419,6 +419,11 @@ def _run_ingest_inner(
         errors.append({"source": "github_enrich", "error": str(exc), "type": type(exc).__name__})
         github_errors = 1
 
+    # Rebuild structured index
+    if not dry_run:
+        from vault.ingest.index_manager import rebuild_index
+        rebuild_index(vault_root)
+
     return {
         "meetings_fetched": len(raw_meetings),
         "meetings_resolved": meetings_resolved,
