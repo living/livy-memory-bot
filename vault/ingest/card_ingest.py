@@ -8,6 +8,7 @@ Phase C1 contract:
 from __future__ import annotations
 
 import os
+import sys
 from datetime import datetime, timezone, timedelta
 from typing import Any
 
@@ -30,7 +31,7 @@ def _fetch_from_trello(days: int = DEFAULT_LOOKBACK_DAYS) -> list[dict[str, Any]
     token = os.environ.get("TRELLO_TOKEN")
     board_id = os.environ.get("TRELLO_BOARD_ID")
     if not api_key or not token or not board_id:
-        print("[WARN] TRELLO_API_KEY or token or board not set; skipping fetch")
+        print("[WARN] TRELLO_API_KEY or token or board not set; skipping fetch", file=sys.stderr)
         return []
 
     cutoff = datetime.now(timezone.utc) - timedelta(days=days)
