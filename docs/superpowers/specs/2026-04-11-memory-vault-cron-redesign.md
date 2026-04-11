@@ -55,7 +55,7 @@ Para localizar cron IDs, rodar `openclaw cron list`.
 ```
 Schedule: 0 10,14,20 * * * (America/Sao_Paulo)
 Modelo: fastest
-Timeout: 300s
+Timeout: 600s (accounting for 3 sources × 60s + retries)
 Agent: memory-agent
 Delivery: announce telegram (accountId: memory, to: 7426291192)
 ```
@@ -75,23 +75,22 @@ Delivery: announce telegram (accountId: memory, to: 7426291192)
 
 **Idempotência:** reprocessar uma reunião não duplica — se entity já existe, overwrite com dados frescos. Se overwrite produzir diff > 50% do conteúdo → logar warning (possível regressão).
 
-**Incremental:** cada run persiste um cursor em `memory/vault/.cursors/{source}.json` com formato:
+**Incremental:** cada fonte mantém seu cursor em arquivo separado (`tldv.json`, `trello.json`, `github.json`) dentro de `memory/vault/.cursors/`. Formato de cada arquivo:
 ```json
 {
   "last_run_at": "2026-04-11T10:00:00Z",
   "last_run_id": "uuid4",
   "watermark": {
-    "tldv": {"latest_meeting_created_at": "...", "page_token": null},
-    "trello": {"latest_card_activity": "..."},
-    "github": {"latest_pr_updated_at": "...", "page": 1}
+    "latest_created_at": "...",
+    "page_token": null
   }
 }
 ```
-O watermark armazena paginação e timestamps específicos por fonte, reduzindo duplicação em janelas densas. Atualização atômica (write tmp + rename). Em falha parcial, cursor NÃO avança — próxima run reprocessa a mesma janela.
+O watermark armazena paginação e timestamps específicos por fonte, reduzindo duplicação em janelas densas. Atualização atômica por arquivo (write tmp + rename). Em falha parcial de uma fonte, seu cursor NÃO avança — as outras fontes avançam normalmente.
 
 **Timeout e retry por estágio:** cada fonte (TLDV/Trello/GitHub) tem timeout independente (60s cada). Falhas são isoladas com backoff exponencial (30s, 60s, 120s) e circuit breaker após 3 falhas consecutivas da mesma fonte (pula estágio por 1h). Fonte A falhando não bloqueia Fonte B.
 
-**Lock de execução:** arquivo `.cursors/vault-ingest.lock` com PID + timestamp. Se lock existe e tem <10min, skip (run anterior ainda ativo). Se >10min, stale lock — remove e prossegue. O lint usa lock análogo `.cursors/vault-lint.lock`. Ingest e lint nunca rodam concorrentemente sobre os mesmos recursos (`index.md`, `log.md`, `relationships/`).
+**Lock de execução:** arquivo `.cursors/vault.lock` compartilhado entre ingest e lint. Formato: `{"pid": 12345, "started_at": "ISO8601", "job": "vault-ingest|vault-lint"}`. Se lock existe e tem <10min, skip (run anterior ainda ativo). Se >10min, stale lock — remove e prossegue. Este lock único garante que ingest e lint nunca rodam concorrentemente sobre `index.md`, `log.md`, `relationships/`.
 
 **Delivery fallback:** se announce Telegram falhar, registrar alerta em `memory/vault/.delivery-failures.jsonl` com timestamp + sumário. No HEARTBEAT diário, incluir contagem de delivery failures pendentes. Canal secundário: log no stdout do cron (capturado pelo OpenClaw task log).
 
@@ -235,8 +234,7 @@ memory/vault/
     ├── tldv.json             # Cursor + watermark TLDV
     ├── trello.json           # Cursor + watermark Trello
     ├── github.json           # Cursor + watermark GitHub
-    ├── vault-ingest.lock     # Lock de execução
-    └── vault-lint.lock       # Lock de execução
+    └── vault.lock             # Lock compartilhado (ingest + lint)
 ```
 
 **Regras:**
@@ -252,7 +250,7 @@ memory/vault/
 
 | SLI | SLO | Medição |
 |---|---|---|
-| Sucesso diário vault-ingest | ≥ 99% (pelo menos 2/3 runs/dia) | Consecutive errors no cron state |
+| Sucesso diário vault-ingest | ≥ 2/3 runs/dia com sucesso | Consecutive errors no cron state |
 | Sucesso diário vault-lint | ≥ 99% | Consecutive errors no cron state |
 | Latência vault-ingest p95 | < 10 min | Duration no cron state |
 | Latência vault-lint p95 | < 15 min | Duration no cron state |
@@ -304,7 +302,7 @@ Esses SLIs são reportados no HEARTBEAT.md.
 8. Backfill manual gradual: `meeting_days=7` → `30` → `90` → `180`
 
 ### Fase 3 — Validação
-9. Rodar vault-ingest em dry_run contra dados reais
+9. Rodar vault-ingest em `dry_run=True` contra dados reais (dry_run: executa todos os estágios de fetch/resolve/build, mas NÃO escreve entities/relationships. Apenas retorna summary com contadores. Index.md e log.md recebem entrada marcada `[dry-run]`.)
 10. Rodar vault-lint e verificar health do vault
 11. Testar vault-query com perguntas reais
 12. Abrir vault no Obsidian e verificar navegabilidade
