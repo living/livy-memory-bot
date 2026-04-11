@@ -31,6 +31,18 @@ from vault.ingest.person_ingest import participant_to_person
 from vault.ingest.entity_writer import upsert_meeting, upsert_card, upsert_person
 from vault.domain.normalize import build_source_record
 from vault.domain.relationship_builder import build_person_meeting_edge
+from vault.ingest.cursor import (
+    acquire_lock,
+    release_lock,
+    write_cursor,
+    read_cursor,
+    record_failure,
+    record_success,
+    check_circuit_breaker,
+)
+from vault.ingest.run_context import new_run_context, RunContext
+from vault.ingest.index_manager import add_entry, init_index
+from vault.ingest.log_manager import append_log, log_delivery_failure, maybe_rotate_log
 
 
 def run_external_ingest(
@@ -44,6 +56,98 @@ def run_external_ingest(
     """Run external ingest: meetings + cards."""
     if vault_root is None:
         vault_root = Path(__file__).resolve().parents[2] / "memory" / "vault"
+
+    # Generate run context
+    ctx = new_run_context(vault_root=vault_root, dry_run=dry_run)
+
+    # In dry_run mode, skip lock/cursor/index/log and run inner logic directly
+    if dry_run:
+        result = _run_ingest_inner(
+            vault_root, dry_run, verbose,
+            meeting_days, card_days, tldv_token, ctx,
+        )
+        result["run_id"] = ctx.run_id
+        return result
+
+    # Acquire lock — skip if another process holds it
+    if not acquire_lock(vault_root, "vault-ingest"):
+        return {"skipped_reason": "locked", "run_id": ctx.run_id}
+
+    try:
+        # All existing ingest logic — unchanged
+        result = _run_ingest_inner(
+            vault_root, dry_run, verbose,
+            meeting_days, card_days, tldv_token, ctx,
+        )
+
+        # Determine which sources succeeded / failed
+        errors = result.get("errors") or []
+        tldv_errors = [e for e in errors if e.get("source") in ("tldv_meetings", "participant_resolve", "meeting_build", "meeting_upsert")]
+        trello_errors = [e for e in errors if e.get("source") in ("trello_cards", "card_upsert")]
+
+        if not dry_run:
+            # Update cursors only for successful sources
+            if not tldv_errors:
+                write_cursor(vault_root, "tldv", {
+                    "last_run_at": ctx.started_at,
+                    "last_run_id": ctx.run_id,
+                    "watermark": {"latest_fetched_days": meeting_days},
+                })
+                record_success(vault_root, "tldv")
+            else:
+                record_failure(vault_root, "tldv")
+
+            if not trello_errors:
+                write_cursor(vault_root, "trello", {
+                    "last_run_at": ctx.started_at,
+                    "last_run_id": ctx.run_id,
+                    "watermark": {"latest_fetched_days": card_days},
+                })
+                record_success(vault_root, "trello")
+            else:
+                record_failure(vault_root, "trello")
+
+            # Append to log.md
+            log_summary = {
+                k: v for k, v in result.items()
+                if k not in ("errors", "skips")
+            }
+            append_log(vault_root, "vault-ingest", log_summary, run_id=ctx.run_id, dry_run=dry_run)
+
+            # Rotate log if needed (>500KB)
+            maybe_rotate_log(vault_root)
+
+            # GitHub cursor
+            github_errors = result.get("github_errors", 0)
+            if not github_errors:
+                write_cursor(vault_root, "github", {
+                    "last_run_at": ctx.started_at,
+                    "last_run_id": ctx.run_id,
+                    "watermark": {},
+                })
+                record_success(vault_root, "github")
+            else:
+                record_failure(vault_root, "github")
+
+        result["run_id"] = ctx.run_id
+        return result
+
+    finally:
+        release_lock(vault_root)
+
+
+def _run_ingest_inner(
+    vault_root: Path,
+    dry_run: bool,
+    verbose: bool,
+    meeting_days: int,
+    card_days: int,
+    tldv_token: str | None,
+    ctx: RunContext,
+) -> dict[str, Any]:
+    """Core ingest logic — all existing behavior preserved."""
+    if not dry_run:
+        init_index(vault_root)
 
     meetings_written = 0
     meetings_skipped = 0
@@ -145,6 +249,7 @@ def run_external_ingest(
                 _, written = upsert_person(person, vault_root)
                 if written:
                     persons_written += 1
+                    _index_entity(vault_root, person)
                 else:
                     persons_skipped += 1
             except Exception as exc:
@@ -182,6 +287,7 @@ def run_external_ingest(
                 meetings_written += 1
                 if verbose:
                     print(f"  [meeting] written: {path.name}")
+                _index_entity(vault_root, entity)
             else:
                 meetings_skipped += 1
                 if verbose:
@@ -273,6 +379,7 @@ def run_external_ingest(
                 cards_written += 1
                 if verbose:
                     print(f"  [card] written: {path.name}")
+                _index_entity(vault_root, entity)
             else:
                 cards_skipped += 1
                 if verbose:
@@ -287,6 +394,25 @@ def run_external_ingest(
                 "type": type(exc).__name__,
             })
 
+    # Stage 7 — GitHub enrichment
+    github_errors = 0
+    github_decisions = 0
+    try:
+        from vault.enrich_github import run_enrich_github
+        if not dry_run:
+            gh_result = run_enrich_github(dry_run=False)
+            github_decisions = gh_result.get("decisions_written", 0)
+            if gh_result.get("errors"):
+                github_errors = len(gh_result["errors"])
+                errors.extend([{"source": "github_enrich", **e} for e in gh_result["errors"]])
+        if verbose:
+            print(f"[external-ingest] github enrichment: {github_decisions} decisions, {github_errors} errors")
+    except Exception as exc:
+        if verbose:
+            print(f"[external-ingest] ERROR github enrichment: {exc}")
+        errors.append({"source": "github_enrich", "error": str(exc), "type": type(exc).__name__})
+        github_errors = 1
+
     return {
         "meetings_fetched": len(raw_meetings),
         "meetings_resolved": meetings_resolved,
@@ -298,7 +424,22 @@ def run_external_ingest(
         "cards_fetched": len(card_entities),
         "cards_written": cards_written,
         "cards_skipped": cards_skipped,
+        "github_decisions": github_decisions,
+        "github_errors": github_errors,
         "dry_run": dry_run,
         "errors": errors,
         "skips": skips,
     }
+
+
+def _index_entity(vault_root: Path, entity: dict[str, Any]) -> None:
+    """Add entity to index.md if it has an id_canonical and path."""
+    entity_id = entity.get("id_canonical") or ""
+    entity_type = entity.get("entity_type") or "unknown"
+    title = entity.get("title") or entity.get("name") or entity_id
+    # Compute relative path inside vault
+    source_keys = entity.get("source_keys") or []
+    source_ref = next((k for k in source_keys if isinstance(k, str)), None)
+    if source_ref:
+        path_str = f"entities/{source_ref.replace(':', '/')}.md"
+        add_entry(vault_root, path_str, title, entity_type)
