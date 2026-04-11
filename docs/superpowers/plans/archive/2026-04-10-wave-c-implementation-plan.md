@@ -1,6 +1,6 @@
 # Wave C — Entity Model Extension Implementation Plan
 
-> **Note (2026-04-11):** The WaveCObserver class was replaced by Counter/Histogram/RunAuditor in the actual implementation. See `vault/domain/observability.py` for the canonical API.
+> **ARCHIVED (2026-04-11):** This plan was implemented and consolidated into the Living Memory Entity Pipeline. Code examples in this document are historical — the canonical implementation lives in `vault/ingest/external_ingest.py` and `vault/domain/observability.py`. See spec: `docs/superpowers/specs/2026-04-11-living-memory-entity-pipeline-design.md`.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:subagent-driven-development` (recommended) or `superpowers:executing-plans` to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
