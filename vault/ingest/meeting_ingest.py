@@ -16,6 +16,7 @@ import json
 
 from vault.domain.normalize import build_entity_with_traceability
 from vault.domain.canonical_types import is_iso_date
+from vault.ingest.tldv_api_client import fetch_participants_from_tldv_api
 
 MAPPER_VERSION = "wave-c-meeting-ingest-v1"
 DEFAULT_LOOKBACK_DAYS = 7
@@ -234,3 +235,134 @@ def fetch_and_build(
         participants = extract_participants(raw)
         all_participants.extend(participants)
     return entities, all_participants
+
+
+def resolve_participants_for_meeting(raw_meeting: dict[str, Any], tldv_token: str) -> dict[str, Any]:
+    """Resolve participants using layered sources for a single meeting."""
+    meeting_id = raw_meeting.get("meeting_id") or raw_meeting.get("id") or ""
+    tried = ["tldv_api"]
+
+    seen_ids: set[str] = set()
+    seen_names: set[str] = set()
+
+    def _normalize_name(name: Any) -> str:
+        return name.strip().lower() if isinstance(name, str) else ""
+
+    def _merge(
+        target: list[dict[str, Any]],
+        pid: Any,
+        name: Any,
+        email: Any,
+        source: str,
+        source_key: str,
+    ) -> None:
+        participant_id = str(pid).strip() if pid not in (None, "") else None
+        participant_name = name.strip() if isinstance(name, str) else ""
+        if not participant_id and not participant_name:
+            return
+
+        if participant_id and participant_id in seen_ids:
+            return
+        norm_name = _normalize_name(participant_name)
+        if norm_name and norm_name in seen_names:
+            return
+
+        if participant_id:
+            seen_ids.add(participant_id)
+        if norm_name:
+            seen_names.add(norm_name)
+
+        resolved_id = participant_id or f"speaker:{'-'.join(participant_name.lower().split())}"
+        target.append(
+            {
+                "id": resolved_id,
+                "name": participant_name or resolved_id,
+                "email": email if isinstance(email, str) else None,
+                "source_key": source_key,
+                "source": source,
+            }
+        )
+
+    # Layer 1 — TLDV API direct
+    resolved: list[dict[str, Any]] = []
+    api_result = fetch_participants_from_tldv_api(meeting_id, tldv_token)
+    for p in api_result.get("participants", []) or []:
+        pid = p.get("id") if isinstance(p, dict) else None
+        pname = (
+            (p.get("name") if isinstance(p, dict) else None)
+            or (p.get("display_name") if isinstance(p, dict) else None)
+            or ""
+        )
+        _merge(
+            resolved,
+            pid,
+            pname,
+            p.get("email") if isinstance(p, dict) else None,
+            "tldv_api",
+            f"tldv_api:participant:{meeting_id}:{pid or 'anon'}",
+        )
+
+    for speaker in api_result.get("speakers", []) or []:
+        if not isinstance(speaker, str) or not speaker.strip():
+            continue
+        speaker_slug = "-".join(speaker.strip().lower().split())
+        _merge(
+            resolved,
+            None,
+            speaker.strip(),
+            None,
+            "tldv_api",
+            f"tldv_api:speaker:{meeting_id}:{speaker_slug}",
+        )
+
+    if resolved:
+        return {"status": "ok", "participants": resolved}
+
+    # Layer 2 — Supabase participants fallback
+    tried.append("supabase_participants")
+    for p in raw_meeting.get("participants") or []:
+        if not isinstance(p, dict):
+            continue
+        pid = p.get("id")
+        pname = p.get("name") or p.get("display_name") or ""
+        _merge(
+            resolved,
+            pid,
+            pname,
+            p.get("email"),
+            "supabase_participants",
+            f"supabase:participant:{meeting_id}:{pid or 'anon'}",
+        )
+
+    if resolved:
+        return {"status": "ok", "participants": resolved}
+
+    # Layer 3 — whisper speaker labels fallback
+    tried.append("supabase_whisper_speakers")
+    transcript_segments = raw_meeting.get("whisper_transcript_json") or []
+    if isinstance(transcript_segments, list):
+        for seg in transcript_segments:
+            if not isinstance(seg, dict):
+                continue
+            speaker = seg.get("speaker")
+            if not isinstance(speaker, str) or not speaker.strip():
+                continue
+            speaker = speaker.strip()
+            speaker_slug = "-".join(speaker.lower().split())
+            _merge(
+                resolved,
+                None,
+                speaker,
+                None,
+                "supabase_whisper_speakers",
+                f"supabase:whisper_speaker:{meeting_id}:{speaker_slug}",
+            )
+
+    if resolved:
+        return {"status": "ok", "participants": resolved}
+
+    return {
+        "status": "skip",
+        "reason": "NO_PARTICIPANTS",
+        "tried": tried,
+    }
