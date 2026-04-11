@@ -42,7 +42,7 @@ from vault.ingest.cursor import (
 )
 from vault.ingest.run_context import new_run_context, RunContext
 from vault.ingest.index_manager import add_entry, init_index
-from vault.ingest.log_manager import append_log
+from vault.ingest.log_manager import append_log, log_delivery_failure, maybe_rotate_log
 
 
 def run_external_ingest(
@@ -113,6 +113,21 @@ def run_external_ingest(
                 if k not in ("errors", "skips")
             }
             append_log(vault_root, "vault-ingest", log_summary, run_id=ctx.run_id, dry_run=dry_run)
+
+            # Rotate log if needed (>500KB)
+            maybe_rotate_log(vault_root)
+
+            # GitHub cursor
+            github_errors = result.get("github_errors", 0)
+            if not github_errors:
+                write_cursor(vault_root, "github", {
+                    "last_run_at": ctx.started_at,
+                    "last_run_id": ctx.run_id,
+                    "watermark": {},
+                })
+                record_success(vault_root, "github")
+            else:
+                record_failure(vault_root, "github")
 
         result["run_id"] = ctx.run_id
         return result
@@ -379,6 +394,25 @@ def _run_ingest_inner(
                 "type": type(exc).__name__,
             })
 
+    # Stage 7 — GitHub enrichment
+    github_errors = 0
+    github_decisions = 0
+    try:
+        from vault.enrich_github import run_enrich_github
+        if not dry_run:
+            gh_result = run_enrich_github(dry_run=False)
+            github_decisions = gh_result.get("decisions_written", 0)
+            if gh_result.get("errors"):
+                github_errors = len(gh_result["errors"])
+                errors.extend([{"source": "github_enrich", **e} for e in gh_result["errors"]])
+        if verbose:
+            print(f"[external-ingest] github enrichment: {github_decisions} decisions, {github_errors} errors")
+    except Exception as exc:
+        if verbose:
+            print(f"[external-ingest] ERROR github enrichment: {exc}")
+        errors.append({"source": "github_enrich", "error": str(exc), "type": type(exc).__name__})
+        github_errors = 1
+
     return {
         "meetings_fetched": len(raw_meetings),
         "meetings_resolved": meetings_resolved,
@@ -390,6 +424,8 @@ def _run_ingest_inner(
         "cards_fetched": len(card_entities),
         "cards_written": cards_written,
         "cards_skipped": cards_skipped,
+        "github_decisions": github_decisions,
+        "github_errors": github_errors,
         "dry_run": dry_run,
         "errors": errors,
         "skips": skips,
