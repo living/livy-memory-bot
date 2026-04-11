@@ -542,6 +542,23 @@ def upsert_card(entity: dict, vault_root: Path | None = None) -> tuple[Path, boo
         lines.append(f"- **Status:** {status}")
     lines.append("")
 
+    # Pessoas section (from crosslink enrichment)
+    persons = entity.get("_persons", [])
+    if persons:
+        lines.append("## Pessoas")
+        lines.append("")
+        for pname in persons:
+            lines.append(f"- [[{pname}]]")
+        lines.append("")
+
+    # Projeto section (from crosslink enrichment)
+    project = entity.get("_project")
+    if project:
+        lines.append("## Projeto")
+        lines.append("")
+        lines.append(f"- [[{project}]]")
+        lines.append("")
+
     path.write_text("\n".join(lines), encoding="utf-8")
     return path, True
 

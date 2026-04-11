@@ -15,6 +15,12 @@ import yaml
 
 # Reuse fuzzy matching from meeting_ingest
 from vault.ingest.meeting_ingest import _fuzzy_name_key, _is_name_prefix
+from vault.ingest.mapping_loader import (
+    load_trello_member_map,
+    load_repo_project_map,
+    load_board_project_map,
+)
+from vault.ingest.entity_writer import upsert_card, upsert_pr, _split_frontmatter
 
 
 def _strip_accents(s: str) -> str:
@@ -290,3 +296,155 @@ def resolve_card_members(
         save_trello_member_map(schema_dir, member_map)
 
     return resolved
+
+
+def run_crosslink(
+    vault_root: Path,
+    dry_run: bool = False,
+    trello_api_key: str | None = None,
+    trello_token: str | None = None,
+    github_token: str | None = None,
+) -> dict[str, Any]:
+    """Stage 8: Cross-link cards and PRs to persons and projects.
+
+    Reads enrichment_context from meeting entities, resolves cards/PRs to
+    persons and projects via mapping configs, and writes relationship files.
+    """
+    import json
+    from vault.ingest.mapping_loader import (
+        load_trello_member_map,
+        load_repo_project_map,
+        load_board_project_map,
+    )
+    from vault.ingest.entity_writer import upsert_pr, _split_frontmatter
+
+    schema_dir = vault_root.parent / "schema"
+    rel_dir = vault_root / "relationships"
+    meetings_dir = vault_root / "entities" / "meetings"
+
+    # Load mappings
+    member_map = load_trello_member_map(schema_dir)
+    repo_map = load_repo_project_map(schema_dir)
+    board_map = load_board_project_map(schema_dir)
+
+    # Collect all cards and PRs from meeting entities
+    all_cards: dict[str, dict] = {}  # card_id → card
+    all_prs: dict[str, dict] = {}    # pr_url → pr
+
+    if meetings_dir.exists():
+        for mf in meetings_dir.glob("*.md"):
+            try:
+                text = mf.read_text(encoding="utf-8")
+                if not text.startswith("---"):
+                    continue
+                end = text.find("---", 3)
+                if end == -1:
+                    continue
+                fm = yaml.safe_load(text[3:end]) or {}
+                ec = fm.get("enrichment_context")
+                if not isinstance(ec, dict):
+                    continue
+                for card in ec.get("trello", {}).get("cards", []):
+                    cid = card.get("id", "")
+                    if cid and cid not in all_cards:
+                        all_cards[cid] = card
+                for pr in ec.get("github", {}).get("pull_requests", []):
+                    purl = pr.get("url", "")
+                    if purl and purl not in all_prs:
+                        all_prs[purl] = pr
+            except Exception:
+                continue
+
+    stats = {"cards": len(all_cards), "prs": len(all_prs), "dry_run": dry_run}
+
+    if dry_run:
+        return stats
+
+    # Resolve and build edges
+    card_person_edges: list[dict] = []
+    card_project_edges: list[dict] = []
+    pr_person_edges: list[dict] = []
+    pr_project_edges: list[dict] = []
+
+    # Cards → Persons + Projects
+    for cid, card in all_cards.items():
+        persons = resolve_card_members(card, member_map, vault_root, schema_dir)
+        for pname in persons:
+            card_person_edges.append({
+                "from_id": f"card:trello:{cid}",
+                "to_id": f"person:{pname}",
+                "role": "assignee",
+                "confidence": "high",
+            })
+
+        board_id = card.get("board_id", card.get("board", ""))
+        project = board_map.get(board_id) if board_id else None
+        if project:
+            card_project_edges.append({
+                "from_id": f"card:trello:{cid}",
+                "to_id": f"project:{project}",
+                "role": "belongs_to",
+                "confidence": "high",
+            })
+
+    # PRs → Persons + Projects
+    for purl, pr in all_prs.items():
+        author = resolve_pr_author(pr, vault_root, github_token)
+        if author:
+            pr_person_edges.append({
+                "from_id": f"pr:{pr.get('repo', '')}:{pr.get('number', '')}",
+                "to_id": f"person:{author}",
+                "role": "author",
+                "confidence": "high",
+            })
+
+        repo = pr.get("repo", "")
+        project = repo_map.get(repo) if repo else None
+        if project:
+            pr_project_edges.append({
+                "from_id": f"pr:{repo}:{pr.get('number', '')}",
+                "to_id": f"project:{project}",
+                "role": "belongs_to",
+                "confidence": "high",
+            })
+
+        # Upsert PR entity
+        try:
+            pr_entity = {
+                "id_canonical": f"pr:{repo}:{pr.get('number', '')}",
+                "entity": pr.get("title", "?"),
+                "title": pr.get("title", "?"),
+                "pr_id_source": pr.get("number", ""),
+                "repo": repo,
+                "project_ref": project,
+                "author": author,
+                "confidence": "medium",
+                "source_keys": [f"github:{repo}:{pr.get('number', '')}"],
+            }
+            merged = pr.get("merged_at")
+            if merged:
+                pr_entity["merged_at"] = merged
+            upsert_pr(pr_entity, vault_root)
+        except Exception:
+            pass
+
+    # Write relationship files
+    rel_dir.mkdir(parents=True, exist_ok=True)
+    for name, edges in [
+        ("card-person.json", card_person_edges),
+        ("card-project.json", card_project_edges),
+        ("pr-person.json", pr_person_edges),
+        ("pr-project.json", pr_project_edges),
+    ]:
+        (rel_dir / name).write_text(
+            json.dumps({"edges": edges}, indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
+
+    stats["edges"] = {
+        "card_person": len(card_person_edges),
+        "card_project": len(card_project_edges),
+        "pr_person": len(pr_person_edges),
+        "pr_project": len(pr_project_edges),
+    }
+    return stats

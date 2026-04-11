@@ -38,7 +38,7 @@ def test_entity_pages_have_valid_frontmatter_if_any_exist():
 
 
 # --- PR Entity Writer Tests ---
-from vault.ingest.entity_writer import upsert_pr, _entity_path
+from vault.ingest.entity_writer import upsert_pr, upsert_card, _entity_path
 
 
 class TestUpsertPr:
@@ -113,6 +113,88 @@ class TestUpsertPr:
         path = _entity_path(tmp_path, entity)
         assert path.parent == tmp_path / "entities" / "prs"
         assert path.suffix == ".md"
+
+
+# --- Card Enrichment Tests (Task 6) ---
+
+class TestUpsertCardWithPersons:
+    """Card file includes ## Pessoas with wiki-links."""
+
+    def test_with_persons(self, tmp_path):
+        entity = {
+            "entity": "Fix login",
+            "type": "card",
+            "id_canonical": "card:trello:board1:card1",
+            "card_id_source": "card1",
+            "title": "Fix login",
+            "source_keys": ["trello:card1"],
+            "_persons": ["Lincoln Quinan Junior", "Robert Urech"],
+        }
+        path, written = upsert_card(entity, vault_root=tmp_path)
+        assert written is True
+        text = path.read_text(encoding="utf-8")
+        assert "## Pessoas" in text
+        assert "[[Lincoln Quinan Junior]]" in text
+        assert "[[Robert Urech]]" in text
+
+
+class TestUpsertCardWithProject:
+    """Card file includes ## Projeto section."""
+
+    def test_with_project(self, tmp_path):
+        entity = {
+            "entity": "Fix login",
+            "type": "card",
+            "id_canonical": "card:trello:board1:card1",
+            "card_id_source": "card1",
+            "title": "Fix login",
+            "source_keys": ["trello:card1"],
+            "_project": "BAT/Kaba",
+        }
+        path, written = upsert_card(entity, vault_root=tmp_path)
+        assert written is True
+        text = path.read_text(encoding="utf-8")
+        assert "## Projeto" in text
+        assert "[[BAT/Kaba]]" in text
+
+
+class TestUpsertCardWithoutPersons:
+    """No ## Pessoas section when empty."""
+
+    def test_without_persons(self, tmp_path):
+        entity = {
+            "entity": "Fix login",
+            "type": "card",
+            "id_canonical": "card:trello:board1:card1",
+            "card_id_source": "card1",
+            "title": "Fix login",
+            "source_keys": ["trello:card1"],
+        }
+        path, written = upsert_card(entity, vault_root=tmp_path)
+        assert written is True
+        text = path.read_text(encoding="utf-8")
+        assert "## Pessoas" not in text
+
+
+class TestUpsertCardIdempotentStillWorks:
+    """Existing cards not broken."""
+
+    def test_idempotent(self, tmp_path):
+        entity = {
+            "entity": "Fix login",
+            "type": "card",
+            "id_canonical": "card:trello:board1:card1",
+            "card_id_source": "card1",
+            "title": "Fix login",
+            "source_keys": ["trello:card1"],
+            "_persons": ["Alice"],
+            "_project": "BAT",
+        }
+        path1, w1 = upsert_card(entity, vault_root=tmp_path)
+        path2, w2 = upsert_card(entity, vault_root=tmp_path)
+        assert w1 is True
+        assert w2 is False
+        assert path1 == path2
 
 
 def test_schema_frontmatter_example_contains_required_fields():
