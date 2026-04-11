@@ -22,6 +22,9 @@ DEFAULT_LOOKBACK_DAYS = 7
 def _fetch_from_supabase(days: int = DEFAULT_LOOKBACK_DAYS) -> list[dict[str, Any]]:
     """Fetch recent meetings from Supabase TLDV.
 
+    Real table schema uses `id`, `name`, `created_at` (not `meeting_id`, `title`,
+    `started_at`). We filter/order by `created_at` and normalize downstream.
+
     Reads SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY from environment.
     Returns list of raw meeting dicts.
     """
@@ -38,8 +41,8 @@ def _fetch_from_supabase(days: int = DEFAULT_LOOKBACK_DAYS) -> list[dict[str, An
     resp = (
         client.table("meetings")
         .select("*")
-        .gte("started_at", cutoff.isoformat())
-        .order("started_at", desc=True)
+        .gte("created_at", cutoff.isoformat())
+        .order("created_at", desc=True)
         .execute()
     )
     return resp.data or []
@@ -54,12 +57,12 @@ def normalize_meeting_record(raw: dict[str, Any]) -> dict[str, Any]:
     Allowed fields per validate_meeting():
       id_canonical, meeting_id_source, title, started_at, ended_at, project_ref
     """
-    meeting_id = raw.get("meeting_id", "")
+    meeting_id = raw.get("meeting_id") or raw.get("id")
     if not isinstance(meeting_id, str) or not meeting_id.strip():
         raise ValueError("meeting_id is required")
 
-    title = raw.get("title", "")
-    started_at = raw.get("started_at")
+    title = raw.get("title") or raw.get("name") or ""
+    started_at = raw.get("started_at") or raw.get("created_at")
     ended_at = raw.get("ended_at")
     project_ref = raw.get("project_ref")
 

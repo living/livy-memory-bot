@@ -137,3 +137,19 @@ def test_fetch_from_supabase_warns_when_env_missing(monkeypatch, capsys):
     captured = capsys.readouterr()
     assert result == []
     assert "[WARN] SUPABASE_URL or key not set; skipping fetch" in captured.err
+
+
+def test_normalize_meeting_record_supports_real_supabase_shape():
+    raw = {
+        "id": "meeting-abc-123",
+        "name": "Daily Status",
+        "created_at": "2026-04-10T14:00:00Z",
+        "participants": [],
+    }
+
+    result = normalize_meeting_record(raw)
+
+    assert result["meeting_id_source"] == "meeting-abc-123"
+    assert result["title"] == "Daily Status"
+    assert result["started_at"] == "2026-04-10T14:00:00Z"
+    assert result["id_canonical"] == "meeting:meeting-abc-123"
