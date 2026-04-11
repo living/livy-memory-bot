@@ -112,7 +112,12 @@ class TestResolveParticipants:
         assert names == {"Alice", "Robert"}
 
     def test_deduplication_by_id_and_name(self):
-        """Duplicate participants by id/name → deduped."""
+        """Dedupe by ID first, then by name for ID-less participants.
+
+        - Same ID → collapsed (first wins)
+        - Different non-empty IDs → both kept (even if same name)
+        - ID-less participants with same name → collapsed
+        """
         from vault.ingest.meeting_ingest import resolve_participants_for_meeting
 
         raw = {"id": "meeting-123", "participants": []}
@@ -125,14 +130,18 @@ class TestResolveParticipants:
                     {"id": "u1", "name": "Alice Duplicate", "email": "alice2@example.com"},
                     {"id": "u2", "name": "  alice  ", "email": "alice3@example.com"},
                 ],
-                "speakers": ["ALICE", "Bob", "Bob"],
+                "speakers": ["Bob", "Bob"],
                 "token_expired": False,
             },
         ):
             result = resolve_participants_for_meeting(raw, "token-abc")
 
         assert result["status"] == "ok"
-        names = [p["name"] for p in result["participants"]]
-        assert "Alice" in names
+        ids = {p["id"] for p in result["participants"]}
+        # u1 and u2 are different non-empty IDs → both kept
+        assert "u1" in ids
+        assert "u2" in ids
+        # Bob from speakers (no id) added once
+        names = {p["name"] for p in result["participants"]}
         assert "Bob" in names
-        assert len(result["participants"]) == 2
+        assert len(result["participants"]) == 3

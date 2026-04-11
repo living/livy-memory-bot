@@ -15,7 +15,7 @@ from typing import Any
 from vault.domain.normalize import build_entity_with_traceability
 from vault.domain.canonical_types import is_iso_date
 
-MAPPER_VERSION = "wave-c-card-ingest-v1"
+MAPPER_VERSION = "external-ingest-card-v1"
 DEFAULT_LOOKBACK_DAYS = 7
 
 

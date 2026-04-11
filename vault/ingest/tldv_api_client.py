@@ -45,7 +45,11 @@ def refresh_tldv_token() -> str | None:
     if response.status_code != 200:
         return None
 
-    payload = response.json() if response.content else {}
+    try:
+        payload = response.json() if response.content else {}
+    except ValueError:
+        return None
+
     new_token = payload.get("token") or payload.get("accessToken") or payload.get("access_token")
     if not new_token:
         return None
@@ -55,7 +59,11 @@ def refresh_tldv_token() -> str | None:
 
 
 def _extract_participants_and_speakers(response: requests.Response) -> dict[str, Any]:
-    payload = response.json() if response.content else {}
+    try:
+        payload = response.json() if response.content else {}
+    except ValueError:
+        return _empty_result()
+
     meeting = payload.get("meeting") or {}
 
     # ── Participants: watch-page may have participants, or they may be None ──
@@ -113,7 +121,11 @@ def _fetch_participants_from_meetings_list(
     if resp is None or not resp.ok:
         return []
 
-    data = resp.json()
+    try:
+        data = resp.json()
+    except ValueError:
+        return []
+
     results = data.get("results") or (data if isinstance(data, list) else [])
     for m in results:
         mid = m.get("id") or m.get("_id")

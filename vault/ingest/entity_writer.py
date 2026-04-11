@@ -186,7 +186,7 @@ def upsert_person(entity: dict, vault_root: Path | None = None) -> tuple[Path, b
             "source_type": "tldv_api",
             "source_ref": source_keys[0],
             "retrieved_at": now_iso,
-            "mapper_version": "wave-c-person-ingest-v1",
+            "mapper_version": "external-ingest-person-v1",
         }]
 
     lines = [

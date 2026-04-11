@@ -8,7 +8,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
-MAPPER_VERSION = "wave-c-person-strengthen-v1"
+MAPPER_VERSION = "external-ingest-person-strengthen-v1"
 
 # Conservative confidence behavior:
 # - low can be strengthened to medium

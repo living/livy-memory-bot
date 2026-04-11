@@ -129,7 +129,7 @@ def run_external_ingest(
                     build_source_record(
                         source_type="tldv_api",
                         source_ref=(person.get("source_keys") or ["tldv:participant:unknown"])[0],
-                        mapper_version="wave-c-person-ingest-v1",
+                        mapper_version="external-ingest-person-ingest-v1",
                     )
                 ])
                 person_by_id[pid] = person
@@ -137,23 +137,23 @@ def run_external_ingest(
                 errors.append({"source": "person_build", "error": str(exc), "type": type(exc).__name__})
 
     # Stage 6(a) — Persist persons before meetings
-    for person in person_by_id.values():
-        try:
-            _, written = upsert_person(person, vault_root)
-            if dry_run:
-                persons_skipped += 1
-            else:
+    if dry_run:
+        persons_skipped += len(person_by_id)
+    else:
+        for person in person_by_id.values():
+            try:
+                _, written = upsert_person(person, vault_root)
                 if written:
                     persons_written += 1
                 else:
                     persons_skipped += 1
-        except Exception as exc:
-            errors.append({
-                "source": "person_upsert",
-                "id_canonical": person.get("id_canonical"),
-                "error": str(exc),
-                "type": type(exc).__name__,
-            })
+            except Exception as exc:
+                errors.append({
+                    "source": "person_upsert",
+                    "id_canonical": person.get("id_canonical"),
+                    "error": str(exc),
+                    "type": type(exc).__name__,
+                })
 
     # Stage 6(b) — Persist meetings
     for unit in meeting_units:
@@ -173,18 +173,19 @@ def run_external_ingest(
                     break
             entity["sources"] = meeting_sources
 
-            path, written = upsert_meeting(entity, vault_root)
             if dry_run:
                 meetings_skipped += 1
+                continue
+
+            path, written = upsert_meeting(entity, vault_root)
+            if written:
+                meetings_written += 1
+                if verbose:
+                    print(f"  [meeting] written: {path.name}")
             else:
-                if written:
-                    meetings_written += 1
-                    if verbose:
-                        print(f"  [meeting] written: {path.name}")
-                else:
-                    meetings_skipped += 1
-                    if verbose:
-                        print(f"  [meeting] skipped (exists): {path.name}")
+                meetings_skipped += 1
+                if verbose:
+                    print(f"  [meeting] skipped (exists): {path.name}")
         except Exception as exc:
             if verbose:
                 print(f"  [meeting] ERROR {entity.get('id_canonical', '?')}: {exc}")
@@ -197,7 +198,6 @@ def run_external_ingest(
 
     # Stage 5 — Build relationships
     rel_dir = vault_root / "relationships"
-    rel_dir.mkdir(parents=True, exist_ok=True)
     rel_edges: list[dict[str, Any]] = []
     now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
@@ -224,7 +224,7 @@ def run_external_ingest(
             source = build_source_record(
                 source_type="tldv_api",
                 source_ref=meeting_source_ref or p_source_key,
-                mapper_version="wave-c-person-meeting-rel-v1",
+                mapper_version="external-ingest-person-meeting-rel-v1",
                 retrieved_at=now_iso,
             )
             try:
@@ -233,17 +233,21 @@ def run_external_ingest(
                     meeting_id=meeting_id,
                     role="participant",
                     source=source,
-                    lineage_run_id=f"run-{now_iso}-wave-c-person-meeting-rel-v1",
+                    lineage_run_id=f"run-{now_iso}-external-ingest-person-meeting-rel-v1",
                     since=meeting_entity.get("started_at"),
                 )
                 rel_edges.append(edge)
             except Exception as exc:
                 errors.append({"source": "relationship_build", "error": str(exc), "type": type(exc).__name__})
 
-    if rel_edges and not dry_run:
-        rel_path = rel_dir / "wave-c-person-meeting.json"
-        rel_path.write_text(json.dumps({"edges": rel_edges}, ensure_ascii=False, indent=2), encoding="utf-8")
-        relationships_written = len(rel_edges)
+    if rel_edges:
+        if dry_run:
+            relationships_written = 0
+        else:
+            rel_dir.mkdir(parents=True, exist_ok=True)
+            rel_path = rel_dir / "person-meeting.json"
+            rel_path.write_text(json.dumps({"edges": rel_edges}, ensure_ascii=False, indent=2), encoding="utf-8")
+            relationships_written = len(rel_edges)
 
     # Cards flow unchanged
     try:
@@ -260,18 +264,19 @@ def run_external_ingest(
 
     for entity in card_entities:
         try:
-            path, written = upsert_card(entity, vault_root)
             if dry_run:
                 cards_skipped += 1
+                continue
+
+            path, written = upsert_card(entity, vault_root)
+            if written:
+                cards_written += 1
+                if verbose:
+                    print(f"  [card] written: {path.name}")
             else:
-                if written:
-                    cards_written += 1
-                    if verbose:
-                        print(f"  [card] written: {path.name}")
-                else:
-                    cards_skipped += 1
-                    if verbose:
-                        print(f"  [card] skipped (exists): {path.name}")
+                cards_skipped += 1
+                if verbose:
+                    print(f"  [card] skipped (exists): {path.name}")
         except Exception as exc:
             if verbose:
                 print(f"  [card] ERROR {entity.get('id_canonical', '?')}: {exc}")
@@ -293,6 +298,7 @@ def run_external_ingest(
         "cards_fetched": len(card_entities),
         "cards_written": cards_written,
         "cards_skipped": cards_skipped,
+        "dry_run": dry_run,
         "errors": errors,
         "skips": skips,
     }

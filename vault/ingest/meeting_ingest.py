@@ -18,7 +18,7 @@ from vault.domain.normalize import build_entity_with_traceability
 from vault.domain.canonical_types import is_iso_date
 from vault.ingest.tldv_api_client import fetch_participants_from_tldv_api
 
-MAPPER_VERSION = "wave-c-meeting-ingest-v1"
+MAPPER_VERSION = "external-ingest-meeting-v1"
 DEFAULT_LOOKBACK_DAYS = 7
 
 
@@ -243,7 +243,7 @@ def resolve_participants_for_meeting(raw_meeting: dict[str, Any], tldv_token: st
     tried = ["tldv_api"]
 
     seen_ids: set[str] = set()
-    seen_names: set[str] = set()
+    seen_names_without_id: set[str] = set()
 
     def _normalize_name(name: Any) -> str:
         return name.strip().lower() if isinstance(name, str) else ""
@@ -261,16 +261,18 @@ def resolve_participants_for_meeting(raw_meeting: dict[str, Any], tldv_token: st
         if not participant_id and not participant_name:
             return
 
-        if participant_id and participant_id in seen_ids:
-            return
-        norm_name = _normalize_name(participant_name)
-        if norm_name and norm_name in seen_names:
-            return
-
+        # Dedupe by ID first — different non-empty IDs must never collapse.
         if participant_id:
+            if participant_id in seen_ids:
+                return
             seen_ids.add(participant_id)
-        if norm_name:
-            seen_names.add(norm_name)
+        else:
+            # For participants without ID, dedupe by normalized name.
+            norm_name = _normalize_name(participant_name)
+            if norm_name and norm_name in seen_names_without_id:
+                return
+            if norm_name:
+                seen_names_without_id.add(norm_name)
 
         resolved_id = participant_id or f"speaker:{'-'.join(participant_name.lower().split())}"
         target.append(
