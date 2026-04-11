@@ -26,12 +26,16 @@
 | `vault/ingest/index_manager.py` | Incremental index.md management (append/patch) |
 | `vault/ingest/log_manager.py` | Log.md append + rotation |
 | `vault/ingest/cross_reference.py` | Cross-source entity matching (person in Trello + TLDV) |
+| `vault/ingest/vault_lint_scanner.py` | Vault lint scans (orphans, stale, gaps, contradictions, suggestions, metrics) |
+| `vault/crons/vault_ingest_cron.py` | Cron entry point for vault-ingest (env load + pipeline call + error handling) |
+| `vault/crons/vault_lint_cron.py` | Cron entry point for vault-lint (env load + pipeline call + error handling) |
 | `vault/tests/test_cursor.py` | Cursor tests |
 | `vault/tests/test_trello_ingest.py` | Trello ingest tests |
 | `vault/tests/test_github_ingest_integration.py` | GitHub ingest tests |
 | `vault/tests/test_index_manager.py` | Index manager tests |
 | `vault/tests/test_log_manager.py` | Log manager tests |
 | `vault/tests/test_cross_reference.py` | Cross-reference tests |
+| `vault/tests/test_vault_lint_scanner.py` | Vault lint scanner tests |
 | `vault/tests/test_vault_ingest_cron.py` | Integration test for full vault-ingest flow |
 | `vault/tests/test_vault_lint_cron.py` | Integration test for full vault-lint flow |
 | `~/.openclaw/skills/vault-query/SKILL.md` | OpenClaw skill definition |
@@ -69,6 +73,9 @@ from vault.ingest.cursor import (
     acquire_lock,
     release_lock,
     is_locked,
+    check_circuit_breaker,
+    record_failure,
+    record_success,
 )
 
 
@@ -136,6 +143,51 @@ class TestLockManagement:
         acquire_lock(tmp_path, "vault-ingest", pid=12345)
         assert not acquire_lock(tmp_path, "vault-lint", pid=99999)
         assert is_locked(tmp_path)
+
+
+class TestCircuitBreaker:
+    def test_circuit_breaker_opens_after_3_failures(self, tmp_path):
+        """Circuit opens after max_failures consecutive failures."""
+        source = "tldv"
+        for i in range(3):
+            record_failure(tmp_path, source)
+        assert check_circuit_breaker(tmp_path, source, max_failures=3) is True
+
+    def test_circuit_breaker_resets_on_success(self, tmp_path):
+        """A successful call resets the failure counter."""
+        source = "github"
+        record_failure(tmp_path, source)
+        record_failure(tmp_path, source)
+        record_success(tmp_path, source)
+        # After success, failure count should be 0
+        assert check_circuit_breaker(tmp_path, source, max_failures=3) is False
+
+    def test_circuit_breaker_skips_for_1h(self, tmp_path):
+        """Circuit stays open for 1 hour after trip."""
+        import datetime, json
+        source = "trello"
+        # Pre-populate a failure file with recent timestamp
+        failure_file = tmp_path / ".cursors" / f"{source}_failures.json"
+        failure_file.parent.mkdir(parents=True, exist_ok=True)
+        failure_file.write_text(json.dumps({
+            "count": 3,
+            "last_failure": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        }))
+        assert check_circuit_breaker(tmp_path, source, max_failures=3) is True
+
+    def test_circuit_breaker_allows_after_1h_cooldown(self, tmp_path):
+        """After 1 hour cooldown, circuit allows requests again."""
+        import datetime, json
+        source = "github"
+        old_time = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(hours=2)
+        failure_file = tmp_path / ".cursors" / f"{source}_failures.json"
+        failure_file.parent.mkdir(parents=True, exist_ok=True)
+        failure_file.write_text(json.dumps({
+            "count": 3,
+            "last_failure": old_time.isoformat(),
+        }))
+        # After 1h cooldown, circuit should allow
+        assert check_circuit_breaker(tmp_path, source, max_failures=3) is False
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
@@ -217,6 +269,56 @@ def release_lock(vault_root: Path) -> None:
 def is_locked(vault_root: Path) -> bool:
     """Check if vault lock exists (does not check staleness)."""
     return (_cursors_dir(vault_root) / "vault.lock").exists()
+
+
+# ── Circuit Breaker ────────────────────────────────────────────────────────────
+
+CIRCUIT_COOLDOWN_SECONDS = 3600  # 1 hour
+
+
+def _failure_file(vault_root: Path, source: str) -> Path:
+    return _cursors_dir(vault_root) / f"{source}_failures.json"
+
+
+def check_circuit_breaker(vault_root: Path, source: str, max_failures: int = 3) -> bool:
+    """Returns True if circuit is OPEN (skip this source)."""
+    f = _failure_file(vault_root, source)
+    if not f.exists():
+        return False
+    try:
+        data = json.loads(f.read_text())
+        count = data.get("count", 0)
+        if count < max_failures:
+            return False
+        last = datetime.fromisoformat(data["last_failure"])
+        age = (datetime.now(timezone.utc) - last).total_seconds()
+        return age < CIRCUIT_COOLDOWN_SECONDS  # Still in cooldown
+    except (json.JSONDecodeError, KeyError, ValueError):
+        return False
+
+
+def record_failure(vault_root: Path, source: str) -> None:
+    """Record a failure for circuit breaker tracking."""
+    f = _failure_file(vault_root, source)
+    if f.exists():
+        data = json.loads(f.read_text())
+    else:
+        data = {"count": 0, "last_failure": None}
+    data["count"] = data.get("count", 0) + 1
+    data["last_failure"] = datetime.now(timezone.utc).isoformat()
+    tmp = _cursors_dir(vault_root) / f"{source}_failures.json.tmp"
+    tmp.write_text(json.dumps(data))
+    tmp.rename(f)
+
+
+def record_success(vault_root: Path, source: str) -> None:
+    """Reset failure count for source."""
+    f = _failure_file(vault_root, source)
+    if f.exists():
+        data = json.loads(f.read_text())
+        data["count"] = 0
+        f.write_text(json.dumps(data))
+
 ```
 
 - [ ] **Step 4: Run test to verify it passes**
@@ -393,7 +495,7 @@ git commit -m "feat(vault): index manager — incremental append/patch for index
 """Tests for log.md management with rotation."""
 import pytest
 from pathlib import Path
-from vault.ingest.log_manager import append_log, maybe_rotate_log
+from vault.ingest.log_manager import append_log, maybe_rotate_log, log_delivery_failure
 
 
 class TestLogManager:
@@ -430,6 +532,28 @@ class TestLogManager:
         assert not log_file.exists() or log_file.stat().st_size < 1000
         archive = vault / "log-archive"
         assert archive.exists()
+
+    def test_delivery_failure_log_creates_jsonl(self, tmp_path):
+        vault = tmp_path / "vault"
+        job_summary = {"meetings": 5, "cards": 3}
+        log_delivery_failure(vault, "vault-ingest", job_summary)
+        log_file = vault / ".delivery-failures.jsonl"
+        assert log_file.exists()
+        lines = log_file.read_text().strip().splitlines()
+        assert len(lines) == 1
+        import json as _json
+        record = _json.loads(lines[0])
+        assert record["job"] == "vault-ingest"
+        assert record["summary"] == job_summary
+        assert "timestamp" in record
+
+    def test_delivery_failure_appends_jsonl(self, tmp_path):
+        vault = tmp_path / "vault"
+        log_delivery_failure(vault, "vault-ingest", {"a": 1})
+        log_delivery_failure(vault, "vault-lint", {"b": 2})
+        log_file = vault / ".delivery-failures.jsonl"
+        lines = log_file.read_text().strip().splitlines()
+        assert len(lines) == 2
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
@@ -494,6 +618,19 @@ def maybe_rotate_log(vault_root: Path, max_bytes: int = 500_000) -> None:
         archive_file.write_text(content)
     # Reset log.md
     log_file.write_text("# Vault Log\n\n")
+
+
+def log_delivery_failure(vault_root: Path, job: str, summary: dict[str, Any]) -> None:
+    """Append delivery failure payload to .delivery-failures.jsonl."""
+    vault_root.mkdir(parents=True, exist_ok=True)
+    f = vault_root / ".delivery-failures.jsonl"
+    payload = {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "job": job,
+        "summary": summary,
+    }
+    with open(f, "a") as fh:
+        fh.write(__import__("json").dumps(payload) + "\n")
 ```
 
 - [ ] **Step 4: Run tests**
@@ -698,12 +835,269 @@ git commit -m "feat(ingest): integrate cursors, locks, GitHub stage, index/log i
 
 ---
 
-## Task 6: Create vault-ingest Cron + Disable Old Crons
+## Task 5b: Vault Lint Scans
 
 **Files:**
-- No new code files — cron configuration via OpenClaw
+- Create: `vault/ingest/vault_lint_scanner.py`
+- Test: `vault/tests/test_vault_lint_scanner.py`
 
-- [ ] **Step 1: Create vault-ingest cron**
+- [ ] **Step 1: Write the failing tests**
+
+```python
+# vault/tests/test_vault_lint_scanner.py
+"""Tests for vault lint scans."""
+from pathlib import Path
+from vault.ingest.vault_lint_scanner import run_lint_scans
+
+
+def test_find_orphans(tmp_path):
+    """Pages in entities/ not referenced in index.md should be flagged."""
+    vault = tmp_path / "vault"
+    (vault / "entities").mkdir(parents=True)
+    (vault / "entities" / "person-a.md").write_text("---\nid: person-a\n---\n")
+    (vault / "index.md").write_text("# Index\n")
+
+    result = run_lint_scans(vault)
+    assert any("entities/person-a.md" in item.get("path", "") for item in result["orphans"])
+
+
+def test_find_stale(tmp_path):
+    """Pages with last_seen_at > 30 days and not archived should be stale."""
+    import datetime
+    vault = tmp_path / "vault"
+    (vault / "entities").mkdir(parents=True)
+    old = (datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=45)).date().isoformat()
+    (vault / "entities" / "person-b.md").write_text(
+        f"---\nid: person-b\nlast_seen_at: {old}\narchived: false\n---\n"
+    )
+
+    result = run_lint_scans(vault)
+    assert any("person-b" in item.get("id", "") for item in result["stale"])
+
+
+def test_find_gaps(tmp_path):
+    """Concepts referenced in entity frontmatter without concept page should be gaps."""
+    vault = tmp_path / "vault"
+    (vault / "entities").mkdir(parents=True)
+    (vault / "concepts").mkdir(parents=True)
+    (vault / "entities" / "meeting-x.md").write_text(
+        "---\nid: meeting-x\nconcepts: [bat, delphos]\n---\n"
+    )
+    (vault / "concepts" / "bat.md").write_text("---\nid: bat\n---\n")
+
+    result = run_lint_scans(vault)
+    assert any(item.get("concept") == "delphos" for item in result["gaps"])
+
+
+def test_find_contradictions(tmp_path):
+    """Same id_canonical with conflicting confidence/data should be contradictions."""
+    vault = tmp_path / "vault"
+    (vault / "entities").mkdir(parents=True)
+    (vault / "entities" / "person-1.md").write_text(
+        "---\nid: person-1\nid_canonical: robert-urech\nconfidence: 0.90\nrole: CTO\n---\n"
+    )
+    (vault / "entities" / "person-2.md").write_text(
+        "---\nid: person-2\nid_canonical: robert-urech\nconfidence: 0.60\nrole: CEO\n---\n"
+    )
+
+    result = run_lint_scans(vault)
+    assert any(item.get("id_canonical") == "robert-urech" for item in result["contradictions"])
+
+
+def test_suggest_cross_refs(tmp_path):
+    """Person appearing in 5+ meetings without concept page should generate suggestion."""
+    vault = tmp_path / "vault"
+    (vault / "entities").mkdir(parents=True)
+    (vault / "concepts").mkdir(parents=True)
+    (vault / "entities" / "person-lincoln.md").write_text(
+        "---\nid: person-lincoln\nname: Lincoln\nmeeting_count: 7\n---\n"
+    )
+
+    result = run_lint_scans(vault)
+    assert any(item.get("type") == "cross_ref" for item in result["suggestions"])
+```
+
+- [ ] **Step 2: Run tests to verify failure**
+
+Run: `python3 -m pytest vault/tests/test_vault_lint_scanner.py -v --tb=short`
+Expected: FAIL with `ModuleNotFoundError: No module named 'vault.ingest.vault_lint_scanner'`
+
+- [ ] **Step 3: Write minimal implementation**
+
+```python
+# vault/ingest/vault_lint_scanner.py
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Any
+
+
+def run_lint_scans(vault_root: Path) -> dict[str, Any]:
+    return {
+        "orphans": [],
+        "stale": [],
+        "gaps": [],
+        "contradictions": [],
+        "suggestions": [],
+        "metrics": {
+            "total_entities": 0,
+            "total_concepts": 0,
+            "total_decisions": 0,
+            "total_relationships": 0,
+            "avg_links_per_page": 0.0,
+            "orphans_by_domain": {},
+            "avg_age_days": 0.0,
+            # Spec §5 SLO-oriented metrics
+            "scan_duration_ms": 0,
+            "pages_scanned": 0,
+            "error_count": 0,
+            "lint_coverage_ratio": 0.0,
+        },
+    }
+```
+
+- [ ] **Step 4: Expand implementation to satisfy all scans**
+
+Implement scan functions used by `run_lint_scans(vault_root)`:
+- `find_orphans(...)`
+- `find_stale(...)`
+- `find_gaps(...)`
+- `find_contradictions(...)`
+- `suggest_cross_refs(...)`
+
+Ensure the return payload follows:
+
+```python
+def run_lint_scans(vault_root: Path) -> dict[str, Any]:
+    return {
+        "orphans": [...],
+        "stale": [...],
+        "gaps": [...],
+        "contradictions": [...],
+        "suggestions": [...],
+        "metrics": {
+            "total_entities": N,
+            "total_concepts": N,
+            "total_decisions": N,
+            "total_relationships": N,
+            "avg_links_per_page": N.N,
+            "orphans_by_domain": {...},
+            "avg_age_days": N.N,
+            # Include spec §5 SLO metrics in this dict
+        },
+    }
+```
+
+- [ ] **Step 5: Run tests to verify pass**
+
+Run: `python3 -m pytest vault/tests/test_vault_lint_scanner.py -v --tb=short`
+Expected: All PASS
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add vault/ingest/vault_lint_scanner.py vault/tests/test_vault_lint_scanner.py
+git commit -m "feat(vault): lint scanner — orphans, stale, gaps, contradictions, cross-ref suggestions"
+```
+
+---
+
+## Task 6: Create cron helper scripts + configure vault crons
+
+**Files:**
+- Create: `vault/crons/vault_ingest_cron.py`
+- Create: `vault/crons/vault_lint_cron.py`
+
+- [ ] **Step 1: Write failing tests for cron helpers (optional but recommended)**
+
+Add tests in:
+- `vault/tests/test_vault_ingest_cron.py`
+- `vault/tests/test_vault_lint_cron.py`
+
+Validate each entry point:
+- loads `.openclaw/.env`
+- calls pipeline function (`run_external_ingest` / `run_full_lint`)
+- returns non-zero exit on uncaught error
+- prints summary payload for cron observability
+
+- [ ] **Step 2: Create `vault_ingest_cron.py` entry point**
+
+```python
+# vault/crons/vault_ingest_cron.py
+from __future__ import annotations
+
+import os
+import sys
+from pathlib import Path
+from vault.ingest.external_ingest import run_external_ingest
+
+
+def load_env(path: Path) -> None:
+    if not path.exists():
+        return
+    for line in path.read_text().splitlines():
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        k, _, v = line.partition("=")
+        os.environ.setdefault(k.strip(), v.strip())
+
+
+def main() -> int:
+    load_env(Path.home() / ".openclaw/.env")
+    try:
+        result = run_external_ingest(
+            tldv_token=os.environ.get("TLDV_JWT_TOKEN"),
+            meeting_days=int(os.environ.get("VAULT_MEETING_DAYS", "1")),
+        )
+        print(result)
+        return 0
+    except Exception as e:
+        print(f"vault-ingest-cron failed: {e}", file=sys.stderr)
+        return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
+```
+
+- [ ] **Step 3: Create `vault_lint_cron.py` entry point**
+
+```python
+# vault/crons/vault_lint_cron.py
+from __future__ import annotations
+
+import os
+import sys
+from pathlib import Path
+from vault.lint import run_full_lint
+
+
+def load_env(path: Path) -> None:
+    if not path.exists():
+        return
+    for line in path.read_text().splitlines():
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        k, _, v = line.partition("=")
+        os.environ.setdefault(k.strip(), v.strip())
+
+
+def main() -> int:
+    load_env(Path.home() / ".openclaw/.env")
+    try:
+        result = run_full_lint()
+        print(result)
+        return 0
+    except Exception as e:
+        print(f"vault-lint-cron failed: {e}", file=sys.stderr)
+        return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
+```
+
+- [ ] **Step 4: Create vault-ingest cron (use helper script, no inline Python)**
 
 ```bash
 openclaw cron add \
@@ -712,14 +1106,14 @@ openclaw cron add \
   --tz "America/Sao_Paulo" \
   --session isolated \
   --model fastest \
-  --message "Run the vault ingest pipeline. Execute: cd /home/lincoln/.openclaw/workspace-livy-memory/.worktrees/wave-c-pipeline-wiring && python3 -c \"from vault.ingest.external_ingest import run_external_ingest; import os; from pathlib import Path; env = Path.home()/'.openclaw/.env'; [__import__('os').environ.setdefault(k.strip(),v.strip()) for l in env.read_text().splitlines() if '=' in l and not l.startswith('#') for k,_,v in [l.partition('=')]]; print(run_external_ingest(tldv_token=os.environ.get('TLDV_JWT_TOKEN'), meeting_days=1))\" 2>&1" \
+  --message "Run vault ingest cron helper. Execute: cd /home/lincoln/.openclaw/workspace-livy-memory/.worktrees/wave-c-pipeline-wiring && python3 -m vault.crons.vault_ingest_cron 2>&1" \
   --timeout 600 \
   --announce \
   --channel telegram \
   --to 7426291192
 ```
 
-- [ ] **Step 2: Disable old crons (one by one)**
+- [ ] **Step 5: Disable old crons (one by one)**
 
 ```bash
 # Use IDs from spec Section 2.3
@@ -732,7 +1126,7 @@ openclaw cron disable 53b45f6f-...   # signal-curation
 openclaw cron disable 63a44a25-...   # openclaw-health
 ```
 
-- [ ] **Step 3: Create vault-lint cron**
+- [ ] **Step 6: Create vault-lint cron (use helper script, no inline Python)**
 
 ```bash
 openclaw cron add \
@@ -741,17 +1135,24 @@ openclaw cron add \
   --tz "America/Sao_Paulo" \
   --session isolated \
   --model "zai/glm-5.1" \
-  --message "Run the vault lint pipeline. Execute: cd /home/lincoln/.openclaw/workspace-livy-memory/.worktrees/wave-c-pipeline-wiring && python3 -m vault.pipeline --reverify --repair 2>&1. Then run lint scans: python3 -c \"from vault.lint import run_full_lint; print(run_full_lint())\" 2>&1" \
+  --message "Run vault lint cron helper. Execute: cd /home/lincoln/.openclaw/workspace-livy-memory/.worktrees/wave-c-pipeline-wiring && python3 -m vault.crons.vault_lint_cron 2>&1" \
   --timeout 600 \
   --announce \
   --channel telegram \
   --to 7426291192
 ```
 
-- [ ] **Step 4: Verify crons**
+- [ ] **Step 7: Verify crons**
 
 Run: `openclaw cron list`
 Expected: vault-ingest + vault-lint enabled, 7 old crons disabled
+
+- [ ] **Step 8: Commit**
+
+```bash
+git add vault/crons/vault_ingest_cron.py vault/crons/vault_lint_cron.py vault/tests/test_vault_ingest_cron.py vault/tests/test_vault_lint_cron.py
+git commit -m "feat(vault): cron helper scripts for ingest and lint entry points"
+```
 
 ---
 
@@ -788,14 +1189,14 @@ git commit -m "feat(skills): vault-query skill — global query skill for Living
 ## Task 8: Integration Tests + Validation
 
 **Files:**
-- Create: `vault/tests/test_vault_ingest_cron.py`
-- Create: `vault/tests/test_vault_lint_cron.py`
+- Create: `vault/tests/test_vault_ingest_cron.py` (if not created in Task 7)
+- Create: `vault/tests/test_vault_lint_cron.py` (if not created in Task 7)
 
-- [ ] **Step 1: Write integration test for vault-ingest**
+- [ ] **Step 1: Write integration test for vault-ingest (if not covered in Task 7)**
 
 Test full flow: lock → fetch → resolve → build → persist → cursor → index → log → unlock
 
-- [ ] **Step 2: Write integration test for vault-lint**
+- [ ] **Step 2: Write integration test for vault-lint (if not covered in Task 7)**
 
 Test: lock → reverify → lint scans → report → log → unlock
 
