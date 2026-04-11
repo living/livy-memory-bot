@@ -257,3 +257,45 @@ Cobertura: deduplicação de nomes, resolução de participantes, pipeline end-t
 5. **Index rebuild (não incremental)** — Evita stale entries, mais simples de manter
 6. **Frontmatter YAML + body Markdown** — Máquina lê frontmatter, humano lê body
 7. **Obsidian callouts (`> [!info]`)** — Formatação nativa para data/duração/vídeo
+
+## Crosslink Pipeline (Stage 8)
+
+### Arquitetura
+
+O crosslink pipeline conecta Cards e PRs a Pessoas e Projetos — **não** a reuniões por data.
+
+**Cadeia transitiva:** Card/PR → Pessoa → Projeto → Reunião
+
+### Módulos
+
+| Módulo | Função |
+|---|---|
+| `crosslink_builder.py` | Orquestração Stage 8 |
+| `mapping_loader.py` | Carrega YAML configs (trello-member-map, repo-project-map, board-project-map) |
+| `entity_writer.py` | `upsert_pr()`, `upsert_card()` com enriquecimento |
+
+### Relationship Files
+
+| Arquivo | Conteúdo |
+|---|---|
+| `card-person.json` | Cards → Pessoas (via Trello member map + fuzzy) |
+| `card-project.json` | Cards → Projetos (via board-project-map) |
+| `pr-person.json` | PRs → Pessoas (via GitHub API + fuzzy) |
+| `pr-project.json` | PRs → Projetos (via repo-project-map) |
+
+### Enriquecimento de Entidades
+
+- **Project hubs:** `## Cards`, `## PRs`, `## Pessoas`
+- **Person files:** `## Cards`, `## PRs` (antes de `## Reuniões`)
+- **Meeting files:** `## Contexto` substituído por links project-scoped
+
+### Mapping Configs (YAML)
+
+- `schema/trello-member-map.yaml` — member ID → person name (auto-populated via fuzzy)
+- `schema/repo-project-map.yaml` — repo → project name
+- `schema/board-project-map.yaml` — board ID → project name
+
+### Idempotência
+
+`run_crosslink()` é idempotente: múltiplas execuções produzem o mesmo resultado.
+Enrichment_context no frontmatter é preservado (yaml.safe_load/yaml.dump).

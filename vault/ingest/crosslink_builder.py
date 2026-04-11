@@ -614,7 +614,14 @@ def _update_meeting_context(vault_root: Path) -> None:
     # Update each meeting file
     for mf in meetings_dir.glob("*.md"):
         text = mf.read_text(encoding="utf-8")
-        fm, body = _split_frontmatter(text)
+        # Parse with yaml.safe_load to preserve nested structures
+        if not text.startswith("---"):
+            continue
+        end = text.find("---", 3)
+        if end == -1:
+            continue
+        fm = yaml.safe_load(text[3:end]) or {}
+        body = text[end + 3:].lstrip("\n")
         title = fm.get("entity", "")
         project = _detect_project(title)
         if not project:
@@ -642,7 +649,9 @@ def _update_meeting_context(vault_root: Path) -> None:
         # Append new context
         body = body.rstrip() + "\n\n" + new_context
 
-        mf.write_text(_join_frontmatter(fm, body), encoding="utf-8")
+        # Write with yaml.dump to preserve nested frontmatter
+        fm_text = yaml.dump(fm, default_flow_style=False, sort_keys=False)
+        mf.write_text(f"---\n{fm_text}---\n\n{body}", encoding="utf-8")
 
 
 def run_crosslink(
