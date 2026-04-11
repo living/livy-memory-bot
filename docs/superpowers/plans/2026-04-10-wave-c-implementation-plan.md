@@ -1,5 +1,7 @@
 # Wave C — Entity Model Extension Implementation Plan
 
+> **Note (2026-04-11):** The WaveCObserver class was replaced by Counter/Histogram/RunAuditor in the actual implementation. See `vault/domain/observability.py` for the canonical API.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:subagent-driven-development` (recommended) or `superpowers:executing-plans` to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Expand vault entity domain with navigable meeting + card entities, relationship graph (person↔meeting, person↔card), and person identity strengthening via participation signals.

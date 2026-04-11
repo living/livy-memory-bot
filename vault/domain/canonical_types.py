@@ -279,6 +279,10 @@ def validate_meeting(entity: dict) -> Union[bool, list[str]]:
     Required:  id_canonical, meeting_id_source, source_keys, sources
     Optional:  title, started_at, ended_at, project_ref
     """
+    # TODO: Schema-aware validation — currently heuristic-based.
+    # Writers may add fields (transcript_source, transcript_ref, board_id)
+    # that aren't validated here. Consider a formal schema (e.g. JSON Schema)
+    # for strict contract enforcement.
     errors: list[str] = []
 
     if "id_canonical" not in entity:

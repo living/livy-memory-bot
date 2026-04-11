@@ -1,9 +1,0 @@
-{
-  "counters": {
-    "audit_test": 1
-  },
-  "histograms": {},
-  "phase": "C3",
-  "recorded_at": "2026-04-11T11:05:15.595653+00:00",
-  "run_id": "test-audit-20260411T110515595638Z-c9c92c0d"
-}

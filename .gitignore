@@ -26,3 +26,18 @@ memory/vault/run-reports/
 __pycache__/
 */__pycache__/
 *.pyc
+
+# ── Wave-C / Living Memory Entity Pipeline artifacts ──────────────────────
+memory/vault/.cache/
+memory/vault/entities/
+memory/vault/wave-c-runs/
+memory/vault/log.md
+memory/vault/lint-reports/*.md
+memory/vault/quality-review/*.md
+memory/vault/evidence/
+memory/vault/index.md
+memory/vault/decisions/*.md
+memory/vault/concepts/*.md
+.claude/napkin.md
+.claude/plans/
+memory/2026-*-report.md
