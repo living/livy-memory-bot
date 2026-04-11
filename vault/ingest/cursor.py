@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 import os
 import tempfile
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import TypedDict
 
@@ -143,7 +143,7 @@ def acquire_lock(vault_root: Path, job: str, pid: int | None = None) -> bool:
         except OSError:
             pass
 
-    # Write new lock file.
+    # Atomically create lock file using O_CREAT|O_EXCL to prevent race.
     if pid is None:
         pid = os.getpid()
     lock_data = {
@@ -151,18 +151,21 @@ def acquire_lock(vault_root: Path, job: str, pid: int | None = None) -> bool:
         "pid": pid,
         "started_at": datetime.now(timezone.utc).isoformat(),
     }
-    fd, tmp_path = tempfile.mkstemp(
-        dir=lock_path.parent,
-        prefix=".writing_",
-        suffix=".lock.tmp",
-    )
+    try:
+        fd = os.open(
+            str(lock_path),
+            os.O_CREAT | os.O_EXCL | os.O_WRONLY,
+            0o644,
+        )
+    except FileExistsError:
+        # Another process created it between our stale check and now.
+        return False
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as fh:
             json.dump(lock_data, fh)
-        os.replace(tmp_path, lock_path)
     except Exception:
         try:
-            os.unlink(tmp_path)
+            os.unlink(str(lock_path))
         except OSError:
             pass
         raise

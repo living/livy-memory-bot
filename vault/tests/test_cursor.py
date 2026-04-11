@@ -1,7 +1,5 @@
 """Tests for vault cursor management."""
 import json
-import pytest
-from pathlib import Path
 from vault.ingest.cursor import (
     read_cursor,
     write_cursor,
@@ -114,11 +112,11 @@ class TestCircuitBreaker:
         assert check_circuit_breaker(tmp_path, source, max_failures=3) is False
 
 
-def _try_acquire_for_test(vault_root, results_list, idx):
-    """Module-level helper for concurrent lock test (must be picklable)."""
+def _concurrent_try_acquire(vault_root, results_list, idx):
+    """Module-level helper for concurrent lock test (must be picklable for spawn)."""
     from vault.ingest.cursor import acquire_lock
-    import os
-    got = acquire_lock(vault_root, "vault-ingest", pid=os.getpid())
+    import os as _os
+    got = acquire_lock(vault_root, "vault-lint", pid=_os.getpid())
     results_list.append((idx, got))
 
 
@@ -142,20 +140,22 @@ class TestEdgeCases:
         assert not acquire_lock(tmp_path, "vault-lint", pid=99999)
 
     def test_lock_concurrent_processes(self, tmp_path):
+        """Active lock blocks a concurrent process from acquiring."""
         import multiprocessing
 
+        # Acquire lock in this process first
+        assert acquire_lock(tmp_path, "vault-ingest", pid=12345)
+        assert is_locked(tmp_path)
+
+        # Spawn a child process that tries to acquire the same lock
         ctx = multiprocessing.get_context("spawn")
         manager = ctx.Manager()
         results = manager.list()
 
-        p0 = ctx.Process(target=_try_acquire_for_test, args=(tmp_path, results, 0))
-        p0.start()
-        p0.join()
-
-        p1 = ctx.Process(target=_try_acquire_for_test, args=(tmp_path, results, 1))
+        p1 = ctx.Process(target=_concurrent_try_acquire, args=(tmp_path, results, 1))
         p1.start()
-        p1.join()
+        p1.join(timeout=10)
 
         results_dict = dict(results)
-        assert results_dict[0] is True
+        # Child process should be blocked by our active lock
         assert results_dict[1] is False
