@@ -185,7 +185,7 @@ Conteúdo:
 - **Schema de entities** — meeting, person, card — campos e tipos
 - **Schema de relationships** — formato JSON com edges (from_id, to_id, role, confidence)
 - **Limitações** — não modificar raw sources, não deletar pages (marcar como archived)
-- **Locks** — verificar `.cursors/vault-*.lock` antes de escrever em recursos compartilhados
+- **Locks** — verificar `.cursors/vault.lock` antes de escrever em recursos compartilhados
 
 ### 3.4 Arquivos da skill
 
@@ -277,7 +277,7 @@ Esses SLIs são reportados no HEARTBEAT.md.
 1. Backfill de 30 dias com dados reais — medir duração por estágio
 2. Backfill de 90 dias — verificar se index incremental mantém performance
 3. Backfill de 180 dias — stress test de lint scan
-4. Simular 1000 reuniões sintéticas — validar timeout de 300s do ingest
+4. Simular 1000 reuniões sintéticas — validar timeout de 600s do ingest
 
 ### Gatilhos de otimização
 
