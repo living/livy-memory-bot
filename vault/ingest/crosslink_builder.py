@@ -5,6 +5,7 @@ Stage 8 in the external ingest pipeline.
 
 from __future__ import annotations
 
+import json
 import re
 import unicodedata
 from datetime import datetime, timedelta, timezone
@@ -298,6 +299,351 @@ def resolve_card_members(
     return resolved
 
 
+def _enrich_project_files(vault_root: Path) -> None:
+    """Task 8: Add Cards/PRs/Pessoas sections to project entity files."""
+    from vault.ingest.entity_writer import _slugify, _split_frontmatter, _join_frontmatter
+
+    rel_dir = vault_root / "relationships"
+    if not rel_dir.exists():
+        return
+
+    # Load relationship data
+    def _load_edges(filename: str) -> list[dict]:
+        p = rel_dir / filename
+        if p.exists():
+            return json.loads(p.read_text(encoding="utf-8")).get("edges", [])
+        return []
+
+    card_project = _load_edges("card-project.json")
+    pr_project = _load_edges("pr-project.json")
+    card_person = _load_edges("card-person.json")
+    pr_person = _load_edges("pr-person.json")
+
+    # Load card/PR details from meeting enrichment_context
+    card_details: dict[str, dict] = {}
+    pr_details: dict[str, dict] = {}
+    meetings_dir = vault_root / "entities" / "meetings"
+    if meetings_dir.exists():
+        for mf in meetings_dir.glob("*.md"):
+            try:
+                text = mf.read_text(encoding="utf-8")
+                if not text.startswith("---"):
+                    continue
+                end = text.find("---", 3)
+                if end == -1:
+                    continue
+                fm = yaml.safe_load(text[3:end]) or {}
+                ec = fm.get("enrichment_context")
+                if not isinstance(ec, dict):
+                    continue
+                for card in ec.get("trello", {}).get("cards", []):
+                    card_details[card.get("id", "")] = card
+                for pr in ec.get("github", {}).get("pull_requests", []):
+                    pr_details.get(pr.get("url", ""), pr)
+                    # Also key by repo+number
+                    pr_details[pr.get("url", "")] = pr
+            except Exception:
+                continue
+
+    # Build per-project data
+    project_cards: dict[str, list[str]] = {}   # project → ["[[card-id|Title]]"]
+    project_prs: dict[str, list[str]] = {}     # project → ["[[pr-repo-num|Title]]"]
+    project_persons: dict[str, set] = {}        # project → {person_name}
+
+    for edge in card_project:
+        proj = edge.get("to_id", "").replace("project:", "")
+        cid = edge.get("from_id", "").replace("card:trello:", "")
+        card = card_details.get(cid, {})
+        title = card.get("name", cid)
+        slug = _slugify(proj)
+        project_cards.setdefault(slug, []).append(f"- [[{cid}|{title}]]")
+
+    for edge in pr_project:
+        proj = edge.get("to_id", "").replace("project:", "")
+        pr_id = edge.get("from_id", "")
+        pr = pr_details.get("", {})
+        # Find PR by matching from_id pattern pr:repo:number
+        title = ""
+        for purl, pdata in pr_details.items():
+            if pr_id == f"pr:{pdata.get('repo', '')}:{pdata.get('number', '')}":
+                title = pdata.get("title", pr_id)
+                break
+        if not title:
+            title = pr_id
+        slug = _slugify(proj)
+        project_prs.setdefault(slug, []).append(f"- [[{pr_id}|{title}]]")
+
+    # Collect persons per project from card-person and pr-person edges
+    card_person_by_card: dict[str, list[str]] = {}
+    for edge in card_person:
+        cid = edge.get("from_id", "").replace("card:trello:", "")
+        pname = edge.get("to_id", "").replace("person:", "")
+        card_person_by_card.setdefault(cid, []).append(pname)
+
+    for edge in card_project:
+        proj = edge.get("to_id", "").replace("project:", "")
+        cid = edge.get("from_id", "").replace("card:trello:", "")
+        slug = _slugify(proj)
+        for pname in card_person_by_card.get(cid, []):
+            project_persons.setdefault(slug, set()).add(pname)
+
+    for edge in pr_person:
+        pname = edge.get("to_id", "").replace("person:", "")
+        pr_id = edge.get("from_id", "")
+        # Find project for this PR
+        for pe in pr_project:
+            if pe.get("from_id") == pr_id:
+                proj = pe.get("to_id", "").replace("project:", "")
+                slug = _slugify(proj)
+                project_persons.setdefault(slug, set()).add(pname)
+
+    # Update project files
+    projects_dir = vault_root / "entities" / "projects"
+    if not projects_dir.exists():
+        return
+    for pf in projects_dir.glob("*.md"):
+        slug = pf.stem
+        text = pf.read_text(encoding="utf-8")
+        fm, body = _split_frontmatter(text)
+
+        # Remove existing sections
+        for section in ["## Cards", "## PRs", "## Pessoas"]:
+            if section in body:
+                idx = body.index(section)
+                next_s = body.find("\n## ", idx + 1)
+                if next_s == -1:
+                    body = body[:idx]
+                else:
+                    body = body[:idx] + body[next_s + 1:]
+
+        sections = []
+        if slug in project_cards:
+            sections.append("## Cards\n")
+            sections.extend(project_cards[slug])
+            sections.append("")
+        if slug in project_prs:
+            sections.append("## PRs\n")
+            sections.extend(project_prs[slug])
+            sections.append("")
+        if slug in project_persons:
+            sections.append("## Pessoas\n")
+            for pname in sorted(project_persons[slug]):
+                sections.append(f"- [[{_slugify(pname)}|{pname}]]")
+            sections.append("")
+
+        if sections:
+            body = body.rstrip() + "\n\n" + "\n".join(sections)
+
+        pf.write_text(_join_frontmatter(fm, body), encoding="utf-8")
+
+
+def _enrich_person_files_with_crosslinks(vault_root: Path) -> None:
+    """Task 9: Add Cards/PRs sections to person entity files."""
+    from vault.ingest.entity_writer import _slugify, _split_frontmatter, _join_frontmatter
+
+    rel_dir = vault_root / "relationships"
+    if not rel_dir.exists():
+        return
+
+    def _load_edges(filename: str) -> list[dict]:
+        p = rel_dir / filename
+        if p.exists():
+            return json.loads(p.read_text(encoding="utf-8")).get("edges", [])
+        return []
+
+    card_person = _load_edges("card-person.json")
+    pr_person = _load_edges("pr-person.json")
+
+    # Load card/PR details
+    card_details: dict[str, dict] = {}
+    pr_details: dict[str, dict] = {}
+    meetings_dir = vault_root / "entities" / "meetings"
+    if meetings_dir.exists():
+        for mf in meetings_dir.glob("*.md"):
+            try:
+                text = mf.read_text(encoding="utf-8")
+                if not text.startswith("---"):
+                    continue
+                end = text.find("---", 3)
+                if end == -1:
+                    continue
+                fm = yaml.safe_load(text[3:end]) or {}
+                ec = fm.get("enrichment_context")
+                if not isinstance(ec, dict):
+                    continue
+                for card in ec.get("trello", {}).get("cards", []):
+                    card_details[card.get("id", "")] = card
+                for pr in ec.get("github", {}).get("pull_requests", []):
+                    pr_details[pr.get("url", "")] = pr
+            except Exception:
+                continue
+
+    # Build person → cards/PRs
+    person_cards: dict[str, list[str]] = {}  # slug → ["[[card-id|Title]]"]
+    person_prs: dict[str, list[str]] = {}    # slug → ["[[pr-id|Title]]"]
+
+    for edge in card_person:
+        pname = edge.get("to_id", "").replace("person:", "")
+        cid = edge.get("from_id", "").replace("card:trello:", "")
+        card = card_details.get(cid, {})
+        title = card.get("name", cid)
+        slug = _slugify(pname)
+        person_cards.setdefault(slug, []).append(f"- [[{cid}|{title}]]")
+
+    for edge in pr_person:
+        pname = edge.get("to_id", "").replace("person:", "")
+        pr_id = edge.get("from_id", "")
+        # Find title
+        title = pr_id
+        for purl, pdata in pr_details.items():
+            if pr_id == f"pr:{pdata.get('repo', '')}:{pdata.get('number', '')}":
+                title = pdata.get("title", pr_id)
+                break
+        slug = _slugify(pname)
+        person_prs.setdefault(slug, []).append(f"- [[{pr_id}|{title}]]")
+
+    # Update person files
+    persons_dir = vault_root / "entities" / "persons"
+    if not persons_dir.exists():
+        return
+    for pf in persons_dir.glob("*.md"):
+        slug = pf.stem
+        if slug not in person_cards and slug not in person_prs:
+            continue
+        text = pf.read_text(encoding="utf-8")
+        fm, body = _split_frontmatter(text)
+
+        # Remove existing Cards/PRs sections
+        for section in ["## Cards", "## PRs"]:
+            if section in body:
+                idx = body.index(section)
+                next_s = body.find("\n## ", idx + 1)
+                if next_s == -1:
+                    body = body[:idx]
+                else:
+                    body = body[:idx] + body[next_s + 1:]
+
+        # Build new sections
+        sections = []
+        if slug in person_cards:
+            sections.append("## Cards\n")
+            sections.extend(person_cards[slug])
+            sections.append("")
+        if slug in person_prs:
+            sections.append("## PRs\n")
+            sections.extend(person_prs[slug])
+            sections.append("")
+
+        if not sections:
+            continue
+
+        new_text = "\n".join(sections)
+        # Insert before ## Reuniões if present, else append
+        if "## Reuniões" in body:
+            idx = body.index("## Reuniões")
+            body = body[:idx] + new_text + "\n" + body[idx:]
+        else:
+            body = body.rstrip() + "\n\n" + new_text
+
+        pf.write_text(_join_frontmatter(fm, body), encoding="utf-8")
+
+
+def _update_meeting_context(vault_root: Path) -> None:
+    """Task 10: Replace date-proximity ## Contexto with project-scoped links."""
+    from vault.ingest.entity_writer import _slugify, _split_frontmatter, _join_frontmatter
+    from vault.ingest.external_ingest import _detect_project
+
+    rel_dir = vault_root / "relationships"
+    if not rel_dir.exists():
+        return
+
+    def _load_edges(filename: str) -> list[dict]:
+        p = rel_dir / filename
+        if p.exists():
+            return json.loads(p.read_text(encoding="utf-8")).get("edges", [])
+        return []
+
+    card_project = _load_edges("card-project.json")
+    pr_project = _load_edges("pr-project.json")
+
+    # Load card/PR details
+    card_details: dict[str, dict] = {}
+    pr_details: dict[str, dict] = {}
+    meetings_dir = vault_root / "entities" / "meetings"
+    if not meetings_dir.exists():
+        return
+
+    for mf in meetings_dir.glob("*.md"):
+        try:
+            text = mf.read_text(encoding="utf-8")
+            if not text.startswith("---"):
+                continue
+            end = text.find("---", 3)
+            if end == -1:
+                continue
+            fm = yaml.safe_load(text[3:end]) or {}
+            ec = fm.get("enrichment_context")
+            if isinstance(ec, dict):
+                for card in ec.get("trello", {}).get("cards", []):
+                    card_details[card.get("id", "")] = card
+                for pr in ec.get("github", {}).get("pull_requests", []):
+                    pr_details[pr.get("url", "")] = pr
+        except Exception:
+            continue
+
+    # Build project → cards/PRs
+    proj_cards: dict[str, list[str]] = {}
+    proj_prs: dict[str, list[str]] = {}
+    for edge in card_project:
+        proj = edge.get("to_id", "").replace("project:", "")
+        cid = edge.get("from_id", "").replace("card:trello:", "")
+        card = card_details.get(cid, {})
+        title = card.get("name", cid)
+        proj_cards.setdefault(proj, []).append(f"📋 {cid}: {title}")
+    for edge in pr_project:
+        proj = edge.get("to_id", "").replace("project:", "")
+        pr_id = edge.get("from_id", "")
+        pr = None
+        for purl, pdata in pr_details.items():
+            if pr_id == f"pr:{pdata.get('repo', '')}:{pdata.get('number', '')}":
+                pr = pdata
+                break
+        title = pr.get("title", pr_id) if pr else pr_id
+        proj_prs.setdefault(proj, []).append(f"🔀 {pr_id}: {title}")
+
+    # Update each meeting file
+    for mf in meetings_dir.glob("*.md"):
+        text = mf.read_text(encoding="utf-8")
+        fm, body = _split_frontmatter(text)
+        title = fm.get("entity", "")
+        project = _detect_project(title)
+        if not project:
+            continue
+
+        # Build new context
+        lines = ["## Contexto", ""]
+        lines.append(f"### Projeto: [[{project}]]")
+        for item in proj_cards.get(project, []):
+            lines.append(f"- {item}")
+        for item in proj_prs.get(project, []):
+            lines.append(f"- {item}")
+        lines.append("")
+        new_context = "\n".join(lines)
+
+        # Replace existing ## Contexto or append
+        if "## Contexto" in body:
+            idx = body.index("## Contexto")
+            next_s = body.find("\n## ", idx + 1)
+            if next_s == -1:
+                body = body[:idx] + new_context
+            else:
+                body = body[:idx] + new_context + "\n" + body[next_s + 1:]
+        else:
+            body = body.rstrip() + "\n\n" + new_context
+
+        mf.write_text(_join_frontmatter(fm, body), encoding="utf-8")
+
+
 def run_crosslink(
     vault_root: Path,
     dry_run: bool = False,
@@ -447,4 +793,19 @@ def run_crosslink(
         "pr_person": len(pr_person_edges),
         "pr_project": len(pr_project_edges),
     }
+
+    # Enrich project/person/meeting files (Tasks 8-10)
+    try:
+        _enrich_project_files(vault_root)
+    except Exception:
+        pass
+    try:
+        _enrich_person_files_with_crosslinks(vault_root)
+    except Exception:
+        pass
+    try:
+        _update_meeting_context(vault_root)
+    except Exception:
+        pass
+
     return stats

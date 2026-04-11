@@ -322,7 +322,7 @@ def _setup_vault_with_enrichment(tmp_path: Path) -> Path:
         }
     }
     meeting_fm = {
-        "entity": "Test Meeting",
+        "entity": "Status Kaba/BAT/BOT",
         "type": "meeting",
         "id_canonical": "meeting:tldv:test123",
         "enrichment_context": ec,
@@ -431,6 +431,166 @@ class TestRunCrosslinkNoEnrichment:
         (vault / "relationships").mkdir(parents=True)
         result = run_crosslink(vault, dry_run=False, github_token="fake")
         assert isinstance(result, dict)
+
+
+# ---------------------------------------------------------------------------
+# Task 8: Project enrichment — Cards/PRs/Persons
+# ---------------------------------------------------------------------------
+
+def _make_project_file(vault: Path, project_name: str, extra_body: str = "") -> Path:
+    from vault.ingest.entity_writer import _slugify as ew_slugify
+    projects_dir = vault / "entities" / "projects"
+    projects_dir.mkdir(parents=True, exist_ok=True)
+    slug = ew_slugify(project_name)
+    path = projects_dir / f"{slug}.md"
+    content = (
+        f"---\nentity: \"{project_name}\"\ntype: project\n---\n\n"
+        f"# {project_name}\n\n{extra_body}"
+    )
+    path.write_text(content, encoding="utf-8")
+    return path
+
+
+class TestEnrichProjectAddsCards:
+    def test_enrich_project_adds_cards(self, tmp_path):
+        from vault.ingest.crosslink_builder import _enrich_project_files
+        vault = _setup_vault_with_enrichment(tmp_path)
+        # Run crosslink to create relationship files first
+        with patch("vault.ingest.crosslink_builder.resolve_pr_author", return_value="Lincoln Quinan"):
+            run_crosslink(vault, dry_run=False, github_token="fake")
+        # Create a project file
+        _make_project_file(vault, "BAT/Kaba")
+        # Enrich
+        _enrich_project_files(vault)
+        from vault.ingest.entity_writer import _slugify as _ew_s
+        slug = _ew_s("BAT/Kaba")
+        content = (vault / "entities" / "projects" / f"{slug}.md").read_text()
+        assert "## Cards" in content
+
+
+class TestEnrichProjectAddsPRs:
+    def test_enrich_project_adds_prs(self, tmp_path):
+        from vault.ingest.crosslink_builder import _enrich_project_files
+        vault = _setup_vault_with_enrichment(tmp_path)
+        with patch("vault.ingest.crosslink_builder.resolve_pr_author", return_value="Lincoln Quinan"):
+            run_crosslink(vault, dry_run=False, github_token="fake")
+        _make_project_file(vault, "BAT/Kaba")
+        _enrich_project_files(vault)
+        from vault.ingest.entity_writer import _slugify as _ew_s
+        slug = _ew_s("BAT/Kaba")
+        content = (vault / "entities" / "projects" / f"{slug}.md").read_text()
+        assert "## PRs" in content
+
+
+class TestEnrichProjectAddsPersons:
+    def test_enrich_project_adds_persons(self, tmp_path):
+        from vault.ingest.crosslink_builder import _enrich_project_files
+        vault = _setup_vault_with_enrichment(tmp_path)
+        with patch("vault.ingest.crosslink_builder.resolve_pr_author", return_value="Lincoln Quinan"):
+            run_crosslink(vault, dry_run=False, github_token="fake")
+        _make_project_file(vault, "BAT/Kaba")
+        _enrich_project_files(vault)
+        from vault.ingest.entity_writer import _slugify as _ew_s
+        slug = _ew_s("BAT/Kaba")
+        content = (vault / "entities" / "projects" / f"{slug}.md").read_text()
+        assert "## Pessoas" in content
+
+
+# ---------------------------------------------------------------------------
+# Task 9: Person enrichment — Cards/PRs
+# ---------------------------------------------------------------------------
+
+def _make_person_file(vault: Path, name: str, extra_body: str = "") -> Path:
+    persons_dir = vault / "entities" / "persons"
+    persons_dir.mkdir(parents=True, exist_ok=True)
+    from vault.ingest.entity_writer import _slugify
+    slug = _slugify(name)
+    path = persons_dir / f"{slug}.md"
+    content = (
+        f"---\nentity: \"{name}\"\ntype: person\n---\n\n"
+        f"# {name}\n\n{extra_body}"
+    )
+    path.write_text(content, encoding="utf-8")
+    return path
+
+
+class TestEnrichPersonAddsCards:
+    def test_enrich_person_adds_cards(self, tmp_path):
+        from vault.ingest.crosslink_builder import _enrich_person_files_with_crosslinks
+        vault = _setup_vault_with_enrichment(tmp_path)
+        with patch("vault.ingest.crosslink_builder.resolve_pr_author", return_value="Lincoln Quinan"):
+            run_crosslink(vault, dry_run=False, github_token="fake")
+        _make_person_file(vault, "Lincoln Quinan")
+        _enrich_person_files_with_crosslinks(vault)
+        from vault.ingest.entity_writer import _slugify
+        slug = _slugify("Lincoln Quinan")
+        content = (vault / "entities" / "persons" / f"{slug}.md").read_text()
+        assert "## Cards" in content
+
+
+class TestEnrichPersonAddsPRs:
+    def test_enrich_person_adds_prs(self, tmp_path):
+        from vault.ingest.crosslink_builder import _enrich_person_files_with_crosslinks
+        vault = _setup_vault_with_enrichment(tmp_path)
+        with patch("vault.ingest.crosslink_builder.resolve_pr_author", return_value="Lincoln Quinan"):
+            run_crosslink(vault, dry_run=False, github_token="fake")
+        _make_person_file(vault, "Lincoln Quinan")
+        _enrich_person_files_with_crosslinks(vault)
+        from vault.ingest.entity_writer import _slugify
+        slug = _slugify("Lincoln Quinan")
+        content = (vault / "entities" / "persons" / f"{slug}.md").read_text()
+        assert "## PRs" in content
+
+
+class TestEnrichPersonPreservesMeetings:
+    def test_preserves_meetings(self, tmp_path):
+        from vault.ingest.crosslink_builder import _enrich_person_files_with_crosslinks
+        vault = _setup_vault_with_enrichment(tmp_path)
+        with patch("vault.ingest.crosslink_builder.resolve_pr_author", return_value="Lincoln Quinan"):
+            run_crosslink(vault, dry_run=False, github_token="fake")
+        _make_person_file(vault, "Lincoln Quinan", "## Reuniões\n\n- [[test-meeting]]\n")
+        _enrich_person_files_with_crosslinks(vault)
+        from vault.ingest.entity_writer import _slugify
+        slug = _slugify("Lincoln Quinan")
+        content = (vault / "entities" / "persons" / f"{slug}.md").read_text()
+        assert "## Reuniões" in content
+        assert "[[test-meeting]]" in content
+
+
+# ---------------------------------------------------------------------------
+# Task 10: Meeting context — project-scoped links
+# ---------------------------------------------------------------------------
+
+class TestUpdateMeetingContextReplaces:
+    def test_replaces_with_project_scoped(self, tmp_path):
+        from vault.ingest.crosslink_builder import _update_meeting_context
+        vault = _setup_vault_with_enrichment(tmp_path)
+        with patch("vault.ingest.crosslink_builder.resolve_pr_author", return_value="Lincoln Quinan"):
+            run_crosslink(vault, dry_run=False, github_token="fake")
+        # Add old-style context to meeting
+        meetings_dir = vault / "entities" / "meetings"
+        meeting_path = meetings_dir / "test-meeting.md"
+        old = meeting_path.read_text(encoding="utf-8")
+        old = old.rstrip() + "\n\n## Contexto\n\n- 📋 [Old card](url)\n"
+        meeting_path.write_text(old, encoding="utf-8")
+        _update_meeting_context(vault)
+        new = meeting_path.read_text(encoding="utf-8")
+        assert "### Projeto:" in new
+        assert "[Old card](url)" not in new
+
+
+# ---------------------------------------------------------------------------
+# Task 11: Pipeline integration
+# ---------------------------------------------------------------------------
+
+class TestPipelineIncludesCrosslink:
+    def test_pipeline_includes_crosslink(self, tmp_path):
+        """external_ingest should call run_crosslink after Stage 7."""
+        import importlib
+        import vault.ingest.external_ingest as mod
+        source = open(mod.__file__).read()
+        assert "run_crosslink" in source
+        assert "Stage 8" in source
 
 
 class TestRunCrosslinkUnmappedEntities:

@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any
 from datetime import datetime, timezone
 import json
+import os
 
 from vault.ingest.meeting_ingest import (
     fetch_meetings_from_supabase,
@@ -418,6 +419,22 @@ def _run_ingest_inner(
             print(f"[external-ingest] ERROR github enrichment: {exc}")
         errors.append({"source": "github_enrich", "error": str(exc), "type": type(exc).__name__})
         github_errors = 1
+
+    # Stage 8 — Cross-linking
+    crosslink_result = None
+    try:
+        from vault.ingest.crosslink_builder import run_crosslink
+        if not dry_run:
+            crosslink_result = run_crosslink(
+                vault_root=vault_root,
+                trello_api_key=os.environ.get("TRELLO_API_KEY"),
+                trello_token=os.environ.get("TRELLO_TOKEN"),
+                github_token=os.environ.get("GITHUB_PERSONAL_ACCESS_TOKEN"),
+            )
+    except Exception as exc:
+        if verbose:
+            print(f"[external-ingest] ERROR crosslink: {exc}")
+        errors.append({"source": "crosslink", "error": str(exc), "type": type(exc).__name__})
 
     # Rebuild structured index
     if not dry_run:
