@@ -101,6 +101,17 @@ def test_normalize_rejects_invalid_started_or_ended_at():
         )
 
 
+def test_normalize_rejects_non_string_project_ref():
+    with pytest.raises(ValueError, match="project_ref"):
+        normalize_meeting_record(
+            {
+                "meeting_id": "daily-2026-04-10",
+                "title": "Daily",
+                "project_ref": {"slug": "bat"},
+            }
+        )
+
+
 def test_fetch_and_build_skips_invalid_records(monkeypatch):
     def _fake_fetch(_days):
         return [

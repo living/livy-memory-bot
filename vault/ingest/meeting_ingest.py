@@ -66,6 +66,8 @@ def normalize_meeting_record(raw: dict[str, Any]) -> dict[str, Any]:
         raise ValueError("started_at must be ISO date/datetime")
     if ended_at is not None and not is_iso_date(ended_at):
         raise ValueError("ended_at must be ISO date/datetime")
+    if project_ref is not None and not isinstance(project_ref, str):
+        raise ValueError("project_ref must be string when provided")
 
     # id_canonical format: meeting:{normalized_id}
     # Use the raw meeting_id directly, colons replaced with hyphens
