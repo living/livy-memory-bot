@@ -10,6 +10,7 @@ from __future__ import annotations
 from datetime import datetime, timezone, timedelta
 from typing import Any
 import os
+import sys
 
 from vault.domain.normalize import build_entity_with_traceability
 from vault.domain.canonical_types import is_iso_date
@@ -29,7 +30,7 @@ def _fetch_from_supabase(days: int = DEFAULT_LOOKBACK_DAYS) -> list[dict[str, An
     url = os.environ.get("SUPABASE_URL")
     key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
     if not url or not key:
-        print("[WARN] SUPABASE_URL or key not set; skipping fetch")
+        print("[WARN] SUPABASE_URL or key not set; skipping fetch", file=sys.stderr)
         return []
 
     cutoff = datetime.now(timezone.utc) - timedelta(days=days)

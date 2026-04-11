@@ -134,6 +134,6 @@ def test_fetch_from_supabase_warns_when_env_missing(monkeypatch, capsys):
 
     result = _fetch_from_supabase()
 
-    out = capsys.readouterr().out
+    captured = capsys.readouterr()
     assert result == []
-    assert "[WARN] SUPABASE_URL or key not set; skipping fetch" in out
+    assert "[WARN] SUPABASE_URL or key not set; skipping fetch" in captured.err

@@ -27,6 +27,7 @@ from vault.reverify import run_reverify
 from vault.status import build_status_payload, render_markdown
 from vault.confidence_gate import gate_decision
 from vault.metrics import collect_domain_metrics
+from vault.ingest.wave_c_pipeline import run_wave_c_ingest
 
 ROOT = Path(__file__).resolve().parents[1]
 VAULT_ROOT = ROOT / "memory" / "vault"
@@ -221,6 +222,24 @@ def run_pipeline(
             if not dry_run:
                 concepts_written.append(Path(result.get("path", "")))
 
+    # Wave C ingest stage (meeting + card entities) — C1 wiring
+    wave_c_summary: dict = {
+        "wave_c_enabled": _WAVE_C_C1_ENABLED,
+        "meetings_fetched": 0,
+        "meetings_written": 0,
+        "meetings_skipped": 0,
+        "cards_fetched": 0,
+        "cards_written": 0,
+        "cards_skipped": 0,
+        "errors": [],
+    }
+    if _WAVE_C_C1_ENABLED:
+        wave_c_summary = run_wave_c_ingest(
+            vault_root=vault_root,
+            dry_run=dry_run,
+            verbose=verbose,
+        )
+
     lint_report_path = run_lint(vault_root)
 
     gaps_after_lint = len(detect_coverage_gaps(vault_root))
@@ -278,6 +297,8 @@ def run_pipeline(
         "domain_metrics": domain_metrics,
         # Wave C observability (C3.2)
         "wave_c_observer": wave_c_observer,
+        # Wave C ingest summary (C1 wiring)
+        "wave_c_ingest": wave_c_summary,
         # Lint results
         "lint_report": str(lint_report_path),
         "gaps_after_lint": gaps_after_lint,
