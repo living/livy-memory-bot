@@ -241,6 +241,33 @@ def upsert_meeting(entity: dict, vault_root: Path | None = None) -> tuple[Path, 
     lines.append("<!-- Decisões da reunião -->")
     lines.append("")
 
+    # Contexto — Trello cards and GitHub PRs
+    enrichment = entity.get("enrichment_context", {})
+    trello_cards = enrichment.get("trello", {}).get("cards", [])
+    github_prs = enrichment.get("github", {}).get("pull_requests", [])
+    if trello_cards or github_prs:
+        lines.append("## Contexto")
+        lines.append("")
+        for card in trello_cards:
+            card_name = card.get("name", "?")
+            card_url = card.get("url", "")
+            if card_url:
+                lines.append(f"- 📋 [{card_name}]({card_url})")
+            else:
+                lines.append(f"- 📋 {card_name}")
+        for pr in github_prs:
+            pr_title = pr.get("title", "?")
+            pr_url = pr.get("url", "")
+            pr_repo = pr.get("repo", "")
+            merged = pr.get("merged_at")
+            state = "merged" if merged else "open"
+            repo_short = pr_repo.split("/")[-1] if pr_repo else ""
+            if pr_url:
+                lines.append(f"- 🔀 [{pr_title}]({pr_url}) — {repo_short} ({state})")
+            else:
+                lines.append(f"- 🔀 {pr_title} — {repo_short} ({state})")
+        lines.append("")
+
     lines.extend(["## Metadados", ""])
     lines.append(f"- **ID:** `{meeting_id_source}`")
     if started_at:

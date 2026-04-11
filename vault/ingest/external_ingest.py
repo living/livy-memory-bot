@@ -423,6 +423,8 @@ def _run_ingest_inner(
     if not dry_run:
         from vault.ingest.index_manager import rebuild_index
         rebuild_index(vault_root)
+        _append_log(vault_root, meetings_written, persons_written, relationships_written, len(errors))
+        _build_projects(vault_root, meeting_units)
 
     return {
         "meetings_fetched": len(raw_meetings),
@@ -500,6 +502,34 @@ def _enrich_person_files_with_meetings(
         lines.append("")
 
         # Replace existing ## Reuniões section or append
+        if "## Projetos" in body:
+            # Remove existing ## Projetos section
+            idx = body.index("## Projetos")
+            next_section = body.find("\n## ", idx + 1)
+            if next_section == -1:
+                body = body[:idx]
+            else:
+                body = body[:idx] + body[next_section + 1:]
+
+        # Build ## Projetos from meeting name patterns
+        person_projects: dict[str, int] = {}
+        for m in sorted(meetings, key=lambda x: x.get("started_at", ""), reverse=True):
+            proj = _detect_project(m["title"])
+            if proj:
+                person_projects[proj] = person_projects.get(proj, 0) + 1
+        if person_projects:
+            proj_lines = ["## Projetos", ""]
+            for pname, count in sorted(person_projects.items(), key=lambda x: -x[1]):
+                proj_slug = _slugify(pname)
+                proj_lines.append(f"- [[{proj_slug}]] ({count} reuniões)")
+            proj_lines.append("")
+            # Insert before ## Reuniões
+            if "## Reuniões" in body:
+                idx = body.index("## Reuniões")
+                body = body[:idx] + "\n".join(proj_lines) + "\n" + body[idx:]
+            else:
+                body = body + "\n".join(proj_lines) + "\n"
+
         if "## Reuniões" in body:
             idx = body.index("## Reuniões")
             next_section = body.find("\n## ", idx + 1)
@@ -511,3 +541,106 @@ def _enrich_person_files_with_meetings(
             body = body + "\n".join(lines) + "\n"
 
         person_file.write_text(_join_frontmatter(fm, body), encoding="utf-8")
+
+
+def _append_log(
+    vault_root: Path,
+    meetings: int,
+    persons: int,
+    rels: int,
+    errors: int,
+) -> None:
+    """Append entry to log.md (append-only, chronological)."""
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc)
+    date = now.strftime("%Y-%m-%d")
+    time = now.strftime("%H:%M UTC")
+    log_path = vault_root / "log.md"
+    if not log_path.exists():
+        log_path.write_text("# Vault Log\n\n", encoding="utf-8")
+    entry = f"## [{date} {time}] ingest\n"
+    entry += f"- Meetings: {meetings} | Persons: {persons} | Relationships: {rels} | Errors: {errors}\n\n"
+    with log_path.open("a", encoding="utf-8") as f:
+        f.write(entry)
+
+
+def _build_projects(vault_root: Path, meeting_units: list[dict[str, Any]]) -> None:
+    """Auto-generate project hub pages from meeting name patterns."""
+    import re
+    from vault.ingest.entity_writer import _slugify, _split_frontmatter, _join_frontmatter
+    from datetime import datetime, timezone
+
+    projects_dir = vault_root / "entities" / "projects"
+    # Group meetings by detected project pattern
+    project_meetings: dict[str, list[dict]] = {}
+    for unit in meeting_units:
+        meeting = unit["meeting"]
+        title = meeting.get("title", "") or meeting.get("entity", "")
+        # Detect project patterns
+        # "Status Kaba/BAT/BOT" → "BAT/Kaba"
+        # "Daily Operações/Infra/Suporte B3" → "Daily Operações B3"
+        # "[Tech] Reunião de Cadência 4D imobi" → "4D Imobi"
+        project = _detect_project(title)
+        if project:
+            project_meetings.setdefault(project, []).append({
+                "title": title,
+                "started_at": meeting.get("started_at", ""),
+            })
+
+    if not project_meetings:
+        return
+
+    projects_dir.mkdir(parents=True, exist_ok=True)
+    for project_name, meetings in project_meetings.items():
+        slug = _slugify(project_name)
+        path = projects_dir / f"{slug}.md"
+        # Build frontmatter + body
+        now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        today = now_iso[:10]
+        lines = [
+            "---",
+            f"entity: \"{project_name}\"",
+            "type: project",
+            f"meeting_count: {len(meetings)}",
+            f"last_updated: {today}",
+            "---",
+            "",
+            f"# {project_name}",
+            "",
+            f"> [!summary] {len(meetings)} reuniões",
+            "",
+            "## Reuniões",
+            "",
+        ]
+        for m in sorted(meetings, key=lambda x: x.get("started_at", ""), reverse=True):
+            mdate = (m.get("started_at") or "")[:10]
+            mtitle = m["title"]
+            mslug = _slugify(mtitle)
+            link = f"{mdate} {mslug}" if mdate else mslug
+            lines.append(f"- {mdate} · [[{link}]]")
+        lines.append("")
+        path.write_text("\n".join(lines), encoding="utf-8")
+
+
+def _detect_project(title: str) -> str | None:
+    """Detect project name from meeting title."""
+    import re
+    # Pattern: "Status Kaba/BAT/BOT" → "BAT/Kaba"
+    m = re.match(r'Status\s+(Kaba/BAT/BOT)', title, re.I)
+    if m:
+        return "BAT/Kaba"
+    # Pattern: "Daily Operações/Infra/Suporte B3" → "Daily Operações B3"
+    m = re.match(r'Daily\s+Operações.*B3', title, re.I)
+    if m:
+        return "Daily Operações B3"
+    # Pattern: "[Tech] Reunião de Cadência 4D imobi" → "4D Imobi"
+    m = re.match(r'.*Cadência\s+4D\s+imobi', title, re.I)
+    if m:
+        return "4D Imobi"
+    # Pattern: "Processo NW" → "Nelway"
+    if 'NW' in title or 'Nelway' in title or 'nelway' in title.lower():
+        return "Nelway"
+    # Pattern: "Deploy" → "Deploy"
+    if 'Deploy' in title or 'deploy' in title:
+        return "Deploy"
+    return None

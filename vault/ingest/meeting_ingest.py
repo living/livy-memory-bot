@@ -142,6 +142,16 @@ def normalize_meeting_record(raw: dict[str, Any]) -> dict[str, Any]:
     if isinstance(transcript_blob, str) and transcript_blob.strip():
         entity["transcript_blob_path"] = transcript_blob.strip()
 
+    # Enrichment context (Trello cards, GitHub PRs) — factual data
+    enrichment = raw.get("enrichment_context")
+    if isinstance(enrichment, dict):
+        entity["enrichment_context"] = enrichment
+
+    # Transcript text for LLM enrichment
+    transcript_text = raw.get("whisper_transcript")
+    if isinstance(transcript_text, str) and transcript_text.strip():
+        entity["transcript_text"] = transcript_text
+
     transcript_source, transcript_ref = _transcript_fallback(raw)
     if transcript_source and transcript_ref:
         entity["transcript_source"] = transcript_source
