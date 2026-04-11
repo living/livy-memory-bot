@@ -21,6 +21,10 @@ from vault.ingest.tldv_api_client import fetch_participants_from_tldv_api
 MAPPER_VERSION = "external-ingest-meeting-v1"
 DEFAULT_LOOKBACK_DAYS = 7
 
+# Patterns for filtering non-human participants
+_HEX_ID_RE = __import__("re").compile(r"^[0-9a-f]{20,}$")
+_BOT_NAMES = {"livy bot", "livy", "zoom", "google meet bot", "fireflies.ai", "otter.ai"}
+
 
 def fetch_meetings_from_supabase(days: int = DEFAULT_LOOKBACK_DAYS) -> list[dict[str, Any]]:
     """Fetch recent meetings from Supabase TLDV.
@@ -237,56 +241,114 @@ def fetch_and_build(
     return entities, all_participants
 
 
+def _clean_name(name: str, email: str | None = None) -> str:
+    """Resolve a participant name that may be a hex ID.
+
+    If name looks like a TLDV user ID (24-hex-char), fall back to the
+    local-part of the email, title-cased.
+    """
+    if not name:
+        return name
+    if _HEX_ID_RE.match(name) and email and "@" in email:
+        local = email.split("@")[0]
+        # Convert 'marcio_rocha' or 'marcio.rocha' → 'Marcio Rocha'
+        return local.replace("_", " ").replace(".", " ").title()
+    return name
+
+
+def _is_bot(name: str) -> bool:
+    """Check if a participant name looks like a bot/recorder."""
+    return name.strip().lower() in _BOT_NAMES
+
+
 def resolve_participants_for_meeting(raw_meeting: dict[str, Any], tldv_token: str) -> dict[str, Any]:
-    """Resolve participants using layered sources for a single meeting."""
+    """Resolve participants using layered sources for a single meeting.
+
+    Cross-source dedupe: same human from API participants + transcript speakers
+    merges into a single record (prefers the one with real name + email).
+    """
     meeting_id = raw_meeting.get("meeting_id") or raw_meeting.get("id") or ""
     tried = ["tldv_api"]
 
+    # Track by normalized name for cross-source dedupe
     seen_ids: set[str] = set()
-    seen_names_without_id: set[str] = set()
+    seen_names_normalized: dict[str, dict[str, Any]] = {}  # norm_name → best record
+    seen_by_real_id: dict[str, dict[str, Any]] = {}  # real_id → record
 
-    def _normalize_name(name: Any) -> str:
-        return name.strip().lower() if isinstance(name, str) else ""
+    def _norm(name: str) -> str:
+        return name.strip().lower()
 
-    def _merge(
-        target: list[dict[str, Any]],
+    def _name_key(name: str) -> str:
+        """Normalize for cross-source matching (case-insensitive, strip accents not needed for Portuguese names)."""
+        return " ".join(name.strip().lower().split())
+
+    def _add(
         pid: Any,
         name: Any,
         email: Any,
         source: str,
         source_key: str,
+        priority: int = 0,
     ) -> None:
         participant_id = str(pid).strip() if pid not in (None, "") else None
-        participant_name = name.strip() if isinstance(name, str) else ""
+        raw_name = name.strip() if isinstance(name, str) else ""
+
+        # Clean hex-ID names
+        participant_name = _clean_name(raw_name, email)
+
         if not participant_id and not participant_name:
             return
 
-        # Dedupe by ID first — different non-empty IDs must never collapse.
+        # Filter empty names after cleaning
+        if not participant_name.strip():
+            return
+
+        # Filter bots
+        if _is_bot(participant_name):
+            return
+
+        norm_name = _name_key(participant_name)
+        record = {
+            "id": participant_id or f"tldv:{participant_name.lower().replace(' ', '-')}",
+            "name": participant_name,
+            "email": email if isinstance(email, str) else None,
+            "source_key": source_key,
+            "source": source,
+        }
+
+        # --- Dedup logic ---
+        # 1) Same real ID → skip (already seen)
+        if participant_id and participant_id in seen_ids:
+            return
         if participant_id:
-            if participant_id in seen_ids:
-                return
             seen_ids.add(participant_id)
-        else:
-            # For participants without ID, dedupe by normalized name.
-            norm_name = _normalize_name(participant_name)
-            if norm_name and norm_name in seen_names_without_id:
+            seen_by_real_id[participant_id] = record
+            # Also track by name so ID-less duplicates get merged
+            seen_names_normalized[norm_name] = record
+            record["_priority"] = priority
+            return
+
+        # 2) No real ID — dedupe by normalized name
+        if norm_name in seen_names_normalized:
+            existing = seen_names_normalized[norm_name]
+            # If existing has a real ID, it's a different person — don't collapse
+            # But if existing also has no real ID, keep the richer record
+            existing_has_real_id = existing["id"] and not existing["id"].startswith("tldv:")
+            if existing_has_real_id:
+                # Already have a named+ID'd version — skip this ID-less duplicate
                 return
-            if norm_name:
-                seen_names_without_id.add(norm_name)
+            # Both ID-less: prefer the one with email
+            existing_priority = existing.get("_priority", 0)
+            if (record["email"] and not existing["email"]) or priority > existing_priority:
+                if not record["email"] and existing["email"]:
+                    record["email"] = existing["email"]
+                record["_priority"] = priority
+                seen_names_normalized[norm_name] = record
+        else:
+            record["_priority"] = priority
+            seen_names_normalized[norm_name] = record
 
-        resolved_id = participant_id or f"speaker:{'-'.join(participant_name.lower().split())}"
-        target.append(
-            {
-                "id": resolved_id,
-                "name": participant_name or resolved_id,
-                "email": email if isinstance(email, str) else None,
-                "source_key": source_key,
-                "source": source,
-            }
-        )
-
-    # Layer 1 — TLDV API direct
-    resolved: list[dict[str, Any]] = []
+    # Layer 1 — TLDV API direct (priority=1 — has IDs and emails)
     api_result = fetch_participants_from_tldv_api(meeting_id, tldv_token)
     for p in api_result.get("participants", []) or []:
         pid = p.get("id") if isinstance(p, dict) else None
@@ -295,27 +357,33 @@ def resolve_participants_for_meeting(raw_meeting: dict[str, Any], tldv_token: st
             or (p.get("display_name") if isinstance(p, dict) else None)
             or ""
         )
-        _merge(
-            resolved,
-            pid,
-            pname,
-            p.get("email") if isinstance(p, dict) else None,
+        pemail = p.get("email") if isinstance(p, dict) else None
+        _add(
+            pid, pname, pemail,
             "tldv_api",
             f"tldv_api:participant:{meeting_id}:{pid or 'anon'}",
+            priority=1,
         )
 
     for speaker in api_result.get("speakers", []) or []:
         if not isinstance(speaker, str) or not speaker.strip():
             continue
         speaker_slug = "-".join(speaker.strip().lower().split())
-        _merge(
-            resolved,
-            None,
-            speaker.strip(),
-            None,
+        _add(
+            None, speaker.strip(), None,
             "tldv_api",
             f"tldv_api:speaker:{meeting_id}:{speaker_slug}",
+            priority=0,
         )
+
+    resolved = list(seen_by_real_id.values())
+    # Add ID-less entries (speakers without ID) from names map
+    for norm_name, rec in seen_names_normalized.items():
+        if rec["id"].startswith("tldv:"):
+            resolved.append(rec)
+    # Clean internal priority field
+    for r in resolved:
+        r.pop("_priority", None)
 
     if resolved:
         return {"status": "ok", "participants": resolved}
@@ -327,14 +395,19 @@ def resolve_participants_for_meeting(raw_meeting: dict[str, Any], tldv_token: st
             continue
         pid = p.get("id")
         pname = p.get("name") or p.get("display_name") or ""
-        _merge(
-            resolved,
-            pid,
-            pname,
-            p.get("email"),
+        _add(
+            pid, pname, p.get("email"),
             "supabase_participants",
             f"supabase:participant:{meeting_id}:{pid or 'anon'}",
+            priority=1,
         )
+
+    resolved = list(seen_by_real_id.values())
+    for norm_name, rec in seen_names_normalized.items():
+        if rec["id"].startswith("tldv:"):
+            resolved.append(rec)
+    for r in resolved:
+        r.pop("_priority", None)
 
     if resolved:
         return {"status": "ok", "participants": resolved}
@@ -351,14 +424,18 @@ def resolve_participants_for_meeting(raw_meeting: dict[str, Any], tldv_token: st
                 continue
             speaker = speaker.strip()
             speaker_slug = "-".join(speaker.lower().split())
-            _merge(
-                resolved,
-                None,
-                speaker,
-                None,
+            _add(
+                None, speaker, None,
                 "supabase_whisper_speakers",
                 f"supabase:whisper_speaker:{meeting_id}:{speaker_slug}",
             )
+
+    resolved = list(seen_by_real_id.values())
+    for norm_name, rec in seen_names_normalized.items():
+        if rec["id"].startswith("tldv:"):
+            resolved.append(rec)
+    for r in resolved:
+        r.pop("_priority", None)
 
     if resolved:
         return {"status": "ok", "participants": resolved}
