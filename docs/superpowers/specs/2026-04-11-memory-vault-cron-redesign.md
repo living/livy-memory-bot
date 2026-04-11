@@ -5,6 +5,22 @@
 > **Branch:** `master` (post PR #10 merge)
 > **Scope:** Memory agent crons only (7 crons → 2 crons + 1 skill)
 
+### Nota sobre código existente
+
+PR #10 mergeou o pipeline `run_external_ingest` para master. As seguintes referências são código já em master:
+- `vault/ingest/external_ingest.py` — `run_external_ingest()` (orquestrador de 7 estágios)
+- `vault/ingest/card_ingest.py` — `fetch_and_build()` (exportado como `fetch_cards` no orquestrador)
+- `vault/enrich_github.py` — `run_enrich_github()` (enriquecimento de PRs)
+- `vault/pipeline.py` — `run_signal_pipeline()` com `--reverify --repair`
+
+Phase 1 abaixo estende esse código existente com ingestão incremental, cursors e integração GitHub.
+
+### Sobre o ingest de signal-events
+
+O Phase 1B `vault/ingest.py` (signal-events.jsonl ingest) está contido dentro de `run_signal_pipeline()` e **continua ativo** — processa eventos de signal cross-curation. Não é substituído por este spec. O `vault-ingest` cron adiciona ingestão de fontes externas (TLDV/Trello/GitHub) como camada adicional.
+
+Para localizar cron IDs, rodar `openclaw cron list`.
+
 ---
 
 ## 1. Propósito e Princípios
@@ -69,7 +85,7 @@ Delivery: announce telegram (accountId: memory, to: 7426291192)
 ```
 
 **Estágios:**
-1. **Reverify/Repair** — `vault.pipeline --reverify --repair`
+1. **Reverify/Repair** — chamada direta: `run_signal_pipeline(reverify=True, repair=True)`
 2. **Contradiction scan** — pages que dizem coisas opostas sobre o mesmo conceito
 3. **Orphan scan** — pages sem inbound links do index.md
 4. **Stale scan** — pages sem atualização há >30 dias e sem indicação de "arquivado"
@@ -190,8 +206,8 @@ memory/vault/
 ### Fase 1 — Setup (imediatamente)
 1. Criar skill `vault-query` em `~/.openclaw/skills/vault-query/` (SKILL.md, MANUAL.md, templates)
 2. Criar 2 novos crons (`vault-ingest`, `vault-lint`)
-3. Integrar `run_enrich_github` no `run_external_ingest` como estágio
-4. Implementar ingestão incremental com cursors para Trello e GitHub
+3. Integrar `run_enrich_github` no `run_external_ingest` como estágio — import como callable step (não refatorar o código), adicionando após Trello no orquestrador
+4. Implementar ingestão incremental com cursors para Trello e GitHub. Formato do cursor: `memory/vault/.cursors/{source}.json` com `{"last_run_at": "ISO8601", "last_run_id": "uuid"}`. Atualizar atomicamente (write tmp + rename) após cada fonte completar com sucesso. Em caso de falha parcial, o cursor NÃO é atualizado — próxima run reprocessa a mesma janela.
 5. Implementar atualização automática de `index.md` e `log.md`
 
 ### Fase 2 — Desligar crons antigos
