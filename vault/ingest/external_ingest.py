@@ -282,6 +282,8 @@ def _run_ingest_inner(
                 meetings_skipped += 1
                 continue
 
+            # Attach participants for wiki-links in body
+            entity["_participants"] = unit.get("participants", [])
             path, written = upsert_meeting(entity, vault_root)
             if written:
                 meetings_written += 1
@@ -354,6 +356,10 @@ def _run_ingest_inner(
             rel_path = rel_dir / "person-meeting.json"
             rel_path.write_text(json.dumps({"edges": rel_edges}, ensure_ascii=False, indent=2), encoding="utf-8")
             relationships_written = len(rel_edges)
+
+    # Stage 5b — Enrich person files with meeting wiki-links
+    if not dry_run and meeting_units:
+        _enrich_person_files_with_meetings(vault_root, meeting_units)
 
     # Cards flow unchanged
     try:
@@ -441,3 +447,60 @@ def _index_entity_by_path(vault_root: Path, entity_path: Path, entity: dict[str,
         add_entry(vault_root, str(rel), title, entity_type)
     except ValueError:
         pass  # path not under vault_root
+
+
+def _enrich_person_files_with_meetings(
+    vault_root: Path,
+    meeting_units: list[dict[str, Any]],
+) -> None:
+    """Update person files with [[wiki-links]] to the meetings they attended."""
+    from vault.ingest.entity_writer import _slugify, _split_frontmatter, _join_frontmatter
+
+    # Build person_name → [meeting_info] map
+    person_meetings: dict[str, list[dict]] = {}
+    for unit in meeting_units:
+        meeting = unit["meeting"]
+        participants = unit.get("participants", [])
+        for p in participants:
+            pname = p.get("name", "?")
+            norm = _slugify(pname)
+            person_meetings.setdefault(norm, []).append({
+                "title": meeting.get("title") or meeting.get("entity") or "",
+                "started_at": meeting.get("started_at", ""),
+            })
+
+    entities_dir = vault_root / "entities"
+    for person_file in entities_dir.glob("*.md"):
+        text = person_file.read_text(encoding="utf-8")
+        fm, body = _split_frontmatter(text)
+        if fm.get("type") != "person":
+            continue
+        name = fm.get("entity", "")
+        norm = _slugify(name)
+        meetings = person_meetings.get(norm, [])
+        if not meetings:
+            continue
+        # Build meetings section
+        lines = []
+        lines.append("## Reuniões")
+        lines.append("")
+        for m in sorted(meetings, key=lambda x: x.get("started_at", ""), reverse=True):
+            mtitle = m["title"]
+            mdate = (m.get("started_at") or "")[:10]
+            mslug = _slugify(mtitle)
+            link = f"{mdate} {mslug}" if mdate else mslug
+            lines.append(f"- [[{link}]]")
+        lines.append("")
+
+        # Replace existing ## Reuniões section or append
+        if "## Reuniões" in body:
+            idx = body.index("## Reuniões")
+            next_section = body.find("\n## ", idx + 1)
+            if next_section == -1:
+                body = body[:idx] + "\n".join(lines) + "\n"
+            else:
+                body = body[:idx] + "\n".join(lines) + "\n" + body[next_section + 1:]
+        else:
+            body = body + "\n".join(lines) + "\n"
+
+        person_file.write_text(_join_frontmatter(fm, body), encoding="utf-8")

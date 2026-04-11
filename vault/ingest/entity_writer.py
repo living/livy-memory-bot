@@ -67,40 +67,50 @@ import yaml
 
 
 def _slugify(text: str) -> str:
-    """URL-safe slug from arbitrary string."""
-    text = text.lower().strip()
-    text = re.sub(r"[^a-z0-9\s-]", "", text)
-    text = re.sub(r"\s+", "-", text)
-    text = re.sub(r"-+", "-", text)
-    return text.strip("-") or "entity"
+    """Human-readable, filesystem-safe slug. Keeps accented chars, spaces, dots."""
+    text = text.strip()
+    # Replace slashes with dashes FIRST (before regex removes them)
+    text = text.replace('/', ' - ')
+    # Remove characters unsafe for filenames, but keep spaces, accents, dots, parentheses, dashes
+    text = re.sub(r'[<>:"\\|?*\x00-\x1f]', '', text)
+    text = re.sub(r'\s+', ' ', text).strip()
+    return text or "entity"
 
 
 def _entity_path(vault_root: Path, entity: dict) -> Path:
-    """Derive filesystem path for a canonical entity."""
+    """Derive human-readable filesystem path for a canonical entity.
+
+    Person → "Lincoln Quinan Junior.md"
+    Meeting → "2026-02-20 Daily Operações B3.md"
+    Card → "card-{board}-{title}.md"
+    """
     entities_dir = vault_root / "entities"
     id_canonical = entity.get("id_canonical", "")
 
     if id_canonical.startswith("meeting:"):
-        slug = _slugify(id_canonical.replace("meeting:", ""))
-        return entities_dir / f"meeting-{slug}.md"
+        # Use date + title for human-readable filename
+        started = entity.get("started_at", "")
+        date_part = started[:10] if started else ""
+        title = entity.get("title") or entity.get("entity") or id_canonical.replace("meeting:", "")
+        slug = _slugify(title)
+        if date_part:
+            return entities_dir / f"{date_part} {slug}.md"
+        return entities_dir / f"{slug}.md"
 
     if id_canonical.startswith("person:"):
-        slug = _slugify(id_canonical.replace("person:", ""))
-        return entities_dir / f"person-{slug}.md"
+        # Use the person's name directly
+        name = entity.get("display_name") or entity.get("entity") or id_canonical.replace("person:", "")
+        return entities_dir / f"{_slugify(name)}.md"
 
     if id_canonical.startswith("card:"):
-        # card:{board_id}:{card_id}
         rest = id_canonical.replace("card:", "")
         parts = rest.split(":", 1)
         if len(parts) == 2:
-            board_slug = _slugify(parts[0])
-            card_slug = _slugify(parts[1])
-            return entities_dir / f"card-{board_slug}-{card_slug}.md"
+            return entities_dir / f"card-{_slugify(parts[0])}-{_slugify(parts[1])}.md"
         return entities_dir / f"card-{_slugify(rest)}.md"
 
-    # Fallback: generic
-    slug = _slugify(id_canonical.replace(":", "-"))
-    return entities_dir / f"entity-{slug}.md"
+    # Fallback
+    return entities_dir / f"{_slugify(id_canonical)}.md"
 
 
 def _render_sources_yaml_block(sources: list[dict]) -> list[str]:
@@ -194,8 +204,18 @@ def upsert_meeting(entity: dict, vault_root: Path | None = None) -> tuple[Path, 
         lines.append(f"**Fonte:** [{source_ref}]({source_ref})")
         lines.append("")
 
-    lines.extend(["## Dados", ""])
-    lines.append(f"- **Meeting ID:** `{meeting_id_source}`")
+    # Participants section with wiki-links
+    participants = entity.get("_participants", [])
+    if participants:
+        lines.append("## Participantes")
+        lines.append("")
+        for p in participants:
+            pname = p.get("name", "?")
+            lines.append(f"- [[{_slugify(pname)}]]")
+        lines.append("")
+
+    lines.extend(["## Metadados", ""])
+    lines.append(f"- **ID:** `{meeting_id_source}`")
     if started_at:
         lines.append(f"- **Início:** {started_at}")
     if ended_at:
@@ -344,6 +364,23 @@ def upsert_person(entity: dict, vault_root: Path | None = None) -> tuple[Path, b
         f"# {title}",
         "",
     ])
+
+    if entity.get("email"):
+        lines.append(f"**Email:** {entity['email']}")
+        lines.append("")
+
+    # Meetings section (passed via entity._meetings)
+    meetings = entity.get("_meetings", [])
+    if meetings:
+        lines.append("## Reuniões")
+        lines.append("")
+        for m in meetings:
+            mtitle = m.get("title", "?")
+            mdate = (m.get("started_at") or "")[:10]
+            mslug = _slugify(mtitle)
+            link = f"{mdate} {mslug}" if mdate else mslug
+            lines.append(f"- [[{link}]]")
+        lines.append("")
 
     path.write_text("\n".join(lines), encoding="utf-8")
     return path, True
