@@ -3,6 +3,8 @@ from unittest.mock import patch
 from pathlib import Path
 import tempfile
 
+import pytest
+
 
 class TestExternalIngestIntegration:
     """End-to-end flow: fetch → resolve → build → persist."""
@@ -295,3 +297,73 @@ class TestExternalIngestLockAndCursors:
             index = read_index(vault_root)
             # Should have at least one entry for the meeting or person
             assert len(index) > 0
+
+    def test_write_order_cursor_last(self, monkeypatch: pytest.MonkeyPatch):
+        """Cursor writes happen after entity persist + log append."""
+        from vault.ingest.external_ingest import run_external_ingest
+
+        order: list[str] = []
+
+        def fake_inner(*args, **kwargs):
+            order.append("persist_entities")
+            return {
+                "meetings_fetched": 0,
+                "meetings_resolved": 0,
+                "meetings_skipped": 0,
+                "meetings_written": 0,
+                "persons_written": 0,
+                "persons_skipped": 0,
+                "relationships_written": 0,
+                "cards_fetched": 0,
+                "cards_written": 0,
+                "cards_skipped": 0,
+                "github_decisions": 0,
+                "github_errors": 0,
+                "dry_run": False,
+                "errors": [],
+                "skips": [],
+            }
+
+        def fake_append_log(*args, **kwargs):
+            order.append("append_log")
+
+        def fake_write_cursor(*args, **kwargs):
+            order.append("write_cursor")
+
+        monkeypatch.setattr("vault.ingest.external_ingest._run_ingest_inner", fake_inner)
+        monkeypatch.setattr("vault.ingest.external_ingest.append_log", fake_append_log)
+        monkeypatch.setattr("vault.ingest.external_ingest.maybe_rotate_log", lambda *a, **k: None)
+        monkeypatch.setattr("vault.ingest.external_ingest.write_cursor", fake_write_cursor)
+        monkeypatch.setattr("vault.ingest.external_ingest.record_success", lambda *a, **k: None)
+        monkeypatch.setattr("vault.ingest.external_ingest.record_failure", lambda *a, **k: None)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            result = run_external_ingest(vault_root=Path(tmp), tldv_token="fake")
+
+        assert result.get("run_id") is not None
+        assert "persist_entities" in order
+        assert "append_log" in order
+        assert "write_cursor" in order
+        assert order.index("persist_entities") < order.index("append_log") < order.index("write_cursor")
+
+    def test_cursor_not_written_if_entity_write_fails(self, monkeypatch: pytest.MonkeyPatch):
+        """If persist stage fails, write_cursor stage must not run."""
+        from vault.ingest.external_ingest import run_external_ingest
+
+        calls = {"write_cursor": 0}
+
+        def fake_inner(*args, **kwargs):
+            raise RuntimeError("entity persist failed")
+
+        def fake_write_cursor(*args, **kwargs):
+            calls["write_cursor"] += 1
+
+        monkeypatch.setattr("vault.ingest.external_ingest._run_ingest_inner", fake_inner)
+        monkeypatch.setattr("vault.ingest.external_ingest.write_cursor", fake_write_cursor)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            result = run_external_ingest(vault_root=Path(tmp), tldv_token="fake")
+
+        assert calls["write_cursor"] == 0
+        assert result.get("run_id") is not None
+        assert result.get("errors")

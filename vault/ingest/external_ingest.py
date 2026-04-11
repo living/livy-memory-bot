@@ -44,6 +44,94 @@ from vault.ingest.cursor import (
 from vault.ingest.run_context import new_run_context, RunContext
 from vault.ingest.index_manager import add_entry, init_index
 from vault.ingest.log_manager import append_log, log_delivery_failure, maybe_rotate_log
+from vault.ingest.stages import PipelineRunner
+
+
+class _FuncStage:
+    """Tiny adapter to run function-based stages in PipelineRunner."""
+
+    def __init__(self, name: str, fn: Any):
+        self.name = name
+        self._fn = fn
+
+    def run(self, ctx: Any, state: dict[str, Any]) -> dict[str, Any]:
+        return self._fn(ctx, state)
+
+
+def _noop_stage(_: RunContext, state: dict[str, Any]) -> dict[str, Any]:
+    return state
+
+
+def _stage_persist_entities(ctx: RunContext, state: dict[str, Any]) -> dict[str, Any]:
+    state["result"] = _run_ingest_inner(
+        ctx.vault_root,
+        ctx.dry_run,
+        state.get("verbose", False),
+        state.get("meeting_days", 7),
+        state.get("card_days", 7),
+        state.get("tldv_token"),
+        ctx,
+    )
+    return state
+
+
+def _stage_append_log(ctx: RunContext, state: dict[str, Any]) -> dict[str, Any]:
+    if ctx.dry_run:
+        return state
+    result = state.get("result") or {}
+    log_summary = {k: v for k, v in result.items() if k not in ("errors", "skips")}
+    append_log(ctx.vault_root, "vault-ingest", log_summary, run_id=ctx.run_id, dry_run=ctx.dry_run)
+    maybe_rotate_log(ctx.vault_root)
+    return state
+
+
+def _stage_write_cursors(ctx: RunContext, state: dict[str, Any]) -> dict[str, Any]:
+    if ctx.dry_run:
+        return state
+
+    result = state.get("result") or {}
+    errors = result.get("errors") or []
+    meeting_days = state.get("meeting_days", 7)
+    card_days = state.get("card_days", 7)
+
+    tldv_errors = [
+        e for e in errors
+        if e.get("source") in ("tldv_meetings", "participant_resolve", "meeting_build", "meeting_upsert")
+    ]
+    trello_errors = [e for e in errors if e.get("source") in ("trello_cards", "card_upsert")]
+
+    if not tldv_errors:
+        write_cursor(ctx.vault_root, "tldv", {
+            "last_run_at": ctx.started_at,
+            "last_run_id": ctx.run_id,
+            "watermark": {"latest_fetched_days": meeting_days},
+        })
+        record_success(ctx.vault_root, "tldv")
+    else:
+        record_failure(ctx.vault_root, "tldv")
+
+    if not trello_errors:
+        write_cursor(ctx.vault_root, "trello", {
+            "last_run_at": ctx.started_at,
+            "last_run_id": ctx.run_id,
+            "watermark": {"latest_fetched_days": card_days},
+        })
+        record_success(ctx.vault_root, "trello")
+    else:
+        record_failure(ctx.vault_root, "trello")
+
+    github_errors = result.get("github_errors", 0)
+    if not github_errors:
+        write_cursor(ctx.vault_root, "github", {
+            "last_run_at": ctx.started_at,
+            "last_run_id": ctx.run_id,
+            "watermark": {},
+        })
+        record_success(ctx.vault_root, "github")
+    else:
+        record_failure(ctx.vault_root, "github")
+
+    return state
 
 
 def run_external_ingest(
@@ -58,83 +146,47 @@ def run_external_ingest(
     if vault_root is None:
         vault_root = Path(__file__).resolve().parents[2] / "memory" / "vault"
 
-    # Generate run context
     ctx = new_run_context(vault_root=vault_root, dry_run=dry_run)
 
-    # In dry_run mode, skip lock/cursor/index/log and run inner logic directly
-    if dry_run:
-        result = _run_ingest_inner(
-            vault_root, dry_run, verbose,
-            meeting_days, card_days, tldv_token, ctx,
-        )
-        result["run_id"] = ctx.run_id
-        return result
-
-    # Acquire lock — skip if another process holds it
-    if not acquire_lock(vault_root, "vault-ingest"):
+    if not dry_run and not acquire_lock(vault_root, "vault-ingest"):
         return {"skipped_reason": "locked", "run_id": ctx.run_id}
 
     try:
-        # All existing ingest logic — unchanged
-        result = _run_ingest_inner(
-            vault_root, dry_run, verbose,
-            meeting_days, card_days, tldv_token, ctx,
+        stages = [
+            _FuncStage("fetch_tldv", _noop_stage),
+            _FuncStage("fetch_cards", _noop_stage),
+            _FuncStage("fetch_github", _noop_stage),
+            _FuncStage("resolve_participants", _noop_stage),
+            _FuncStage("persist_entities", _stage_persist_entities),
+            _FuncStage("persist_relationships", _noop_stage),
+            _FuncStage("update_index", _noop_stage),
+            _FuncStage("append_log", _stage_append_log),
+            _FuncStage("write_cursors", _stage_write_cursors),
+        ]
+        runner = PipelineRunner(stages)
+        state = runner.run(
+            ctx,
+            initial_state={
+                "meeting_days": meeting_days,
+                "card_days": card_days,
+                "tldv_token": tldv_token,
+                "verbose": verbose,
+            },
         )
 
-        # Determine which sources succeeded / failed
-        errors = result.get("errors") or []
-        tldv_errors = [e for e in errors if e.get("source") in ("tldv_meetings", "participant_resolve", "meeting_build", "meeting_upsert")]
-        trello_errors = [e for e in errors if e.get("source") in ("trello_cards", "card_upsert")]
-
-        if not dry_run:
-            # Update cursors only for successful sources
-            if not tldv_errors:
-                write_cursor(vault_root, "tldv", {
-                    "last_run_at": ctx.started_at,
-                    "last_run_id": ctx.run_id,
-                    "watermark": {"latest_fetched_days": meeting_days},
-                })
-                record_success(vault_root, "tldv")
-            else:
-                record_failure(vault_root, "tldv")
-
-            if not trello_errors:
-                write_cursor(vault_root, "trello", {
-                    "last_run_at": ctx.started_at,
-                    "last_run_id": ctx.run_id,
-                    "watermark": {"latest_fetched_days": card_days},
-                })
-                record_success(vault_root, "trello")
-            else:
-                record_failure(vault_root, "trello")
-
-            # Append to log.md
-            log_summary = {
-                k: v for k, v in result.items()
-                if k not in ("errors", "skips")
-            }
-            append_log(vault_root, "vault-ingest", log_summary, run_id=ctx.run_id, dry_run=dry_run)
-
-            # Rotate log if needed (>500KB)
-            maybe_rotate_log(vault_root)
-
-            # GitHub cursor
-            github_errors = result.get("github_errors", 0)
-            if not github_errors:
-                write_cursor(vault_root, "github", {
-                    "last_run_at": ctx.started_at,
-                    "last_run_id": ctx.run_id,
-                    "watermark": {},
-                })
-                record_success(vault_root, "github")
-            else:
-                record_failure(vault_root, "github")
-
+        result = state.get("result") or {"errors": [], "skips": [], "dry_run": dry_run}
+        if state.get("error"):
+            errors = result.setdefault("errors", [])
+            errors.append({
+                "source": "pipeline",
+                "stage": state.get("failed_stage"),
+                "error": state.get("error"),
+            })
         result["run_id"] = ctx.run_id
         return result
-
     finally:
-        release_lock(vault_root)
+        if not dry_run:
+            release_lock(vault_root)
 
 
 def _run_ingest_inner(
