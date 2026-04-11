@@ -42,6 +42,9 @@ Para localizar cron IDs, rodar `openclaw cron list`.
 - Wiki é persistente e compounding — nunca re-derivada do zero
 - Simplicidade > completude — 2 crons + 1 skill em vez de 7 crons soltos
 - Observabilidade via `index.md` (catálogo) + `log.md` (cronológico) — simples, grep-friendly
+- Isolamento por recurso — locks para evitar condições de corrida entre ingest e lint
+- Qualidade com porta — derivação automática de páginas exige confiança mínima e provenance
+- Escala incremental — index/log são atualizados por patch/append, nunca rebuild completo
 
 ---
 
@@ -62,7 +65,7 @@ Delivery: announce telegram (accountId: memory, to: 7426291192)
 2. **Trello** — ingestão incremental de todos os boards configurados (cards criados/modificados desde última run)
 3. **GitHub** — ingestão incremental de todos os repos configurados (PRs merged/open/recent, issues fechadas recentemente)
 4. **Cruzamento** — pessoa X aparece no Trello como membro de cards e no TLDV como participante de meetings → relationship automaticamente
-5. **Index** — atualiza `index.md` com catálogo de todas as páginas
+5. **Index** — atualização incremental de `index.md`: append de novas entradas, patch de entradas existentes. Nunca rebuild completo.
 6. **Log** — appenda entrada em `log.md` com timestamp, fontes processadas, contadores
 
 **Modos de operação:**
@@ -70,9 +73,29 @@ Delivery: announce telegram (accountId: memory, to: 7426291192)
 - **Reunião isolada:** `run_external_ingest(meeting_ids=["id1", "id2"])` — IDs específicos
 - **Backfill gradual:** `run_external_ingest(meeting_days=30)` — janela maior, skip meetings que já têm entity no vault (idempotência via `entities/meeting-{id}.md` existe = skip)
 
-**Idempotência:** reprocessar uma reunião não duplica — se entity já existe, overwrite com dados frescos.
+**Idempotência:** reprocessar uma reunião não duplica — se entity já existe, overwrite com dados frescos. Se overwrite produzir diff > 50% do conteúdo → logar warning (possível regressão).
 
-**Incremental:** cada run persiste um cursor (timestamp da última run) em `memory/vault/.cursors/{source}.json`. Próxima run só busca a partir dali.
+**Incremental:** cada run persiste um cursor em `memory/vault/.cursors/{source}.json` com formato:
+```json
+{
+  "last_run_at": "2026-04-11T10:00:00Z",
+  "last_run_id": "uuid4",
+  "watermark": {
+    "tldv": {"latest_meeting_created_at": "...", "page_token": null},
+    "trello": {"latest_card_activity": "..."},
+    "github": {"latest_pr_updated_at": "...", "page": 1}
+  }
+}
+```
+O watermark armazena paginação e timestamps específicos por fonte, reduzindo duplicação em janelas densas. Atualização atômica (write tmp + rename). Em falha parcial, cursor NÃO avança — próxima run reprocessa a mesma janela.
+
+**Timeout e retry por estágio:** cada fonte (TLDV/Trello/GitHub) tem timeout independente (60s cada). Falhas são isoladas com backoff exponencial (30s, 60s, 120s) e circuit breaker após 3 falhas consecutivas da mesma fonte (pula estágio por 1h). Fonte A falhando não bloqueia Fonte B.
+
+**Lock de execução:** arquivo `.cursors/vault-ingest.lock` com PID + timestamp. Se lock existe e tem <10min, skip (run anterior ainda ativo). Se >10min, stale lock — remove e prossegue. O lint usa lock análogo `.cursors/vault-lint.lock`. Ingest e lint nunca rodam concorrentemente sobre os mesmos recursos (`index.md`, `log.md`, `relationships/`).
+
+**Delivery fallback:** se announce Telegram falhar, registrar alerta em `memory/vault/.delivery-failures.jsonl` com timestamp + sumário. No HEARTBEAT diário, incluir contagem de delivery failures pendentes. Canal secundário: log no stdout do cron (capturado pelo OpenClaw task log).
+
+**Compactação de log:** quando `log.md` passar de 500KB, mover para `log-archive/{YYYY-MM}.md` e iniciar novo `log.md` vazio.
 
 ### 2.2 `vault-lint` (1x/dia)
 
@@ -93,6 +116,16 @@ Delivery: announce telegram (accountId: memory, to: 7426291192)
 6. **Cross-reference suggestions** — padrões não conectados ("essa pessoa aparece em 5 meetings mas não tem página de conceito")
 7. **Relatório** — gera `lint-reports/{date}.md`
 8. **Log** — appenda entrada em `log.md`
+
+**Lock e delivery:** mesmos mecanismos do vault-ingest (lock file, delivery fallback).
+
+**Métricas de crescimento da wiki (incluídas no lint report e HEARTBEAT):**
+- Total de entities por tipo (meeting, person, card)
+- Total de concepts, decisions, synthesis
+- Total de relationships (edges)
+- Densidade de links (avg links/page)
+- Órfãos por domínio
+- Idade média das páginas (dias desde last_seen_at)
 
 ### 2.3 Crons removidos
 
@@ -125,10 +158,7 @@ Quando um agente recebe uma pergunta que pode ser respondida pela wiki:
 1. **Index first** — lê `index.md` para localizar páginas relevantes
 2. **Deep read** — lê as páginas relevantes (entities, concepts, decisions, relationships)
 3. **Sintetiza** — compõe resposta com citações (wikilinks `[[page-slug]]`)
-4. **Deriva** — se a pergunta gera insight valioso, cria página derivada:
-   - `concepts/{slug}.md` — conceito identificado a partir de padrões
-   - `decisions/{slug}.md` — decisão extraída de reuniões
-   - `synthesis/{slug}.md` — síntese de tema recorrente
+4. **Deriva** — se a pergunta gera insight valioso, cria página derivada (respeitando política de confiança — seção 3.5)
 5. **Atualiza** — index.md e log.md são atualizados com a nova página
 
 ### 3.2 Tipos de pergunta suportados
@@ -156,6 +186,7 @@ Conteúdo:
 - **Schema de entities** — meeting, person, card — campos e tipos
 - **Schema de relationships** — formato JSON com edges (from_id, to_id, role, confidence)
 - **Limitações** — não modificar raw sources, não deletar pages (marcar como archived)
+- **Locks** — verificar `.cursors/vault-*.lock` antes de escrever em recursos compartilhados
 
 ### 3.4 Arquivos da skill
 
@@ -169,6 +200,18 @@ Conteúdo:
     └── synthesis.md  # Template de página de síntese
 ```
 
+### 3.5 Política de confiança para derivação automática
+
+A skill `vault-query` pode criar páginas derivadas (concepts, decisions, synthesis), mas com guardrails:
+
+| Tipo de página | Confiança mínima | Evidência requerida |
+|---|---|---|
+| `concepts/` | medium | Mencionado em ≥2 entities distintas |
+| `decisions/` | high | source_keys de ≥1 fonte oficial (tldv_api, github_api) + menção em meeting |
+| `synthesis/` | medium | Padrão identificado em ≥3 entities ou ≥2 decisions |
+
+Decisions sem provenance ficam em `draft: true` até validação humana no Obsidian.
+
 ---
 
 ## 4. Estrutura do Vault (Obsidian-ready)
@@ -177,6 +220,7 @@ Conteúdo:
 memory/vault/
 ├── index.md                  # Catálogo de todas as páginas (LLM mantém)
 ├── log.md                    # Append-only cronológico (grep-friendly)
+├── log-archive/              # Logs mensais compactados
 ├── entities/
 │   ├── meeting-{id}.md       # Gerado pelo ingest (TLDV)
 │   ├── person-{id}.md        # Gerado pelo ingest (TLDV + cruzamento)
@@ -188,9 +232,11 @@ memory/vault/
 ├── synthesis/                # Criado por query (insights derivados)
 ├── lint-reports/             # Gerado pelo lint
 └── .cursors/                 # Estado incremental (não versionado, .gitignore)
-    ├── tldv.json
-    ├── trello.json
-    └── github.json
+    ├── tldv.json             # Cursor + watermark TLDV
+    ├── trello.json           # Cursor + watermark Trello
+    ├── github.json           # Cursor + watermark GitHub
+    ├── vault-ingest.lock     # Lock de execução
+    └── vault-lint.lock       # Lock de execução
 ```
 
 **Regras:**
@@ -198,30 +244,78 @@ memory/vault/
 - `concepts/`, `decisions/`, `synthesis/` = podem ser criados pelo pipeline OU manualmente no Obsidian
 - `.cursors/` no `.gitignore` — estado operacional, não conhecimento
 - `index.md` e `log.md` = mantidos pelo pipeline, legíveis no Obsidian
+- `.delivery-failures.jsonl` no `.gitignore` — log de falhas de delivery
 
 ---
 
-## 5. Migração e Plano de Rollout
+## 5. SLOs e Observabilidade
+
+| SLI | SLO | Medição |
+|---|---|---|
+| Sucesso diário vault-ingest | ≥ 99% (pelo menos 2/3 runs/dia) | Consecutive errors no cron state |
+| Sucesso diário vault-lint | ≥ 99% | Consecutive errors no cron state |
+| Latência vault-ingest p95 | < 10 min | Duration no cron state |
+| Latência vault-lint p95 | < 15 min | Duration no cron state |
+| Atraso máximo de atualização | < 24h | `last_seen_at` da entity mais recente vs now |
+| Delivery success | ≥ 95% | `delivery-failures.jsonl` vs total runs |
+
+Esses SLIs são reportados no HEARTBEAT.md.
+
+---
+
+## 6. Escala e Teste de Carga
+
+### Volume esperado
+
+| Cenário | Entities | Relationships | Lint scan |
+|---|---|---|---|
+| Atual (7 dias) | ~50 | ~200 | < 1s |
+| Curto prazo (90 dias) | ~500 | ~2000 | ~5s |
+| Médio prazo (1 ano) | ~2000 | ~8000 | ~20s |
+| Longo prazo (3 anos) | ~6000 | ~24000 | ~60s |
+
+### Plano de teste de carga
+
+1. Backfill de 30 dias com dados reais — medir duração por estágio
+2. Backfill de 90 dias — verificar se index incremental mantém performance
+3. Backfill de 180 dias — stress test de lint scan
+4. Simular 1000 reuniões sintéticas — validar timeout de 300s do ingest
+
+### Gatilhos de otimização
+
+- Se `index.md` > 100KB → particionar por tipo (`index-entities.md`, `index-concepts.md`)
+- Se lint scan > 30s → índice auxiliar em `.cursors/lint-index.json`
+- Se entity overwrite produzir diff > 50% do conteúdo → logar warning (possível regressão)
+
+---
+
+## 7. Migração e Plano de Rollout
 
 ### Fase 1 — Setup (imediatamente)
 1. Criar skill `vault-query` em `~/.openclaw/skills/vault-query/` (SKILL.md, MANUAL.md, templates)
 2. Criar 2 novos crons (`vault-ingest`, `vault-lint`)
 3. Integrar `run_enrich_github` no `run_external_ingest` como estágio — import como callable step (não refatorar o código), adicionando após Trello no orquestrador
-4. Implementar ingestão incremental com cursors para Trello e GitHub. Formato do cursor: `memory/vault/.cursors/{source}.json` com `{"last_run_at": "ISO8601", "last_run_id": "uuid"}`. Atualizar atomicamente (write tmp + rename) após cada fonte completar com sucesso. Em caso de falha parcial, o cursor NÃO é atualizado — próxima run reprocessa a mesma janela.
-5. Implementar atualização automática de `index.md` e `log.md`
+4. Implementar ingestão incremental com cursors + watermarks para Trello e GitHub. Formato: `memory/vault/.cursors/{source}.json`. Atualização atômica (write tmp + rename). Em caso de falha parcial, cursor NÃO avança.
+5. Implementar atualização incremental de `index.md` (append/patch) e `log.md` (append)
+6. Implementar locks de execução e delivery fallback
 
 ### Fase 2 — Desligar crons antigos
-6. Desabilitar os 7 crons antigos (um por um, verificando que o novo cobre)
-7. Backfill manual gradual: `meeting_days=7` → `30` → `90` → `180`
+7. Desabilitar os 7 crons antigos (um por um, verificando que o novo cobre)
+8. Backfill manual gradual: `meeting_days=7` → `30` → `90` → `180`
 
 ### Fase 3 — Validação
-8. Rodar vault-ingest em dry_run contra dados reais
-9. Rodar vault-lint e verificar health do vault
-10. Testar vault-query com perguntas reais
-11. Abrir vault no Obsidian e verificar navegabilidade
+9. Rodar vault-ingest em dry_run contra dados reais
+10. Rodar vault-lint e verificar health do vault
+11. Testar vault-query com perguntas reais
+12. Abrir vault no Obsidian e verificar navegabilidade
+13. Teste de carga: backfill 30 dias → medir duração por estágio
 
-### Critério de sucesso
+---
+
+## 8. Critério de sucesso
 - Vault responde perguntas que antes precisavam de memória humana
 - Obsidian graph view mostra rede conectada de entities/concepts/decisions
 - Lint report sem contradições críticas
 - Zero crons de memória órfãos
+- SLOs atingidos por 7 dias consecutivos após rollout
+- Delivery failures < 5% no primeiro mês
