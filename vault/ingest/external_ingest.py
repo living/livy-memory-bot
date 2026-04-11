@@ -246,10 +246,10 @@ def _run_ingest_inner(
     else:
         for person in person_by_id.values():
             try:
-                _, written = upsert_person(person, vault_root)
+                path, written = upsert_person(person, vault_root)
                 if written:
                     persons_written += 1
-                    _index_entity(vault_root, person)
+                    _index_entity_by_path(vault_root, path, person)
                 else:
                     persons_skipped += 1
             except Exception as exc:
@@ -287,7 +287,7 @@ def _run_ingest_inner(
                 meetings_written += 1
                 if verbose:
                     print(f"  [meeting] written: {path.name}")
-                _index_entity(vault_root, entity)
+                _index_entity_by_path(vault_root, path, entity)
             else:
                 meetings_skipped += 1
                 if verbose:
@@ -432,14 +432,12 @@ def _run_ingest_inner(
     }
 
 
-def _index_entity(vault_root: Path, entity: dict[str, Any]) -> None:
-    """Add entity to index.md if it has an id_canonical and path."""
-    entity_id = entity.get("id_canonical") or ""
-    entity_type = entity.get("entity_type") or "unknown"
-    title = entity.get("title") or entity.get("name") or entity_id
-    # Compute relative path inside vault
-    source_keys = entity.get("source_keys") or []
-    source_ref = next((k for k in source_keys if isinstance(k, str)), None)
-    if source_ref:
-        path_str = f"entities/{source_ref.replace(':', '/')}.md"
-        add_entry(vault_root, path_str, title, entity_type)
+def _index_entity_by_path(vault_root: Path, entity_path: Path, entity: dict[str, Any]) -> None:
+    """Add entity to index.jsonl using the actual file path."""
+    entity_type = entity.get("entity_type") or entity.get("type") or "unknown"
+    title = entity.get("title") or entity.get("name") or entity.get("entity") or entity.get("id_canonical") or ""
+    try:
+        rel = entity_path.relative_to(vault_root)
+        add_entry(vault_root, str(rel), title, entity_type)
+    except ValueError:
+        pass  # path not under vault_root

@@ -89,6 +89,22 @@ def _read_index_paths(vault_root: Path) -> set[str]:
     return paths
 
 
+def _count_relationships(vault_root: Path) -> int:
+    """Count relationships from relationships/*.json files."""
+    import json
+    rel_dir = vault_root / "relationships"
+    if not rel_dir.exists():
+        return 0
+    total = 0
+    for f in rel_dir.glob("*.json"):
+        try:
+            data = json.loads(f.read_text(encoding="utf-8"))
+            edges = data.get("edges", [])
+            total += len(edges)
+        except (json.JSONDecodeError, OSError):
+            pass
+    return total
+
 def run_lint_scans(vault_root: Path) -> LintReport:
     """Run all lint scans and return a structured report.
 
@@ -155,6 +171,8 @@ def run_lint_scans(vault_root: Path) -> LintReport:
                     "confidences": sorted(confidences),
                 })
 
+    relationships = _count_relationships(vault_root)
+
     return LintReport(
         orphans=orphans,
         stale=stale,
@@ -164,7 +182,7 @@ def run_lint_scans(vault_root: Path) -> LintReport:
         metrics={
             "total_entities": len(entities),
             "total_concepts": len(concepts),
-            "total_relationships": 0,
+            "total_relationships": relationships,
             "orphans_count": len(orphans),
             "stale_count": len(stale),
             "gaps_count": len(gaps),
