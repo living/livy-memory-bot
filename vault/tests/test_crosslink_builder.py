@@ -567,12 +567,19 @@ class TestUpdateMeetingContextReplaces:
         vault = _setup_vault_with_enrichment(tmp_path)
         with patch("vault.ingest.crosslink_builder.resolve_pr_author", return_value="Lincoln Quinan"):
             run_crosslink(vault, dry_run=False, github_token="fake")
-        # Add old-style context to meeting
+        # Rewrite meeting with a title that _detect_project will match
         meetings_dir = vault / "entities" / "meetings"
         meeting_path = meetings_dir / "test-meeting.md"
+        import yaml as _y
         old = meeting_path.read_text(encoding="utf-8")
-        old = old.rstrip() + "\n\n## Contexto\n\n- 📋 [Old card](url)\n"
-        meeting_path.write_text(old, encoding="utf-8")
+        # Parse frontmatter
+        end = old.find("---", 3)
+        fm = _y.safe_load(old[3:end]) or {}
+        fm["entity"] = "Status Kaba/BAT/BOT 2024-04-11"
+        body = old[end + 3:].lstrip("\n")
+        body = body.rstrip() + "\n\n## Contexto\n\n- 📋 [Old card](url)\n"
+        new_fm = _y.dump(fm, default_flow_style=False, sort_keys=False)
+        meeting_path.write_text(f"---\n{new_fm}---\n\n{body}", encoding="utf-8")
         _update_meeting_context(vault)
         new = meeting_path.read_text(encoding="utf-8")
         assert "### Projeto:" in new

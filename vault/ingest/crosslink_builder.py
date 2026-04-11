@@ -630,16 +630,17 @@ def _update_meeting_context(vault_root: Path) -> None:
         lines.append("")
         new_context = "\n".join(lines)
 
-        # Replace existing ## Contexto or append
-        if "## Contexto" in body:
+        # Remove ALL existing ## Contexto sections
+        while "## Contexto" in body:
             idx = body.index("## Contexto")
             next_s = body.find("\n## ", idx + 1)
             if next_s == -1:
-                body = body[:idx] + new_context
+                body = body[:idx]
             else:
-                body = body[:idx] + new_context + "\n" + body[next_s + 1:]
-        else:
-            body = body.rstrip() + "\n\n" + new_context
+                body = body[:idx] + body[next_s + 1:]
+
+        # Append new context
+        body = body.rstrip() + "\n\n" + new_context
 
         mf.write_text(_join_frontmatter(fm, body), encoding="utf-8")
 
