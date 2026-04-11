@@ -80,15 +80,14 @@ def _slugify(text: str) -> str:
 def _entity_path(vault_root: Path, entity: dict) -> Path:
     """Derive human-readable filesystem path for a canonical entity.
 
-    Person → "Lincoln Quinan Junior.md"
-    Meeting → "2026-02-20 Daily Operações B3.md"
-    Card → "card-{board}-{title}.md"
+    Person → persons/"Lincoln Quinan Junior.md"
+    Meeting → meetings/"2026-02-20 Daily Operações B3.md"
+    Card → cards/"card-{board}-{title}.md"
     """
-    entities_dir = vault_root / "entities"
     id_canonical = entity.get("id_canonical", "")
 
     if id_canonical.startswith("meeting:"):
-        # Use date + title for human-readable filename
+        entities_dir = vault_root / "entities" / "meetings"
         started = entity.get("started_at", "")
         date_part = started[:10] if started else ""
         title = entity.get("title") or entity.get("entity") or id_canonical.replace("meeting:", "")
@@ -98,11 +97,12 @@ def _entity_path(vault_root: Path, entity: dict) -> Path:
         return entities_dir / f"{slug}.md"
 
     if id_canonical.startswith("person:"):
-        # Use the person's name directly
+        entities_dir = vault_root / "entities" / "persons"
         name = entity.get("display_name") or entity.get("entity") or id_canonical.replace("person:", "")
         return entities_dir / f"{_slugify(name)}.md"
 
     if id_canonical.startswith("card:"):
+        entities_dir = vault_root / "entities" / "cards"
         rest = id_canonical.replace("card:", "")
         parts = rest.split(":", 1)
         if len(parts) == 2:
@@ -138,8 +138,7 @@ def upsert_meeting(entity: dict, vault_root: Path | None = None) -> tuple[Path, 
     if path.exists():
         return path, False
 
-    entities_dir = vault_root / "entities"
-    entities_dir.mkdir(parents=True, exist_ok=True)
+    path.parent.mkdir(parents=True, exist_ok=True)
 
     id_canonical = entity.get("id_canonical", "")
     title = entity.get("title", "")
@@ -200,12 +199,30 @@ def upsert_meeting(entity: dict, vault_root: Path | None = None) -> tuple[Path, 
         "",
     ])
 
-    if source_ref:
-        lines.append(f"**Fonte:** [{source_ref}]({source_ref})")
-        lines.append("")
+    # Obsidian callout with date, duration, video link
+    duration_min = entity.get("duration_min")
+    participants = entity.get("_participants", [])
+    n_part = len(participants)
+    date_display = started_at[:10] if started_at else "?"
+    duration_str = f"{duration_min} min" if duration_min else "? min"
+    lines.append(f"> [!info] {date_display} · {duration_str} · {n_part} participantes")
+
+    # Video link (Azure blob preferred, fallback to TLDV)
+    video_url = entity.get("video_url")
+    if video_url:
+        lines.append(f"> 🎥 [Assistir gravação]({video_url})")
+    elif meeting_id_source:
+        lines.append(f"> 🎥 [Assistir no TLDV](https://tldv.io/app/meetings/{meeting_id_source})")
+    # Transcript link
+    transcript_blob = entity.get("transcript_blob_path")
+    if transcript_blob:
+        # Construct Azure blob URL
+        import os as _os
+        storage_base = "https://livingnetopenclawstorage.blob.core.windows.net/living-meeting-hub"
+        lines.append(f"> 📝 [Transcrição]({storage_base}/{transcript_blob})")
+    lines.append("")
 
     # Participants section with wiki-links
-    participants = entity.get("_participants", [])
     if participants:
         lines.append("## Participantes")
         lines.append("")
@@ -214,14 +231,22 @@ def upsert_meeting(entity: dict, vault_root: Path | None = None) -> tuple[Path, 
             lines.append(f"- [[{_slugify(pname)}]]")
         lines.append("")
 
+    # Structured sections for enrichment (TLDV fills these)
+    lines.append("## Resumo")
+    lines.append("")
+    lines.append("<!-- Enriquecimento TLDV: tópicos e pontos-chave -->")
+    lines.append("")
+    lines.append("## Decisões")
+    lines.append("")
+    lines.append("<!-- Decisões da reunião -->")
+    lines.append("")
+
     lines.extend(["## Metadados", ""])
     lines.append(f"- **ID:** `{meeting_id_source}`")
     if started_at:
         lines.append(f"- **Início:** {started_at}")
     if ended_at:
         lines.append(f"- **Término:** {ended_at}")
-    if project_ref:
-        lines.append(f"- **Projeto:** {project_ref}")
     lines.append("")
 
     path.write_text("\n".join(lines), encoding="utf-8")
@@ -231,16 +256,17 @@ def upsert_meeting(entity: dict, vault_root: Path | None = None) -> tuple[Path, 
 def _find_existing_person_fuzzy(entities_dir: Path, name: str) -> Path | None:
     """Search existing person files for a fuzzy name match.
 
+    Searches in entities/persons/ subdirectory.
     Returns the path of the best matching existing person, or None.
     """
     from vault.ingest.meeting_ingest import _is_name_prefix, _fuzzy_name_key, _pick_richer_name
     target_key = _fuzzy_name_key(name)
-    target_words = target_key.split()
     best_match = None
     best_match_words = 0
 
-    for f in entities_dir.glob("person-*.md"):
-        # Read just the first line with entity: to get the name
+    # Search in persons/ subdirectory
+    persons_dir = entities_dir / "persons" if (entities_dir / "persons").exists() else entities_dir
+    for f in persons_dir.glob("*.md"):
         try:
             text = f.read_text(encoding="utf-8")
         except OSError:
@@ -272,7 +298,6 @@ def upsert_person(entity: dict, vault_root: Path | None = None) -> tuple[Path, b
         vault_root = Path(__file__).resolve().parents[2] / "memory" / "vault"
 
     entities_dir = vault_root / "entities"
-    entities_dir.mkdir(parents=True, exist_ok=True)
 
     new_name = entity.get("display_name") or entity.get("entity") or ""
     new_email = entity.get("email")
@@ -314,6 +339,8 @@ def upsert_person(entity: dict, vault_root: Path | None = None) -> tuple[Path, b
     path = _entity_path(vault_root, entity)
     if path.exists():
         return path, False
+
+    path.parent.mkdir(parents=True, exist_ok=True)
 
     id_canonical = entity.get("id_canonical", "")
     title = entity.get("display_name") or entity.get("entity") or id_canonical
@@ -402,8 +429,7 @@ def upsert_card(entity: dict, vault_root: Path | None = None) -> tuple[Path, boo
     if path.exists():
         return path, False
 
-    entities_dir = vault_root / "entities"
-    entities_dir.mkdir(parents=True, exist_ok=True)
+    path.parent.mkdir(parents=True, exist_ok=True)
 
     id_canonical = entity.get("id_canonical", "")
     title = entity.get("title", "")

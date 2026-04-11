@@ -127,6 +127,21 @@ def normalize_meeting_record(raw: dict[str, Any]) -> dict[str, Any]:
     if project_ref is not None:
         entity["project_ref"] = project_ref
 
+    # Azure blob video URL and duration from Supabase record
+    video_url = raw.get("video_url")
+    if isinstance(video_url, str) and video_url.strip():
+        entity["video_url"] = video_url.strip()
+    duration = raw.get("duration")
+    if duration is not None:
+        try:
+            entity["duration_min"] = round(float(duration) / 60)
+        except (ValueError, TypeError):
+            pass
+    # Transcript blob path (Azure)
+    transcript_blob = raw.get("transcript_blob_path")
+    if isinstance(transcript_blob, str) and transcript_blob.strip():
+        entity["transcript_blob_path"] = transcript_blob.strip()
+
     transcript_source, transcript_ref = _transcript_fallback(raw)
     if transcript_source and transcript_ref:
         entity["transcript_source"] = transcript_source

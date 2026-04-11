@@ -469,7 +469,9 @@ def _enrich_person_files_with_meetings(
                 "started_at": meeting.get("started_at", ""),
             })
 
-    entities_dir = vault_root / "entities"
+    entities_dir = vault_root / "entities" / "persons"
+    if not entities_dir.exists():
+        return
     for person_file in entities_dir.glob("*.md"):
         text = person_file.read_text(encoding="utf-8")
         fm, body = _split_frontmatter(text)
