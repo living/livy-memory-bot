@@ -296,6 +296,436 @@ class TestLintReportOutput:
 
 
 # ------------------------------------------------------------------
+# 6. Wave C: meeting/card id_source requirements + orphan edges + role validation
+# ------------------------------------------------------------------
+
+class TestWaveCLint_wave_c_lint:
+    """C3.3: lint extension for Wave C entity model."""
+
+    # --- meeting_id_source requirement ---
+
+    def test_detect_meeting_id_source_missing(self, lint_module, tmp_path):
+        """Meeting entity without meeting_id_source must be flagged."""
+        root = tmp_path / "memory" / "vault"
+        for d in ("entities", "decisions", "relationships"):
+            (root / d).mkdir(parents=True, exist_ok=True)
+        (root / "entities" / "meeting-no-source.md").write_text(
+            """---
+entity: Meeting Entity
+type: meeting
+id_canonical: meeting:daily-2026-04-10
+confidence: high
+sources: []
+last_verified: 2026-04-10
+verification_log: []
+last_touched_by: livy-agent
+draft: false
+---
+# Daily Sync
+
+No meeting_id_source field present.
+""",
+            encoding="utf-8",
+        )
+        result = lint_module.detect_meeting_id_source_requirements(root)
+        assert len(result) >= 1
+        assert any("meeting-no-source" in r["page"] for r in result)
+
+    def test_detect_meeting_id_source_present(self, lint_module, tmp_path):
+        """Meeting entity with meeting_id_source must NOT be flagged."""
+        root = tmp_path / "memory" / "vault"
+        for d in ("entities", "decisions", "relationships"):
+            (root / d).mkdir(parents=True, exist_ok=True)
+        (root / "entities" / "meeting-with-source.md").write_text(
+            """---
+entity: Meeting Entity
+type: meeting
+id_canonical: meeting:daily-2026-04-10
+meeting_id_source: tldv:67890
+confidence: high
+sources: []
+last_verified: 2026-04-10
+verification_log: []
+last_touched_by: livy-agent
+draft: false
+---
+# Daily Sync
+""",
+            encoding="utf-8",
+        )
+        result = lint_module.detect_meeting_id_source_requirements(root)
+        page_names = {r["page"] for r in result}
+        assert "meeting-with-source" not in page_names
+
+    def test_detect_meeting_id_source_only_checks_meeting_type(self, lint_module, tmp_path):
+        """Person entities should not be checked for meeting_id_source."""
+        root = tmp_path / "memory" / "vault"
+        for d in ("entities", "decisions", "relationships"):
+            (root / d).mkdir(parents=True, exist_ok=True)
+        (root / "entities" / "person-no-meeting.md").write_text(
+            """---
+entity: Person Example
+type: person
+id_canonical: person:john
+confidence: high
+sources: []
+last_verified: 2026-04-10
+verification_log: []
+last_touched_by: livy-agent
+draft: false
+---
+# Person Example
+""",
+            encoding="utf-8",
+        )
+        result = lint_module.detect_meeting_id_source_requirements(root)
+        page_names = {r["page"] for r in result}
+        assert "person-no-meeting" not in page_names
+
+    # --- card_id_source requirement ---
+
+    def test_detect_card_id_source_missing(self, lint_module, tmp_path):
+        """Card entity without card_id_source must be flagged."""
+        root = tmp_path / "memory" / "vault"
+        for d in ("entities", "decisions", "relationships"):
+            (root / d).mkdir(parents=True, exist_ok=True)
+        (root / "entities" / "card-no-source.md").write_text(
+            """---
+entity: Card Entity
+type: card
+id_canonical: card:abc123
+confidence: high
+sources: []
+last_verified: 2026-04-10
+verification_log: []
+last_touched_by: livy-agent
+draft: false
+---
+# Card Title
+""",
+            encoding="utf-8",
+        )
+        result = lint_module.detect_card_id_source_requirements(root)
+        assert len(result) >= 1
+        assert any("card-no-source" in r["page"] for r in result)
+
+    def test_detect_card_id_source_present(self, lint_module, tmp_path):
+        """Card entity with card_id_source must NOT be flagged."""
+        root = tmp_path / "memory" / "vault"
+        for d in ("entities", "decisions", "relationships"):
+            (root / d).mkdir(parents=True, exist_ok=True)
+        (root / "entities" / "card-with-source.md").write_text(
+            """---
+entity: Card Entity
+type: card
+id_canonical: card:abc123
+card_id_source: trello:abc123
+confidence: high
+sources: []
+last_verified: 2026-04-10
+verification_log: []
+last_touched_by: livy-agent
+draft: false
+---
+# Card Title
+""",
+            encoding="utf-8",
+        )
+        result = lint_module.detect_card_id_source_requirements(root)
+        page_names = {r["page"] for r in result}
+        assert "card-with-source" not in page_names
+
+    def test_detect_card_id_source_only_checks_card_type(self, lint_module, tmp_path):
+        """Repo entities should not be checked for card_id_source."""
+        root = tmp_path / "memory" / "vault"
+        for d in ("entities", "decisions", "relationships"):
+            (root / d).mkdir(parents=True, exist_ok=True)
+        (root / "entities" / "repo-no-card.md").write_text(
+            """---
+entity: Repo Example
+type: repo
+id_canonical: repo:living/livy-memory-bot
+confidence: high
+sources: []
+last_verified: 2026-04-10
+verification_log: []
+last_touched_by: livy-agent
+draft: false
+---
+# Repo Example
+""",
+            encoding="utf-8",
+        )
+        result = lint_module.detect_card_id_source_requirements(root)
+        page_names = {r["page"] for r in result}
+        assert "repo-no-card" not in page_names
+
+    # --- orphan edge detection ---
+
+    def test_detect_orphan_edges_flags_from_id_not_in_vault(self, lint_module, tmp_path):
+        """Edge whose from_id references a non-existent entity must be flagged."""
+        root = tmp_path / "memory" / "vault"
+        for d in ("entities", "decisions", "relationships"):
+            (root / d).mkdir(parents=True, exist_ok=True)
+        # Entity B exists but A does not
+        (root / "entities" / "entity-b.md").write_text(
+            """---
+entity: Entity B
+type: person
+id_canonical: person:bob
+confidence: high
+sources: []
+last_verified: 2026-04-10
+verification_log: []
+last_touched_by: livy-agent
+draft: false
+---
+# Entity B
+""",
+            encoding="utf-8",
+        )
+        import json
+        (root / "relationships" / "r.json").write_text(
+            json.dumps([
+                {
+                    "from_id": "person:alice",  # Does not exist in vault
+                    "to_id": "person:bob",
+                    "role": "author",
+                    "confidence": "high",
+                    "sources": [],
+                }
+            ]),
+            encoding="utf-8",
+        )
+        result = lint_module.detect_orphan_edges(root)
+        assert len(result) >= 1
+        assert any("person:alice" in r.get("orphan_id", "") for r in result)
+
+    def test_detect_orphan_edges_flags_to_id_not_in_vault(self, lint_module, tmp_path):
+        """Edge whose to_id references a non-existent entity must be flagged."""
+        root = tmp_path / "memory" / "vault"
+        for d in ("entities", "decisions", "relationships"):
+            (root / d).mkdir(parents=True, exist_ok=True)
+        # Entity A exists but C does not
+        (root / "entities" / "entity-a.md").write_text(
+            """---
+entity: Entity A
+type: person
+id_canonical: person:alice
+confidence: high
+sources: []
+last_verified: 2026-04-10
+verification_log: []
+last_touched_by: livy-agent
+draft: false
+---
+# Entity A
+""",
+            encoding="utf-8",
+        )
+        import json
+        (root / "relationships" / "r.json").write_text(
+            json.dumps([
+                {
+                    "from_id": "person:alice",
+                    "to_id": "person:charlie",  # Does not exist in vault
+                    "role": "participant",
+                    "confidence": "high",
+                    "sources": [],
+                }
+            ]),
+            encoding="utf-8",
+        )
+        result = lint_module.detect_orphan_edges(root)
+        assert len(result) >= 1
+        assert any("person:charlie" in r.get("orphan_id", "") for r in result)
+
+    def test_detect_orphan_edges_all_ids_exist(self, lint_module, tmp_path):
+        """Edge where both from_id and to_id exist in vault must NOT be flagged."""
+        root = tmp_path / "memory" / "vault"
+        for d in ("entities", "decisions", "relationships"):
+            (root / d).mkdir(parents=True, exist_ok=True)
+        (root / "entities" / "entity-a.md").write_text(
+            """---
+entity: Entity A
+type: person
+id_canonical: person:alice
+confidence: high
+sources: []
+last_verified: 2026-04-10
+verification_log: []
+last_touched_by: livy-agent
+draft: false
+---
+# Entity A
+""",
+            encoding="utf-8",
+        )
+        (root / "entities" / "entity-b.md").write_text(
+            """---
+entity: Entity B
+type: person
+id_canonical: person:bob
+confidence: high
+sources: []
+last_verified: 2026-04-10
+verification_log: []
+last_touched_by: livy-agent
+draft: false
+---
+# Entity B
+""",
+            encoding="utf-8",
+        )
+        import json
+        (root / "relationships" / "r.json").write_text(
+            json.dumps([
+                {
+                    "from_id": "person:alice",
+                    "to_id": "person:bob",
+                    "role": "author",
+                    "confidence": "high",
+                    "sources": [],
+                }
+            ]),
+            encoding="utf-8",
+        )
+        result = lint_module.detect_orphan_edges(root)
+        assert result == [], f"Expected no orphan edges, got: {result}"
+
+    def test_detect_orphan_edges_no_relationships_dir(self, lint_module, tmp_path):
+        """Vault without relationships directory must return empty list (valid state)."""
+        root = tmp_path / "memory" / "vault"
+        for d in ("entities", "decisions"):
+            (root / d).mkdir(parents=True, exist_ok=True)
+        result = lint_module.detect_orphan_edges(root)
+        assert result == []
+
+    # --- role validation per allowed set ---
+
+    def test_detect_invalid_relationship_roles_flags_unknown_role(
+        self, lint_module, tmp_path
+    ):
+        """Edge with a role not in RELATIONSHIP_ROLES must be flagged."""
+        root = tmp_path / "memory" / "vault"
+        for d in ("entities", "decisions", "relationships"):
+            (root / d).mkdir(parents=True, exist_ok=True)
+        (root / "entities" / "entity-a.md").write_text(
+            """---
+entity: Entity A
+type: person
+id_canonical: person:alice
+confidence: high
+sources: []
+last_verified: 2026-04-10
+verification_log: []
+last_touched_by: livy-agent
+draft: false
+---
+# Entity A
+""",
+            encoding="utf-8",
+        )
+        (root / "entities" / "entity-b.md").write_text(
+            """---
+entity: Entity B
+type: person
+id_canonical: person:bob
+confidence: high
+sources: []
+last_verified: 2026-04-10
+verification_log: []
+last_touched_by: livy-agent
+draft: false
+---
+# Entity B
+""",
+            encoding="utf-8",
+        )
+        import json
+        (root / "relationships" / "r.json").write_text(
+            json.dumps([
+                {
+                    "from_id": "person:alice",
+                    "to_id": "person:bob",
+                    "role": "hacker",  # Not in RELATIONSHIP_ROLES
+                    "confidence": "high",
+                    "sources": [],
+                }
+            ]),
+            encoding="utf-8",
+        )
+        result = lint_module.detect_invalid_relationship_roles(root)
+        assert len(result) >= 1
+        assert any("hacker" in r.get("role", "") for r in result)
+
+    def test_detect_invalid_relationship_roles_passes_valid_roles(
+        self, lint_module, tmp_path
+    ):
+        """Edge with a role in RELATIONSHIP_ROLES must NOT be flagged."""
+        root = tmp_path / "memory" / "vault"
+        for d in ("entities", "decisions", "relationships"):
+            (root / d).mkdir(parents=True, exist_ok=True)
+        (root / "entities" / "entity-a.md").write_text(
+            """---
+entity: Entity A
+type: person
+id_canonical: person:alice
+confidence: high
+sources: []
+last_verified: 2026-04-10
+verification_log: []
+last_touched_by: livy-agent
+draft: false
+---
+# Entity A
+""",
+            encoding="utf-8",
+        )
+        (root / "entities" / "entity-b.md").write_text(
+            """---
+entity: Entity B
+type: person
+id_canonical: person:bob
+confidence: high
+sources: []
+last_verified: 2026-04-10
+verification_log: []
+last_touched_by: livy-agent
+draft: false
+---
+# Entity B
+""",
+            encoding="utf-8",
+        )
+        import json
+        (root / "relationships" / "r.json").write_text(
+            json.dumps([
+                {
+                    "from_id": "person:alice",
+                    "to_id": "person:bob",
+                    "role": "author",  # Valid role
+                    "confidence": "high",
+                    "sources": [],
+                }
+            ]),
+            encoding="utf-8",
+        )
+        result = lint_module.detect_invalid_relationship_roles(root)
+        assert result == [], f"Expected no invalid roles, got: {result}"
+
+    def test_detect_invalid_relationship_roles_no_relationships_dir(
+        self, lint_module, tmp_path
+    ):
+        """Vault without relationships directory must return empty list (valid state)."""
+        root = tmp_path / "memory" / "vault"
+        for d in ("entities", "decisions"):
+            (root / d).mkdir(parents=True, exist_ok=True)
+        result = lint_module.detect_invalid_relationship_roles(root)
+        assert result == []
+
+
+# ------------------------------------------------------------------
 # 6. Domain completeness (quality/domain_lint.py)
 # ------------------------------------------------------------------
 

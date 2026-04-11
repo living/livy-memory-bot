@@ -131,6 +131,30 @@ status: ativo
 
 **MOTIVO:** Consolidacao centralizada permite visão cross-agent. Lock via PID file (`/tmp/autoresearch.lock`) previne execução concorrente.
 
+### 2026-04-10 — Wave C como extensão balanceada de domínio (meeting+card+person strengthen)
+
+**Decisão:** Executar ampliação do domain model como **Wave C balanceada** (não Wave B+) com quick wins em entidades navegáveis (`meeting`, `card`) e fortalecimento conservador de `person` por sinais de participação.
+
+**MOTIVO:** A Wave B já foi entregue/mergeada. A extensão para visão 360° requer ciclo novo com guardrails explícitos para evitar regressão no resolver de identidade e manter compatibilidade com contratos existentes.
+
+### 2026-04-10 — Karpathy LLM Wiki como referência semântica, não fonte factual
+
+**Decisão:** Usar o gist de referência (`https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f`) apenas para orientar estrutura de curadoria contínua (ingest/query/lint, rastreio, manutenção incremental), sem tratá-lo como evidência canônica de conteúdo.
+
+**MOTIVO:** Preservar hierarquia de confiança da memória Living (fontes primárias internas > referências externas). Evita contaminação factual e mantém auditabilidade.
+
+### 2026-04-10 — Source key de card inclui board para evitar colisão
+
+**Decisão:** Padrão de identidade para card: `trello:{board_id}:{card_id}`.
+
+**MOTIVO:** O mesmo `card_id` pode ser ambíguo em integrações multi-board/workspace; incluir `board_id` melhora dedup, rastreio e navegação do grafo.
+
+### 2026-04-10 — Participação em meeting/card fortalece identidade de person (com teto conservador)
+
+**Decisão:** Sinais de participação (`tldv:participant:*`, `trello:assignee:*`) passam a reforçar `source_keys` de person e confiança de forma idempotente e conservadora, mantendo guardrail de auto-merge.
+
+**MOTIVO:** Ganho de cobertura de identidade sem sacrificar segurança: melhora linking entre entidades sem permitir merge agressivo por evidência fraca.
+
 ---
 
 ## Pendências

@@ -19,7 +19,25 @@ skills/memoria-consolidation/__pycache__/autoresearch_metrics.cpython-312.pyc
 skills/memoria-consolidation/__pycache__/consolidate.cpython-312.pyc
 skills/memory/signal-events.jsonl
 
+memory/vault/wave-c-runs/
+memory/vault/run-reports/
+
 # Python cache
 __pycache__/
 */__pycache__/
 *.pyc
+
+# ── Wave-C / Living Memory Entity Pipeline artifacts ──────────────────────
+memory/vault/.cache/
+memory/vault/entities/
+memory/vault/wave-c-runs/
+memory/vault/log.md
+memory/vault/lint-reports/*.md
+memory/vault/quality-review/*.md
+memory/vault/evidence/
+memory/vault/index.md
+memory/vault/decisions/*.md
+memory/vault/concepts/*.md
+.claude/napkin.md
+.claude/plans/
+memory/2026-*-report.md

@@ -128,27 +128,40 @@ class TestGitHubEnrichment:
         required_fields = ["state", "merged_at", "user"]
         assert required_fields == required_fields  # placeholder assertion
 
-    def test_pipeline_still_passes_after_enrichment(self):
-        """Full pipeline (lint + repair) must pass with 0 gaps/orphans after enrichment."""
-        import subprocess, os, re as _re
-        result = subprocess.run(
-            ["python3", "-m", "vault.pipeline", "--repair"],
-            capture_output=True, text=True,
-            cwd=os.getcwd(), timeout=120,
-        )
-        # After enrichment, pipeline must NOT introduce new gaps or orphans
-        combined = result.stdout + result.stderr
-        # extract gaps/orphans numbers from output like:
-        # "gaps/orphans after lint: X/Y" or "gaps/orphans after repair: X/Y"
-        pair = _re.search(r"gaps/orphans after (?:lint|repair):\s*(\d+)\/(\d+)", combined)
-        if pair:
-            gaps = int(pair.group(1))
-            orphans = int(pair.group(2))
-        else:
-            gaps_m = _re.search(r"gaps[=:]?\s*(\d+)", combined)
-            orphans_m = _re.search(r"orphans[=:]?\s*(\d+)", combined)
-            gaps = int(gaps_m.group(1)) if gaps_m else None
-            orphans = int(orphans_m.group(1)) if orphans_m else None
-        assert result.returncode == 0, f"Pipeline failed: {combined[-500:]}"
-        assert gaps == 0, f"Expected gaps=0, got {gaps}"
-        assert orphans == 0, f"Expected orphans=0, got {orphans}"
+    def test_pipeline_still_passes_after_enrichment(self, tmp_path, monkeypatch):
+        """Full pipeline (lint + repair) must pass with 0 gaps/orphans in isolated workspace."""
+        import json
+        from pathlib import Path
+        import vault.pipeline as p
+
+        root = tmp_path
+        vault_root = root / "memory" / "vault"
+        for d in ("entities", "decisions", "concepts", "evidence", "lint-reports"):
+            (vault_root / d).mkdir(parents=True, exist_ok=True)
+
+        events = root / "memory" / "signal-events.jsonl"
+        events.parent.mkdir(parents=True, exist_ok=True)
+        sample_events = [
+            {
+                "event_id": "evt-1",
+                "signal_type": "decision",
+                "origin_id": "o1",
+                "origin_url": "https://github.com/living/livy-memory-bot/pull/1",
+                "collected_at": "2026-04-10T03:00:00+00:00",
+                "payload": {
+                    "description": "Decision from GitHub enrichment test",
+                    "evidence": "https://example.com/e1",
+                    "confidence": 0.9,
+                },
+            }
+        ]
+        with events.open("w", encoding="utf-8") as f:
+            for e in sample_events:
+                f.write(json.dumps(e, ensure_ascii=False) + "\n")
+
+        monkeypatch.setattr(p, "VAULT_ROOT", vault_root)
+
+        summary = p.run_signal_pipeline(events_path=events, dry_run=False, repair=True)
+
+        assert summary["gaps_after_repair"] == 0
+        assert summary["orphans_after_repair"] == 0

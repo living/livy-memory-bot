@@ -276,9 +276,13 @@ def validate_repo(entity: dict) -> Union[bool, list[str]]:
 def validate_meeting(entity: dict) -> Union[bool, list[str]]:
     """Validate a Meeting entity per spec.
 
-    Required:  id_canonical, meeting_id_source
+    Required:  id_canonical, meeting_id_source, source_keys, sources
     Optional:  title, started_at, ended_at, project_ref
     """
+    # TODO: Schema-aware validation — currently heuristic-based.
+    # Writers may add fields (transcript_source, transcript_ref, board_id)
+    # that aren't validated here. Consider a formal schema (e.g. JSON Schema)
+    # for strict contract enforcement.
     errors: list[str] = []
 
     if "id_canonical" not in entity:
@@ -290,6 +294,19 @@ def validate_meeting(entity: dict) -> Union[bool, list[str]]:
         errors.append("meeting_id_source")
     elif not isinstance(entity["meeting_id_source"], str):
         errors.append("meeting_id_source_type")
+
+    if "source_keys" not in entity:
+        errors.append("source_keys")
+    elif not isinstance(entity["source_keys"], list):
+        errors.append("source_keys_type")
+
+    if "sources" not in entity:
+        errors.append("sources")
+    elif not isinstance(entity["sources"], list):
+        errors.append("sources_type")
+    else:
+        for idx, src in enumerate(entity["sources"]):
+            errors.extend(_check_source_record(src, idx))
 
     if "started_at" in entity and not is_iso_date(entity["started_at"]):
         errors.append("started_at_format")
@@ -304,6 +321,8 @@ def validate_meeting(entity: dict) -> Union[bool, list[str]]:
         "started_at",
         "ended_at",
         "project_ref",
+        "source_keys",
+        "sources",
     }
     errors.extend(_unknown_fields(entity, allowed))
 
@@ -313,7 +332,7 @@ def validate_meeting(entity: dict) -> Union[bool, list[str]]:
 def validate_card(entity: dict) -> Union[bool, list[str]]:
     """Validate a Card entity per spec.
 
-    Required:  id_canonical, card_id_source, title
+    Required:  id_canonical, card_id_source, title, source_keys, sources
     Optional:  board, list, project_ref, status
     """
     errors: list[str] = []
@@ -321,7 +340,7 @@ def validate_card(entity: dict) -> Union[bool, list[str]]:
     if "id_canonical" not in entity:
         errors.append("id_canonical")
     elif not entity["id_canonical"].startswith("card:"):
-        errors.append("id_canonical_prefix")
+        errors.append("card_canonical_prefix")
 
     if "card_id_source" not in entity:
         errors.append("card_id_source")
@@ -333,6 +352,19 @@ def validate_card(entity: dict) -> Union[bool, list[str]]:
     elif not isinstance(entity["title"], str):
         errors.append("title_type")
 
+    if "source_keys" not in entity:
+        errors.append("source_keys")
+    elif not isinstance(entity["source_keys"], list):
+        errors.append("source_keys_type")
+
+    if "sources" not in entity:
+        errors.append("sources")
+    elif not isinstance(entity["sources"], list):
+        errors.append("sources_type")
+    else:
+        for idx, src in enumerate(entity["sources"]):
+            errors.extend(_check_source_record(src, idx))
+
     allowed = {
         "id_canonical",
         "card_id_source",
@@ -341,6 +373,8 @@ def validate_card(entity: dict) -> Union[bool, list[str]]:
         "list",
         "project_ref",
         "status",
+        "source_keys",
+        "sources",
     }
     errors.extend(_unknown_fields(entity, allowed))
 
