@@ -1,7 +1,6 @@
 """Tests for person identity strengthening (Wave C Phase C2)."""
 from __future__ import annotations
 
-import pytest
 
 
 class TestStrengthenPersonBasics:

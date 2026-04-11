@@ -1,8 +1,6 @@
 """Tests for conservative identity resolution — TDD RED phase."""
 from __future__ import annotations
 
-import pytest
-
 from vault.domain.identity_resolution import (
     IdentityResult,
     MergeAction,
