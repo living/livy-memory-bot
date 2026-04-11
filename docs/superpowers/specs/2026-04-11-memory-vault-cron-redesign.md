@@ -90,7 +90,7 @@ O watermark armazena paginação e timestamps específicos por fonte, reduzindo 
 
 **Timeout e retry por estágio:** cada fonte (TLDV/Trello/GitHub) tem timeout independente (60s cada). Falhas são isoladas com backoff exponencial (30s, 60s, 120s) e circuit breaker após 3 falhas consecutivas da mesma fonte (pula estágio por 1h). Fonte A falhando não bloqueia Fonte B.
 
-**Lock de execução:** arquivo `.cursors/vault.lock` compartilhado entre ingest e lint. Formato: `{"pid": 12345, "started_at": "ISO8601", "job": "vault-ingest|vault-lint"}`. Se lock existe e tem <10min, skip (run anterior ainda ativo). Se >10min, stale lock — remove e prossegue. Este lock único garante que ingest e lint nunca rodam concorrentemente sobre `index.md`, `log.md`, `relationships/`.
+**Lock de execução:** arquivo `.cursors/vault.lock` compartilhado entre ingest e lint. Formato: `{"pid": 12345, "started_at": "ISO8601", "job": "vault-ingest|vault-lint"}`. Se lock existe e tem <20min, skip (run anterior ainda ativo). Se >20min, stale lock — remove e prossegue. Este lock único garante que ingest e lint nunca rodam concorrentemente sobre `index.md`, `log.md`, `relationships/`.
 
 **Delivery fallback:** se announce Telegram falhar, registrar alerta em `memory/vault/.delivery-failures.jsonl` com timestamp + sumário. No HEARTBEAT diário, incluir contagem de delivery failures pendentes. Canal secundário: log no stdout do cron (capturado pelo OpenClaw task log).
 
