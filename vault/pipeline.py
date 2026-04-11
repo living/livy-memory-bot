@@ -13,6 +13,7 @@ Supports dry-run mode for safe validation.
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -30,6 +31,34 @@ from vault.metrics import collect_domain_metrics
 ROOT = Path(__file__).resolve().parents[1]
 VAULT_ROOT = ROOT / "memory" / "vault"
 DEFAULT_EVENTS = ROOT / "memory" / "signal-events.jsonl"
+
+
+# ---------------------------------------------------------------------------
+# Wave C feature flags (C3.2)
+# Defaults: C1=on, C2=off, C3=off
+# Can be overridden via WAVE_C_C1_ENABLED / WAVE_C_C2_ENABLED / WAVE_C_C3_ENABLED env vars.
+# ---------------------------------------------------------------------------
+
+def _get_wave_c_flag(var_name: str, default: bool) -> bool:
+    """Parse a WAVE_C_CN_ENABLED env var as a boolean.
+
+    Accepts: "true", "false", "True", "False", "1", "0" (case-insensitive).
+    Returns `default` when the variable is unset or has an unrecognised value.
+    """
+    raw = os.environ.get(var_name)
+    if raw is None:
+        return default
+    low = raw.lower()
+    if low in ("true", "1"):
+        return True
+    if low in ("false", "0"):
+        return False
+    return default
+
+
+_WAVE_C_C1_ENABLED = _get_wave_c_flag("WAVE_C_C1_ENABLED", default=True)
+_WAVE_C_C2_ENABLED = _get_wave_c_flag("WAVE_C_C2_ENABLED", default=False)
+_WAVE_C_C3_ENABLED = _get_wave_c_flag("WAVE_C_C3_ENABLED", default=False)
 
 
 def _enforce_confidence_gate(signal: dict) -> dict:
@@ -225,6 +254,13 @@ def run_pipeline(
                 print(f"  [WARN] Domain metrics collection failed: {e}")
             domain_metrics = {"error": str(e), "entities_count": 0, "decisions_count": 0, "concepts_count": 0}
 
+    # Wave C observability payload (C3.2)
+    wave_c_observer = {
+        "c1": {"enabled": _WAVE_C_C1_ENABLED},
+        "c2": {"enabled": _WAVE_C_C2_ENABLED},
+        "c3": {"enabled": _WAVE_C_C3_ENABLED},
+    }
+
     return {
         "dry_run": dry_run,
         "events_total": len(events),
@@ -240,6 +276,8 @@ def run_pipeline(
         "source_counts": source_counts,
         # Domain metrics (Task 6)
         "domain_metrics": domain_metrics,
+        # Wave C observability (C3.2)
+        "wave_c_observer": wave_c_observer,
         # Lint results
         "lint_report": str(lint_report_path),
         "gaps_after_lint": gaps_after_lint,

@@ -1,9 +1,11 @@
 """
 vault/lint.py — Daily lint checks for Memory Vault.
-Detects contradictions, orphan pages, stale claims, and coverage gaps.
+Detects contradictions, orphan pages, stale claims, coverage gaps,
+and Wave C entity model requirements (meeting/card id_source, orphan edges, role validation).
 """
 from __future__ import annotations
 
+import json
 import re
 from collections import defaultdict
 from datetime import datetime, timezone
@@ -14,6 +16,14 @@ try:
 
 except ImportError:
     _resolve_slug = lambda s: s  # type: ignore
+
+try:
+    from vault.domain.canonical_types import RELATIONSHIP_ROLES
+except ImportError:
+    RELATIONSHIP_ROLES = frozenset([
+        "author", "reviewer", "commenter",
+        "participant", "assignee", "decision_maker",
+    ])
 
 ROOT = Path(__file__).resolve().parents[1]
 VAULT_ROOT = ROOT / "memory" / "vault"
@@ -272,6 +282,158 @@ def run_lint(vault_root: Path = VAULT_ROOT, now: datetime | None = None) -> Path
 
     _append_log(vault_root, now, contradictions, orphans, stale, gaps)
     return path
+
+
+# ---------------------------------------------------------------------------
+# Wave C: meeting/card id_source requirements + orphan edges + role validation
+# ---------------------------------------------------------------------------
+
+def _collect_id_canonical_set(vault_root: Path) -> set[str]:
+    """Collect all id_canonical values from entities/ and decisions/."""
+    ids: set[str] = set()
+    for subdir in ("entities", "decisions"):
+        d = vault_root / subdir
+        if not d.exists():
+            continue
+        for md_file in d.glob("*.md"):
+            text = _read(md_file)
+            m = re.search(r"^id_canonical:\s*(.+)\s*$", text, flags=re.MULTILINE)
+            if m:
+                ids.add(m.group(1).strip())
+    return ids
+
+
+def _parse_frontmatter_value(text: str, key: str) -> str | None:
+    """Extract a top-level frontmatter key value from markdown text."""
+    pattern = rf"^{re.escape(key)}:\s*(.+)\s*$"
+    m = re.search(pattern, text, flags=re.MULTILINE)
+    return m.group(1).strip() if m else None
+
+
+def detect_meeting_id_source_requirements(vault_root: Path = VAULT_ROOT) -> list[dict]:
+    """
+    Flag meeting-type entities missing the required meeting_id_source field.
+
+    Each violation is a dict with:
+      page   — stem of the markdown file
+      reason — "missing_meeting_id_source"
+    """
+    entities_dir = vault_root / "entities"
+    if not entities_dir.exists():
+        return []
+
+    violations: list[dict] = []
+    for md_file in sorted(entities_dir.glob("*.md")):
+        text = _read(md_file)
+        entity_type = _parse_frontmatter_value(text, "type")
+        if entity_type != "meeting":
+            continue
+        meeting_id_source = _parse_frontmatter_value(text, "meeting_id_source")
+        if not meeting_id_source:
+            violations.append({
+                "page": md_file.stem,
+                "reason": "missing_meeting_id_source",
+            })
+    return violations
+
+
+def detect_card_id_source_requirements(vault_root: Path = VAULT_ROOT) -> list[dict]:
+    """
+    Flag card-type entities missing the required card_id_source field.
+
+    Each violation is a dict with:
+      page   — stem of the markdown file
+      reason — "missing_card_id_source"
+    """
+    entities_dir = vault_root / "entities"
+    if not entities_dir.exists():
+        return []
+
+    violations: list[dict] = []
+    for md_file in sorted(entities_dir.glob("*.md")):
+        text = _read(md_file)
+        entity_type = _parse_frontmatter_value(text, "type")
+        if entity_type != "card":
+            continue
+        card_id_source = _parse_frontmatter_value(text, "card_id_source")
+        if not card_id_source:
+            violations.append({
+                "page": md_file.stem,
+                "reason": "missing_card_id_source",
+            })
+    return violations
+
+
+def detect_orphan_edges(vault_root: Path = VAULT_ROOT) -> list[dict]:
+    """
+    Flag relationship edges whose from_id or to_id does not correspond to any
+    id_canonical found in the vault's entities/ or decisions/ directories.
+
+    An "orphan edge" is one that references at least one entity ID that does
+    not exist in the vault — indicating a dangling cross-reference.
+
+    Each violation is a dict with:
+      edge        — index of the offending edge (0-based)
+      file        — relationship JSON filename
+      orphan_id   — the referenced id that has no matching entity
+      direction   — "from_id" or "to_id"
+    """
+    rel_dir = vault_root / "relationships"
+    if not rel_dir.exists():
+        return []
+
+    known_ids = _collect_id_canonical_set(vault_root)
+    violations: list[dict] = []
+
+    for rel_file in sorted(rel_dir.glob("*.json")):
+        try:
+            data = json.loads(_read(rel_file))
+        except Exception:
+            continue
+        edges = data if isinstance(data, list) else data.get("edges", [])
+        for idx, edge in enumerate(edges):
+            for direction in ("from_id", "to_id"):
+                ref_id = edge.get(direction)
+                if ref_id and ref_id not in known_ids:
+                    violations.append({
+                        "edge": idx,
+                        "file": rel_file.name,
+                        "orphan_id": ref_id,
+                        "direction": direction,
+                    })
+    return violations
+
+
+def detect_invalid_relationship_roles(vault_root: Path = VAULT_ROOT) -> list[dict]:
+    """
+    Flag relationship edges whose role field is not in the allowed RELATIONSHIP_ROLES
+    set (author, reviewer, commenter, participant, assignee, decision_maker).
+
+    Each violation is a dict with:
+      edge  — index of the offending edge (0-based)
+      file  — relationship JSON filename
+      role  — the invalid role value
+    """
+    rel_dir = vault_root / "relationships"
+    if not rel_dir.exists():
+        return []
+
+    violations: list[dict] = []
+    for rel_file in sorted(rel_dir.glob("*.json")):
+        try:
+            data = json.loads(_read(rel_file))
+        except Exception:
+            continue
+        edges = data if isinstance(data, list) else data.get("edges", [])
+        for idx, edge in enumerate(edges):
+            role = edge.get("role", "")
+            if role and role not in RELATIONSHIP_ROLES:
+                violations.append({
+                    "edge": idx,
+                    "file": rel_file.name,
+                    "role": role,
+                })
+    return violations
 
 
 if __name__ == "__main__":

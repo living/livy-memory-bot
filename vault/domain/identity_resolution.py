@@ -151,3 +151,56 @@ def resolve_identity(
 
     # No match.
     return IdentityResult(action=MergeAction.NO_MATCH)
+
+
+def resolve_by_source_key(
+    existing: list[dict],
+    entity_type: str,
+    source_key: str,
+) -> IdentityResult:
+    """Resolve entity by exact source_key match.
+
+    Supports entity_type values: person, meeting, card, repo.
+
+    Contract:
+    - 0 matches for source_key -> NO_MATCH.
+    - 1 match -> MERGE (or REVIEW for person guardrail / missing id_canonical).
+    - >1 matches -> REVIEW with all matched candidates.
+    - Unknown entity_type -> REVIEW (conservative, never auto-merge).
+
+    Args:
+        existing:     List of existing entity dicts.
+        entity_type:  "person" | "meeting" | "card" | "repo".
+        source_key:   source_key to match exactly.
+
+    Returns:
+        IdentityResult with MERGE, NO_MATCH, or REVIEW.
+    """
+    allowed_entity_types = {"person", "meeting", "card", "repo"}
+
+    matches: list[dict] = []
+    for entity in existing:
+        if source_key in _get_source_keys(entity):
+            matches.append(entity)
+
+    if not matches:
+        return IdentityResult(action=MergeAction.NO_MATCH)
+
+    if len(matches) > 1:
+        return IdentityResult(action=MergeAction.REVIEW, candidates=matches)
+
+    only_match = matches[0]
+
+    # Unknown type is a schema/contract issue: require human review.
+    if entity_type not in allowed_entity_types:
+        return IdentityResult(action=MergeAction.REVIEW, candidates=[only_match])
+
+    canonical_id = only_match.get("id_canonical")
+    if not canonical_id:
+        return IdentityResult(action=MergeAction.REVIEW, candidates=[only_match])
+
+    # Person guardrail: auto-merge requires >= 2 source_keys.
+    if entity_type == "person" and len(_get_source_keys(only_match)) < 2:
+        return IdentityResult(action=MergeAction.REVIEW, candidates=[only_match])
+
+    return IdentityResult(action=MergeAction.MERGE, canonical_id=canonical_id)

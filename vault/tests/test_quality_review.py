@@ -477,12 +477,14 @@ class TestReportGeneration:
 
     def test_write_report_to_file(self, quality_module, tmp_vault, tmp_path):
         """write_report writes a dated .md file to memory/vault/quality-review/."""
+        from datetime import datetime, timezone
         quality_module.generate_quality_report(tmp_vault)
         out_path = quality_module.write_report(tmp_vault, output_dir=tmp_path)
+        today = datetime.now(timezone.utc).date().isoformat()
 
         assert out_path is not None
         assert out_path.suffix == ".md"
-        assert "2026-04-10" in out_path.name
+        assert today in out_path.name
 
     def test_write_report_creates_dir(self, quality_module, tmp_vault, tmp_path):
         """write_report creates output directory if it doesn't exist."""
