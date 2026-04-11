@@ -18,6 +18,8 @@ from vault.domain.normalize import build_entity_with_traceability
 from vault.domain.canonical_types import is_iso_date
 from vault.ingest.tldv_api_client import fetch_participants_from_tldv_api
 
+import unicodedata
+
 MAPPER_VERSION = "external-ingest-meeting-v1"
 DEFAULT_LOOKBACK_DAYS = 7
 
@@ -261,6 +263,55 @@ def _is_bot(name: str) -> bool:
     return name.strip().lower() in _BOT_NAMES
 
 
+def _strip_accents(s: str) -> str:
+    """Remove diacritics for accent-insensitive matching."""
+    return unicodedata.normalize("NFD", s).encode("ascii", "ignore").decode("ascii")
+
+
+def _is_name_prefix(shorter: str, longer: str) -> bool:
+    """Check if shorter name is a word-level prefix of longer name.
+
+    Examples:
+      ('lincoln quinan', 'lincoln quinan junior') → True
+      ('luiz rogério', 'luiz rogério carvalho') → True
+      ('roberto', 'robert urech') → False (first word differs after unidecode)
+      ('sergio', 'sergio fraga') → True
+    """
+    s_words = _strip_accents(shorter).strip().lower().split()
+    l_words = _strip_accents(longer).strip().lower().split()
+    if not s_words or not l_words:
+        return False
+    if len(s_words) >= len(l_words):
+        return False
+    # All words in shorter must match the corresponding words in longer
+    return s_words == l_words[:len(s_words)]
+
+
+def _fuzzy_name_key(name: str) -> str:
+    """Normalize name for fuzzy matching: case-insensitive, accent-stripped."""
+    return _strip_accents(name).strip().lower()
+
+
+def _pick_richer_name(a: str, b: str) -> str:
+    """Given two names that match fuzzily, return the richer one.
+
+    Prefers: longer > shorter, accented > non-accented, title case > lowercase.
+    """
+    if len(b.split()) > len(a.split()):
+        return b
+    if len(a.split()) > len(b.split()):
+        return a
+    # Same word count — prefer accented
+    a_has_accents = _strip_accents(a) != a
+    b_has_accents = _strip_accents(b) != b
+    if b_has_accents and not a_has_accents:
+        return b
+    if a_has_accents and not b_has_accents:
+        return a
+    # Prefer title case
+    return a if a == a.title() else b
+
+
 def resolve_participants_for_meeting(raw_meeting: dict[str, Any], tldv_token: str) -> dict[str, Any]:
     """Resolve participants using layered sources for a single meeting.
 
@@ -279,8 +330,8 @@ def resolve_participants_for_meeting(raw_meeting: dict[str, Any], tldv_token: st
         return name.strip().lower()
 
     def _name_key(name: str) -> str:
-        """Normalize for cross-source matching (case-insensitive, strip accents not needed for Portuguese names)."""
-        return " ".join(name.strip().lower().split())
+        """Normalize for cross-source matching: case-insensitive + accent-stripped."""
+        return _fuzzy_name_key(name)
 
     def _add(
         pid: Any,
@@ -320,30 +371,74 @@ def resolve_participants_for_meeting(raw_meeting: dict[str, Any], tldv_token: st
         # 1) Same real ID → skip (already seen)
         if participant_id and participant_id in seen_ids:
             return
+
+        # 2) Find fuzzy match among existing records
+        matched_key = None
+        for existing_norm, existing_rec in list(seen_names_normalized.items()):
+            # Exact normalized match
+            if norm_name == existing_norm:
+                matched_key = existing_norm
+                break
+            # Prefix match: one name is a word-level prefix of the other
+            if _is_name_prefix(norm_name, existing_norm) or _is_name_prefix(existing_norm, norm_name):
+                matched_key = existing_norm
+                break
+
         if participant_id:
+            # Has real ID — always add, but may merge with existing
             seen_ids.add(participant_id)
-            seen_by_real_id[participant_id] = record
-            # Also track by name so ID-less duplicates get merged
-            seen_names_normalized[norm_name] = record
+            if matched_key and matched_key in seen_names_normalized:
+                existing = seen_names_normalized[matched_key]
+                # Merge: pick richer name, keep email, update ID
+                record["name"] = _pick_richer_name(record["name"], existing["name"])
+                if not record["email"] and existing["email"]:
+                    record["email"] = existing["email"]
+                # Remove old key if different
+                if matched_key != norm_name:
+                    del seen_names_normalized[matched_key]
+                    # Also remove from seen_by_real_id if it was an ID-less entry
+                    if existing["id"].startswith("tldv:") and existing["id"] in seen_by_real_id:
+                        del seen_by_real_id[existing["id"]]
+                seen_names_normalized[norm_name] = record
+                seen_by_real_id[participant_id] = record
+            else:
+                seen_names_normalized[norm_name] = record
+                seen_by_real_id[participant_id] = record
             record["_priority"] = priority
             return
 
-        # 2) No real ID — dedupe by normalized name
-        if norm_name in seen_names_normalized:
-            existing = seen_names_normalized[norm_name]
-            # If existing has a real ID, it's a different person — don't collapse
-            # But if existing also has no real ID, keep the richer record
+        # 3) No real ID — dedupe by fuzzy match
+        if matched_key and matched_key in seen_names_normalized:
+            existing = seen_names_normalized[matched_key]
+            # If existing has a real ID, merge into it (enrich name)
             existing_has_real_id = existing["id"] and not existing["id"].startswith("tldv:")
             if existing_has_real_id:
-                # Already have a named+ID'd version — skip this ID-less duplicate
+                # Enrich existing name if this one is richer
+                existing["name"] = _pick_richer_name(existing["name"], record["name"])
+                # Update key if name changed
+                new_norm = _name_key(existing["name"])
+                if new_norm != matched_key:
+                    seen_names_normalized[new_norm] = existing
+                    if matched_key in seen_names_normalized and matched_key != new_norm:
+                        del seen_names_normalized[matched_key]
                 return
-            # Both ID-less: prefer the one with email
+            # Both ID-less: prefer the one with email, richer name
             existing_priority = existing.get("_priority", 0)
-            if (record["email"] and not existing["email"]) or priority > existing_priority:
+            should_replace = (
+                (record["email"] and not existing["email"])
+                or priority > existing_priority
+                or (not record["email"] and not existing["email"] and record["name"] == _pick_richer_name(record["name"], existing["name"]))
+            )
+            if should_replace:
+                record["name"] = _pick_richer_name(record["name"], existing["name"])
                 if not record["email"] and existing["email"]:
                     record["email"] = existing["email"]
                 record["_priority"] = priority
-                seen_names_normalized[norm_name] = record
+                # Update key if name changed
+                new_norm = _name_key(record["name"])
+                if new_norm != matched_key:
+                    del seen_names_normalized[matched_key]
+                seen_names_normalized[new_norm] = record
         else:
             record["_priority"] = priority
             seen_names_normalized[norm_name] = record
