@@ -13,7 +13,6 @@ Supports dry-run mode for safe validation.
 from __future__ import annotations
 
 import argparse
-import os
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -27,39 +26,13 @@ from vault.reverify import run_reverify
 from vault.status import build_status_payload, render_markdown
 from vault.confidence_gate import gate_decision
 from vault.metrics import collect_domain_metrics
-from vault.ingest.wave_c_pipeline import run_wave_c_ingest
+from vault.ingest.external_ingest import run_external_ingest
 
 ROOT = Path(__file__).resolve().parents[1]
 VAULT_ROOT = ROOT / "memory" / "vault"
 DEFAULT_EVENTS = ROOT / "memory" / "signal-events.jsonl"
 
 
-# ---------------------------------------------------------------------------
-# Wave C feature flags (C3.2)
-# Defaults: C1=on, C2=off, C3=off
-# Can be overridden via WAVE_C_C1_ENABLED / WAVE_C_C2_ENABLED / WAVE_C_C3_ENABLED env vars.
-# ---------------------------------------------------------------------------
-
-def _get_wave_c_flag(var_name: str, default: bool) -> bool:
-    """Parse a WAVE_C_CN_ENABLED env var as a boolean.
-
-    Accepts: "true", "false", "True", "False", "1", "0" (case-insensitive).
-    Returns `default` when the variable is unset or has an unrecognised value.
-    """
-    raw = os.environ.get(var_name)
-    if raw is None:
-        return default
-    low = raw.lower()
-    if low in ("true", "1"):
-        return True
-    if low in ("false", "0"):
-        return False
-    return default
-
-
-_WAVE_C_C1_ENABLED = _get_wave_c_flag("WAVE_C_C1_ENABLED", default=True)
-_WAVE_C_C2_ENABLED = _get_wave_c_flag("WAVE_C_C2_ENABLED", default=False)
-_WAVE_C_C3_ENABLED = _get_wave_c_flag("WAVE_C_C3_ENABLED", default=False)
 
 
 def _enforce_confidence_gate(signal: dict) -> dict:
@@ -145,7 +118,7 @@ def _process_single_event(
 
 
 
-def run_pipeline(
+def run_signal_pipeline(
     *,
     events_path: Path | str = DEFAULT_EVENTS,
     dry_run: bool = False,
@@ -222,23 +195,12 @@ def run_pipeline(
             if not dry_run:
                 concepts_written.append(Path(result.get("path", "")))
 
-    # Wave C ingest stage (meeting + card entities) — C1 wiring
-    wave_c_summary: dict = {
-        "wave_c_enabled": _WAVE_C_C1_ENABLED,
-        "meetings_fetched": 0,
-        "meetings_written": 0,
-        "meetings_skipped": 0,
-        "cards_fetched": 0,
-        "cards_written": 0,
-        "cards_skipped": 0,
-        "errors": [],
-    }
-    if _WAVE_C_C1_ENABLED:
-        wave_c_summary = run_wave_c_ingest(
-            vault_root=vault_root,
-            dry_run=dry_run,
-            verbose=verbose,
-        )
+    # External ingest stage (meeting + card entities)
+    external_ingest_summary = run_external_ingest(
+        vault_root=vault_root,
+        dry_run=dry_run,
+        verbose=verbose,
+    )
 
     lint_report_path = run_lint(vault_root)
 
@@ -273,13 +235,6 @@ def run_pipeline(
                 print(f"  [WARN] Domain metrics collection failed: {e}")
             domain_metrics = {"error": str(e), "entities_count": 0, "decisions_count": 0, "concepts_count": 0}
 
-    # Wave C observability payload (C3.2)
-    wave_c_observer = {
-        "c1": {"enabled": _WAVE_C_C1_ENABLED},
-        "c2": {"enabled": _WAVE_C_C2_ENABLED},
-        "c3": {"enabled": _WAVE_C_C3_ENABLED},
-    }
-
     return {
         "dry_run": dry_run,
         "events_total": len(events),
@@ -295,10 +250,8 @@ def run_pipeline(
         "source_counts": source_counts,
         # Domain metrics (Task 6)
         "domain_metrics": domain_metrics,
-        # Wave C observability (C3.2)
-        "wave_c_observer": wave_c_observer,
-        # Wave C ingest summary (C1 wiring)
-        "wave_c_ingest": wave_c_summary,
+        # External ingest summary
+        "external_ingest": external_ingest_summary,
         # Lint results
         "lint_report": str(lint_report_path),
         "gaps_after_lint": gaps_after_lint,
@@ -312,6 +265,10 @@ def run_pipeline(
         "downgraded_pages": reverify_result["downgraded_pages"],
         "pipeline_at": datetime.now(timezone.utc).isoformat(),
     }
+
+
+# Deprecated alias — prefer run_signal_pipeline
+run_pipeline = run_signal_pipeline
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -332,7 +289,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.dry_run:
         print("=== DRY RUN — no files will be written ===\n", flush=True)
 
-    summary = run_pipeline(
+    summary = run_signal_pipeline(
         events_path=args.events,
         dry_run=args.dry_run,
         verbose=args.verbose,

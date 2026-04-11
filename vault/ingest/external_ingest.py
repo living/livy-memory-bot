@@ -1,26 +1,26 @@
-"""Wave C ingest orchestration — fetch, normalize, write meeting + card entities.
+"""External ingest orchestration — fetch, normalize, write meeting + card entities.
 
-Orchestrates the full Wave C data flow:
+Orchestrates the full external data flow:
   1. Fetch meetings from TLDV (Supabase) + fetch cards from Trello
-  2. Build canonical entities with full lineage stamps
-  3. Idempotent upsert to memory/vault/entities/
-  4. Return summary with counts
-
-Controlled by WAVE_C_C1_ENABLED env var (default: True).
-When disabled, returns zero-count summary silently.
+  2. Resolve participants for each meeting (layered: TLDV API → Supabase → Whisper speakers)
+  3. Build canonical entities with full lineage stamps
+  4. Idempotent upsert to memory/vault/entities/
+  5. Write person↔meeting relationships
+  6. Return summary with counts
 
 Can be run standalone or integrated into vault/pipeline.py.
 """
 from __future__ import annotations
 
-import os
 from pathlib import Path
 from typing import Any
 from datetime import datetime, timezone
 import json
 
 from vault.ingest.meeting_ingest import (
-    fetch_and_build as fetch_meetings,
+    fetch_meetings_from_supabase,
+    resolve_participants_for_meeting,
+    build_meeting_entity,
     MAPPER_VERSION as MEETING_MAPPER_VERSION,
 )
 from vault.ingest.card_ingest import (
@@ -33,95 +33,110 @@ from vault.domain.normalize import build_source_record
 from vault.domain.relationship_builder import build_person_meeting_edge
 
 
-def _is_wave_c_enabled() -> bool:
-    """Check WAVE_C_C1_ENABLED env var (mirrors pipeline._get_wave_c_flag)."""
-    raw = os.environ.get("WAVE_C_C1_ENABLED")
-    if raw is None:
-        return True  # default: enabled
-    return raw.lower() in ("true", "1")
-
-
-def run_wave_c_ingest(
+def run_external_ingest(
     vault_root: Path | None = None,
     dry_run: bool = False,
     verbose: bool = False,
     meeting_days: int = 7,
     card_days: int = 7,
+    tldv_token: str | None = None,
 ) -> dict[str, Any]:
-    """Run Wave C ingest: meetings + cards.
-
-    Args:
-        vault_root:   override vault root path (defaults to memory/vault)
-        dry_run:      if True, fetch and normalize but skip file writes
-        verbose:      if True, print per-entity actions
-        meeting_days: lookback days for TLDV meetings (default 7)
-        card_days:    lookback days for Trello cards (default 7)
-
-    Returns:
-        Summary dict with meetings_written, cards_written, errors, etc.
-    """
+    """Run external ingest: meetings + cards."""
     if vault_root is None:
         vault_root = Path(__file__).resolve().parents[2] / "memory" / "vault"
 
-    if not _is_wave_c_enabled():
-        return {
-            "wave_c_enabled": False,
-            "meetings_fetched": 0,
-            "meetings_written": 0,
-            "meetings_skipped": 0,
-            "persons_fetched": 0,
-            "persons_written": 0,
-            "persons_skipped": 0,
-            "relationships_written": 0,
-            "cards_fetched": 0,
-            "cards_written": 0,
-            "cards_skipped": 0,
-            "errors": [],
-        }
-
     meetings_written = 0
     meetings_skipped = 0
+    meetings_resolved = 0
     persons_written = 0
     persons_skipped = 0
     cards_written = 0
     cards_skipped = 0
     relationships_written = 0
     errors: list[dict[str, Any]] = []
+    skips: list[dict[str, Any]] = []
 
-    # --- Meetings ---
+    # Stage 1 — Fetch meetings
     try:
         if verbose:
-            print(f"[wave-c] fetching meetings (lookback={meeting_days}d)...")
-        meeting_entities, participant_records = fetch_meetings(days=meeting_days)
+            print(f"[external-ingest] fetching meetings (lookback={meeting_days}d)...")
+        raw_meetings = fetch_meetings_from_supabase(days=meeting_days)
         if verbose:
-            print(f"[wave-c] fetched {len(meeting_entities)} meetings")
+            print(f"[external-ingest] fetched {len(raw_meetings)} meetings")
     except Exception as exc:
         if verbose:
-            print(f"[wave-c] ERROR fetching meetings: {exc}")
+            print(f"[external-ingest] ERROR fetching meetings: {exc}")
         errors.append({"source": "tldv_meetings", "error": str(exc), "type": type(exc).__name__})
-        meeting_entities = []
-        participant_records = []
+        raw_meetings = []
 
-    # Build person entities from meeting participants first
+    # Stage 2/3/4 — Resolve participants + build meeting/person entities
+    meeting_units: list[dict[str, Any]] = []
     person_by_id: dict[str, dict[str, Any]] = {}
-    for p in participant_records:
-        try:
-            person = participant_to_person(p, run_id="wave-c")
-            pid = person.get("id_canonical")
-            if not pid:
-                continue
-            person.setdefault("sources", [
-                build_source_record(
-                    source_type="tldv_api",
-                    source_ref=(person.get("source_keys") or ["tldv:participant:unknown"])[0],
-                    mapper_version="wave-c-person-ingest-v1",
-                )
-            ])
-            person_by_id[pid] = person
-        except Exception as exc:
-            errors.append({"source": "person_build", "error": str(exc), "type": type(exc).__name__})
 
-    # write persons before meetings
+    for raw in raw_meetings:
+        meeting_id = raw.get("meeting_id") or raw.get("id") or ""
+
+        # Stage 2 — Resolve participants
+        try:
+            resolution = resolve_participants_for_meeting(raw, tldv_token or "")
+        except Exception as exc:
+            errors.append({
+                "source": "participant_resolve",
+                "meeting_id": meeting_id,
+                "error": str(exc),
+                "type": type(exc).__name__,
+            })
+            meetings_skipped += 1
+            skips.append({"meeting_id": meeting_id, "reason": "RESOLVE_ERROR", "tried": ["tldv_api"]})
+            continue
+
+        if resolution.get("status") == "skip":
+            meetings_skipped += 1
+            skips.append({
+                "meeting_id": meeting_id,
+                "reason": resolution.get("reason", "NO_PARTICIPANTS"),
+                "tried": resolution.get("tried", []),
+            })
+            continue
+
+        participants = resolution.get("participants") or []
+        meetings_resolved += 1
+
+        # Stage 3 — Build meeting entity
+        try:
+            meeting_entity = build_meeting_entity(raw)
+        except Exception as exc:
+            meetings_skipped += 1
+            errors.append({
+                "source": "meeting_build",
+                "meeting_id": meeting_id,
+                "error": str(exc),
+                "type": type(exc).__name__,
+            })
+            continue
+
+        # Keep resolved participants attached for downstream relationship stage
+        meeting_units.append({"meeting": meeting_entity, "participants": participants})
+
+        # Stage 4 — Build person entities
+        for p in participants:
+            try:
+                person = participant_to_person(p, run_id="external-ingest")
+                pid = person.get("id_canonical")
+                if not pid:
+                    continue
+                person.setdefault("sources", [
+                    build_source_record(
+                        source_type="tldv_api",
+                        source_ref=(person.get("source_keys") or ["tldv:participant:unknown"])[0],
+                        mapper_version="wave-c-person-ingest-v1",
+                    )
+                ])
+                person_by_id[pid] = person
+            except Exception as exc:
+                errors.append({"source": "person_build", "error": str(exc), "type": type(exc).__name__})
+
+    # Stage 6(a) — Persist persons before meetings
     for person in person_by_id.values():
         try:
             _, written = upsert_person(person, vault_root)
@@ -140,16 +155,10 @@ def run_wave_c_ingest(
                 "type": type(exc).__name__,
             })
 
-    # map source_key -> person id for meeting participant linkage
-    sourcekey_to_personid: dict[str, str] = {}
-    for person in person_by_id.values():
-        for key in person.get("source_keys", []):
-            if isinstance(key, str):
-                sourcekey_to_personid[key] = person.get("id_canonical")
-
-    for entity in meeting_entities:
+    # Stage 6(b) — Persist meetings
+    for unit in meeting_units:
+        entity = unit["meeting"]
         try:
-            # enrich meeting sources with tldv source record for strict frontmatter tests
             now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
             meeting_sources = entity.get("sources") or []
             source_keys = entity.get("source_keys") or []
@@ -186,26 +195,28 @@ def run_wave_c_ingest(
                 "type": type(exc).__name__,
             })
 
-    # Write person->meeting relationships
+    # Stage 5 — Build relationships
     rel_dir = vault_root / "relationships"
     rel_dir.mkdir(parents=True, exist_ok=True)
     rel_edges: list[dict[str, Any]] = []
     now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
-    for meeting_entity in meeting_entities:
+    for unit in meeting_units:
+        meeting_entity = unit["meeting"]
+        participants = unit["participants"]
+
         meeting_id = meeting_entity.get("id_canonical")
         if not meeting_id:
             continue
 
-        # Best-effort: infer participant keys from source keys carrying meeting id
         meeting_source_keys = meeting_entity.get("source_keys", [])
         meeting_source_ref = next((k for k in meeting_source_keys if isinstance(k, str) and k.startswith("tldv:")), "")
 
-        for p in participant_records:
+        for p in participants:
             p_source_key = p.get("source_key")
             if not isinstance(p_source_key, str):
                 continue
-            person = participant_to_person(p, run_id="wave-c")
+            person = participant_to_person(p, run_id="external-ingest")
             person_id = person.get("id_canonical")
             if not person_id:
                 continue
@@ -234,16 +245,16 @@ def run_wave_c_ingest(
         rel_path.write_text(json.dumps({"edges": rel_edges}, ensure_ascii=False, indent=2), encoding="utf-8")
         relationships_written = len(rel_edges)
 
-    # --- Cards ---
+    # Cards flow unchanged
     try:
         if verbose:
-            print(f"[wave-c] fetching cards (lookback={card_days}d)...")
+            print(f"[external-ingest] fetching cards (lookback={card_days}d)...")
         card_entities, _ = fetch_cards(days=card_days)
         if verbose:
-            print(f"[wave-c] fetched {len(card_entities)} cards")
+            print(f"[external-ingest] fetched {len(card_entities)} cards")
     except Exception as exc:
         if verbose:
-            print(f"[wave-c] ERROR fetching cards: {exc}")
+            print(f"[external-ingest] ERROR fetching cards: {exc}")
         errors.append({"source": "trello_cards", "error": str(exc), "type": type(exc).__name__})
         card_entities = []
 
@@ -272,11 +283,10 @@ def run_wave_c_ingest(
             })
 
     return {
-        "wave_c_enabled": True,
-        "meetings_fetched": len(meeting_entities),
-        "meetings_written": meetings_written,
+        "meetings_fetched": len(raw_meetings),
+        "meetings_resolved": meetings_resolved,
         "meetings_skipped": meetings_skipped,
-        "persons_fetched": len(participant_records),
+        "meetings_written": meetings_written,
         "persons_written": persons_written,
         "persons_skipped": persons_skipped,
         "relationships_written": relationships_written,
@@ -284,4 +294,5 @@ def run_wave_c_ingest(
         "cards_written": cards_written,
         "cards_skipped": cards_skipped,
         "errors": errors,
+        "skips": skips,
     }

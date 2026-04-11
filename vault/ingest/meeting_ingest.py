@@ -22,7 +22,7 @@ MAPPER_VERSION = "wave-c-meeting-ingest-v1"
 DEFAULT_LOOKBACK_DAYS = 7
 
 
-def _fetch_from_supabase(days: int = DEFAULT_LOOKBACK_DAYS) -> list[dict[str, Any]]:
+def fetch_meetings_from_supabase(days: int = DEFAULT_LOOKBACK_DAYS) -> list[dict[str, Any]]:
     """Fetch recent meetings from Supabase TLDV.
 
     Real table schema uses `id`, `name`, `created_at` (not `meeting_id`, `title`,
@@ -223,7 +223,7 @@ def fetch_and_build(
     Returns:
         (meeting_entities, participant_records)
     """
-    raw_meetings = _fetch_from_supabase(days)
+    raw_meetings = fetch_meetings_from_supabase(days)
     entities = []
     all_participants = []
     for raw in raw_meetings:

@@ -1,13 +1,12 @@
-"""Tests for Wave C pipeline wiring into vault/pipeline.py.
+"""Tests for external ingest wiring into vault/pipeline.py.
 
 Covers:
-1) run_wave_c_ingest writes meeting/card entities idempotently
-2) run_pipeline exposes wave_c_ingest summary
-3) WAVE_C_C1_ENABLED=false bypasses Wave C ingest stage
+1) run_external_ingest writes meeting/card entities idempotently
+2) run_pipeline exposes external_ingest summary
+3) External ingest always runs (no feature flags)
 """
 from __future__ import annotations
 
-import importlib
 import json
 from pathlib import Path
 
@@ -50,19 +49,20 @@ def wiring_workspace(tmp_path, monkeypatch):
     return {"root": root, "vault_root": vault_root, "events": events}
 
 
-class TestWaveCIngestWriter:
+class TestExternalIngestWriter:
 
-    def test_run_wave_c_ingest_writes_meeting_and_card(self, wiring_workspace, monkeypatch):
-        from vault.ingest import wave_c_pipeline as wcp
+    def test_run_external_ingest_writes_meeting_and_card(self, wiring_workspace, monkeypatch):
+        from vault.ingest import external_ingest as ext
 
-        fake_meeting = {
-            "id_canonical": "meeting:daily-2026-04-10",
-            "meeting_id_source": "daily-2026-04-10",
-            "title": "Daily",
-            "source_keys": ["tldv:daily-2026-04-10"],
-            "lineage": {"mapper_version": "wave-c-meeting-ingest-v1"},
+        # Raw meeting as returned by fetch_meetings_from_supabase
+        fake_raw_meeting = {
+            "id": "daily-2026-04-10",
+            "name": "Daily",
+            "participants": [
+                {"id": "p1", "name": "Robert", "email": "robert@livingnet.com.br"},
+            ],
         }
-        fake_card = {
+        fake_card_entity = {
             "id_canonical": "card:board123:card456",
             "card_id_source": "card456",
             "title": "Implement Wave C",
@@ -71,12 +71,22 @@ class TestWaveCIngestWriter:
             "lineage": {"mapper_version": "wave-c-card-ingest-v1"},
         }
 
-        monkeypatch.setattr(wcp, "fetch_meetings", lambda days=7: ([fake_meeting], []))
-        monkeypatch.setattr(wcp, "fetch_cards", lambda days=7: ([fake_card], []))
+        monkeypatch.setattr(
+            "vault.ingest.external_ingest.fetch_meetings_from_supabase",
+            lambda days=7: [fake_raw_meeting],
+        )
+        monkeypatch.setattr(
+            "vault.ingest.external_ingest.fetch_cards",
+            lambda days=7: ([fake_card_entity], []),
+        )
 
-        summary = wcp.run_wave_c_ingest(vault_root=wiring_workspace["vault_root"], dry_run=False)
+        summary = ext.run_external_ingest(
+            vault_root=wiring_workspace["vault_root"],
+            dry_run=False,
+        )
 
         assert summary["meetings_fetched"] == 1
+        assert summary["meetings_resolved"] == 1
         assert summary["meetings_written"] == 1
         assert summary["cards_fetched"] == 1
         assert summary["cards_written"] == 1
@@ -86,17 +96,17 @@ class TestWaveCIngestWriter:
         assert any(name.startswith("meeting-") for name in names)
         assert any(name.startswith("card-") for name in names)
 
-    def test_run_wave_c_ingest_is_idempotent(self, wiring_workspace, monkeypatch):
-        from vault.ingest import wave_c_pipeline as wcp
+    def test_run_external_ingest_is_idempotent(self, wiring_workspace, monkeypatch):
+        from vault.ingest import external_ingest as ext
 
-        fake_meeting = {
-            "id_canonical": "meeting:daily-2026-04-10",
-            "meeting_id_source": "daily-2026-04-10",
-            "title": "Daily",
-            "source_keys": ["tldv:daily-2026-04-10"],
-            "lineage": {"mapper_version": "wave-c-meeting-ingest-v1"},
+        fake_raw_meeting = {
+            "id": "daily-2026-04-10",
+            "name": "Daily",
+            "participants": [
+                {"id": "p1", "name": "Robert"},
+            ],
         }
-        fake_card = {
+        fake_card_entity = {
             "id_canonical": "card:board123:card456",
             "card_id_source": "card456",
             "title": "Implement Wave C",
@@ -105,11 +115,23 @@ class TestWaveCIngestWriter:
             "lineage": {"mapper_version": "wave-c-card-ingest-v1"},
         }
 
-        monkeypatch.setattr(wcp, "fetch_meetings", lambda days=7: ([fake_meeting], []))
-        monkeypatch.setattr(wcp, "fetch_cards", lambda days=7: ([fake_card], []))
+        monkeypatch.setattr(
+            "vault.ingest.external_ingest.fetch_meetings_from_supabase",
+            lambda days=7: [fake_raw_meeting],
+        )
+        monkeypatch.setattr(
+            "vault.ingest.external_ingest.fetch_cards",
+            lambda days=7: ([fake_card_entity], []),
+        )
 
-        s1 = wcp.run_wave_c_ingest(vault_root=wiring_workspace["vault_root"], dry_run=False)
-        s2 = wcp.run_wave_c_ingest(vault_root=wiring_workspace["vault_root"], dry_run=False)
+        s1 = ext.run_external_ingest(
+            vault_root=wiring_workspace["vault_root"],
+            dry_run=False,
+        )
+        s2 = ext.run_external_ingest(
+            vault_root=wiring_workspace["vault_root"],
+            dry_run=False,
+        )
 
         assert s1["meetings_written"] == 1
         assert s1["cards_written"] == 1
@@ -119,65 +141,50 @@ class TestWaveCIngestWriter:
         assert s2["cards_skipped"] >= 1
 
 
-class TestWaveCPipelineIntegration:
+class TestExternalIngestPipelineIntegration:
 
-    def test_run_pipeline_exposes_wave_c_ingest_summary(self, wiring_workspace, monkeypatch):
+    def test_run_pipeline_exposes_external_ingest_summary(self, wiring_workspace, monkeypatch):
         import vault.pipeline as pipeline_module
 
         monkeypatch.setattr(pipeline_module, "VAULT_ROOT", wiring_workspace["vault_root"])
 
-        # Avoid real external calls; emulate empty fetches
         monkeypatch.setattr(
-            "vault.ingest.wave_c_pipeline.fetch_meetings",
-            lambda days=7: ([], []),
+            "vault.ingest.external_ingest.fetch_meetings_from_supabase",
+            lambda days=7: [],
         )
         monkeypatch.setattr(
-            "vault.ingest.wave_c_pipeline.fetch_cards",
+            "vault.ingest.external_ingest.fetch_cards",
             lambda days=7: ([], []),
         )
 
-        summary = pipeline_module.run_pipeline(
+        summary = pipeline_module.run_signal_pipeline(
             events_path=wiring_workspace["events"],
             dry_run=True,
         )
 
-        assert "wave_c_ingest" in summary
-        assert "meetings_fetched" in summary["wave_c_ingest"]
-        assert "cards_fetched" in summary["wave_c_ingest"]
-
-    def test_wave_c_stage_can_be_disabled_via_env(self, wiring_workspace, monkeypatch):
-        # Re-import module so env flag is re-evaluated at import-time.
-        monkeypatch.setenv("WAVE_C_C1_ENABLED", "false")
-
-        import vault.pipeline as p
-        p = importlib.reload(p)
-
-        monkeypatch.setattr(p, "VAULT_ROOT", wiring_workspace["vault_root"])
-
-        summary = p.run_pipeline(
-            events_path=wiring_workspace["events"],
-            dry_run=True,
-        )
-
-        assert summary["wave_c_ingest"]["wave_c_enabled"] is False
-        assert summary["wave_c_ingest"]["meetings_fetched"] == 0
-        assert summary["wave_c_ingest"]["cards_fetched"] == 0
+        assert "external_ingest" in summary
+        assert "meetings_fetched" in summary["external_ingest"]
+        assert "cards_fetched" in summary["external_ingest"]
 
     def test_meeting_entity_has_source_keys_and_sources(self, wiring_workspace, monkeypatch):
         """Meeting entities must have source_keys (non-empty list) and sources array."""
-        from vault.ingest import wave_c_pipeline as wcp
+        from vault.ingest import external_ingest as ext
 
-        fake_meeting = {
-            "id_canonical": "meeting:daily-2026-04-10",
-            "meeting_id_source": "daily-2026-04-10",
-            "title": "Daily",
-            "source_keys": ["tldv:daily-2026-04-10"],
-            "lineage": {"mapper_version": "wave-c-meeting-ingest-v1"},
+        fake_raw_meeting = {
+            "id": "daily-2026-04-10",
+            "name": "Daily",
+            "participants": [{"id": "p1", "name": "Robert"}],
         }
-        monkeypatch.setattr(wcp, "fetch_meetings", lambda days=7: ([fake_meeting], []))
-        monkeypatch.setattr(wcp, "fetch_cards", lambda days=7: ([], []))
+        monkeypatch.setattr(
+            "vault.ingest.external_ingest.fetch_meetings_from_supabase",
+            lambda days=7: [fake_raw_meeting],
+        )
+        monkeypatch.setattr(
+            "vault.ingest.external_ingest.fetch_cards",
+            lambda days=7: ([], []),
+        )
 
-        wcp.run_wave_c_ingest(vault_root=wiring_workspace["vault_root"], dry_run=False)
+        ext.run_external_ingest(vault_root=wiring_workspace["vault_root"], dry_run=False)
 
         entities = list((wiring_workspace["vault_root"] / "entities").glob("meeting-*.md"))
         assert len(entities) == 1
@@ -194,32 +201,59 @@ class TestWaveCPipelineIntegration:
         assert len(fm["sources"]) > 0, "sources must be non-empty"
         assert fm["sources"][0].get("source_type") == "tldv_api"
 
-    def test_meeting_entity_references_person_via_sources(self, wiring_workspace, monkeypatch):
-        """When person entities exist for participants, meeting sources should reference them."""
-        from vault.ingest import wave_c_pipeline as wcp
+    def test_meeting_entity_sources_reference_tldv_api(self, wiring_workspace, monkeypatch):
+        """When meeting entity is written, meeting sources should reference the TLDV API."""
+        from vault.ingest import external_ingest as ext
 
-        # A meeting with participants that already have person entities written
-        fake_meeting = {
-            "id_canonical": "meeting:daily-2026-04-10",
-            "meeting_id_source": "daily-2026-04-10",
-            "title": "Daily",
-            "participants": [
-                {"id_canonical": "person:lincoln", "display_name": "Lincoln"},
-                {"id_canonical": "person:robert", "display_name": "Robert"},
-            ],
-            "source_keys": ["tldv:daily-2026-04-10"],
-            "lineage": {"mapper_version": "wave-c-meeting-ingest-v1"},
+        fake_raw_meeting = {
+            "id": "daily-2026-04-10",
+            "name": "Daily",
+            "participants": [{"id": "p1", "name": "Robert"}],
         }
-        monkeypatch.setattr(wcp, "fetch_meetings", lambda days=7: ([fake_meeting], []))
-        monkeypatch.setattr(wcp, "fetch_cards", lambda days=7: ([], []))
+        monkeypatch.setattr(
+            "vault.ingest.external_ingest.fetch_meetings_from_supabase",
+            lambda days=7: [fake_raw_meeting],
+        )
+        monkeypatch.setattr(
+            "vault.ingest.external_ingest.fetch_cards",
+            lambda days=7: ([], []),
+        )
 
-        wcp.run_wave_c_ingest(vault_root=wiring_workspace["vault_root"], dry_run=False)
+        ext.run_external_ingest(vault_root=wiring_workspace["vault_root"], dry_run=False)
 
         entities = list((wiring_workspace["vault_root"] / "entities").glob("meeting-*.md"))
         import yaml
         text = entities[0].read_text(encoding="utf-8")
         fm = yaml.safe_load(text.split("---", 2)[1])
 
-        # Sources should reference both the TLDV meeting and person participants
         source_types = {s.get("source_type") for s in fm.get("sources", [])}
         assert "tldv_api" in source_types
+
+    def test_skipped_meetings_appear_in_skips_list(self, wiring_workspace, monkeypatch):
+        """Meetings with no participants are skipped and recorded in skips list."""
+        from vault.ingest import external_ingest as ext
+
+        fake_raw_meeting = {
+            "id": "no-participants-meeting",
+            "name": "Empty Meeting",
+            "participants": [],
+        }
+        monkeypatch.setattr(
+            "vault.ingest.external_ingest.fetch_meetings_from_supabase",
+            lambda days=7: [fake_raw_meeting],
+        )
+        monkeypatch.setattr(
+            "vault.ingest.external_ingest.fetch_cards",
+            lambda days=7: ([], []),
+        )
+
+        summary = ext.run_external_ingest(
+            vault_root=wiring_workspace["vault_root"],
+            dry_run=False,
+        )
+
+        assert summary["meetings_fetched"] == 1
+        assert summary["meetings_resolved"] == 0
+        assert summary["meetings_skipped"] == 1
+        assert len(summary["skips"]) == 1
+        assert summary["skips"][0]["reason"] == "NO_PARTICIPANTS"

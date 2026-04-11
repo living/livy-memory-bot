@@ -62,3 +62,20 @@ def upsert_concept(topic):
 def run_ingest(events_path=DEFAULT_EVENTS):
     _sync_globals()
     return _legacy.run_ingest(events_path)
+
+
+# Source-specific ingest orchestrators
+from .external_ingest import run_external_ingest  # noqa: E402
+
+__all__ = [
+    "VAULT_ROOT",
+    "DEFAULT_EVENTS",
+    "load_events",
+    "map_signal_confidence",
+    "deduplicate_events",
+    "extract_signal",
+    "upsert_decision",
+    "upsert_concept",
+    "run_ingest",
+    "run_external_ingest",
+]

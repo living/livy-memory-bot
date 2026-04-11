@@ -1,7 +1,7 @@
 import pytest
 
 from vault.ingest.meeting_ingest import (
-    _fetch_from_supabase,
+    fetch_meetings_from_supabase,
     normalize_meeting_record,
     build_meeting_entity,
     extract_participants,
@@ -151,7 +151,7 @@ def test_fetch_and_build_skips_invalid_records(monkeypatch):
             {"meeting_id": "", "title": "bad"},
         ]
 
-    monkeypatch.setattr("vault.ingest.meeting_ingest._fetch_from_supabase", _fake_fetch)
+    monkeypatch.setattr("vault.ingest.meeting_ingest.fetch_meetings_from_supabase", _fake_fetch)
 
     entities, participants = fetch_and_build()
 
@@ -164,7 +164,7 @@ def test_fetch_from_supabase_warns_when_env_missing(monkeypatch, capsys):
     monkeypatch.delenv("SUPABASE_URL", raising=False)
     monkeypatch.delenv("SUPABASE_SERVICE_ROLE_KEY", raising=False)
 
-    result = _fetch_from_supabase()
+    result = fetch_meetings_from_supabase()
 
     captured = capsys.readouterr()
     assert result == []

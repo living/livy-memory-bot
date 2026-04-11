@@ -159,10 +159,9 @@ class TestGitHubEnrichment:
             for e in sample_events:
                 f.write(json.dumps(e, ensure_ascii=False) + "\n")
 
-        monkeypatch.setenv("WAVE_C_C1_ENABLED", "false")
         monkeypatch.setattr(p, "VAULT_ROOT", vault_root)
 
-        summary = p.run_pipeline(events_path=events, dry_run=False, repair=True)
+        summary = p.run_signal_pipeline(events_path=events, dry_run=False, repair=True)
 
         assert summary["gaps_after_repair"] == 0
         assert summary["orphans_after_repair"] == 0
