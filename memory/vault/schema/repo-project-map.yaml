@@ -1,3 +1,8 @@
-# GitHub repo → project name (for cross-linking)
-# Auto-populated by repo resolution, manually curated
-repos: {}
+repos:
+  living/AbsRio-ApiCRM: BAT/Kaba
+  living/RetailAuditRulesDashboard: BAT/Kaba
+  living/bot-ai-api: BAT/Kaba
+  living/elcano-robo-ocr: BAT/Kaba
+  living/living-energy: Deploy
+  living/livy-memory-bot: Livy Memory
+  living/livy-tldv-jobs: TLDV Pipeline

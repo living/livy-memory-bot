@@ -1,3 +1,28 @@
-# Trello board ID → project name (for cross-linking)
-# Auto-populated by board resolution, manually curated
-boards: {}
+boards:
+  59bac089383b1a593af7588d: Quadro de Boas-vindas
+  59bac41868ed55f2fefb3e2c: Demo 01
+  5cbe2142f822f229f94db5a3: Projeto Identificação de materiais
+  5cd04887f4067d0f27f40ea5: SC-Hub
+  5cef0843ab461e77ee556f69: B3 - Rollout ECB
+  5d85184c0c352d33748609f0: Living/Infra ECB
+  5d9f364e4f6991417bf61374: B3/Listados
+  60f058aa0bebde2f6e4e4b9c: KE20 Infra
+  64fb3f596b85baef06d464a5: CERC/Billing
+  652fd02862b676f96d01a906: B3/BancoB3
+  6539390e8307e1a4950ff230: B3/Balcão
+  6552608b26aee8630440485d: B3/UIF+NW+NT
+  65dcb744609910de6631076d: Elcano/Robôs Sede e Navio
+  6604261fbe5664b71107e3a9: Living/Gestao
+  660ff54fc58cbcea05710f15: DevOps & Infra
+  6697cdb0b388dea00a594901: Elcano/Robôs OCR e Navios
+  66e99655f8e85b6698d3d784: BAT/ConectaBot
+  672a0c308586fa77cbd2f23f: B3/Neoway+Neurotech
+  679b7e0478125a174c9a34ae: Living/M.I.C.I
+  67a0d022c7d95f3f8e0809d7: Delphos/DFI-SVD
+  67b354831114cedcdc342d8c: B3/Balcao-MVP Modernizacao
+  67e6e1b29de74ee5ee6731ed: Delphos/SVR
+  67ebea7092183d7f88cb0b5d: CERC/Novo Interop
+  695c1a2b525c201947444cfc: B3\Balcao-KE20 Modernização
+  6964f88f5b00feaf4078988d: Delphos Integração 2026
+  698b5c744bdec8ef779b2729: tl;dv integrations
+  69a086a99bb2eb087f43ec75: BAT - Conecta Check
