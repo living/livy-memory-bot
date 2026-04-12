@@ -14,6 +14,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+import yaml
+
 
 def _split_frontmatter(text: str) -> tuple[dict, str]:
     """Parse YAML frontmatter from markdown text into a dict."""
@@ -36,7 +38,6 @@ def _join_frontmatter(fm: dict, body: str) -> str:
     fm_text = yaml.dump(fm, default_flow_style=False, sort_keys=False)
     return f"---\n{fm_text}---\n\n{body}"
 
-import yaml
 
 
 def _slugify(text: str) -> str:
