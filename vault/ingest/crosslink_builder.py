@@ -219,12 +219,10 @@ def run_crosslink(
         ("pr-project.json", pr_project_edges),
     ]:
         target = rel_dir / name
-        tmp = target.with_suffix(".tmp")
-        tmp.write_text(
+        _atomic_write(
+            target,
             json.dumps({"edges": edges}, indent=2, ensure_ascii=False),
-            encoding="utf-8",
         )
-        os.replace(str(tmp), str(target))
 
     stats["edges"] = {
         "card_person": len(card_person_edges),
