@@ -674,6 +674,77 @@ def _update_meeting_context(vault_root: Path, card_project_edges: list[dict], pr
 
 
 
+def _dedup_draft_persons(vault_root: Path) -> int:
+    """Merge draft persons into canonicals by fuzzy name matching."""
+    persons_dir = vault_root / "entities" / "persons"
+    if not persons_dir.exists():
+        return 0
+
+    persons = []
+    for f in persons_dir.glob("*.md"):
+        text = f.read_text(encoding="utf-8")
+        end = text.find("---", 3)
+        if end == -1:
+            continue
+        fm = yaml.safe_load(text[3:end]) or {}
+        persons.append({
+            "file": f,
+            "name": fm.get("entity", f.stem),
+            "stem": f.stem,
+            "source_keys": fm.get("source_keys", []),
+            "trello_ids": fm.get("trello_ids", []),
+            "trello_usernames": fm.get("trello_usernames", []),
+            "github_logins": fm.get("github_logins", []),
+        })
+
+    canonicals = [p for p in persons if " " in p["name"] and not p["name"].startswith("person:")]
+    drafts = [p for p in persons if p not in canonicals]
+
+    merged = 0
+    for draft in drafts:
+        best = None
+        best_score = 0
+        draft_name_lower = draft["name"].lower().replace("-", " ").replace("_", " ")
+
+        for canon in canonicals:
+            canon_name_lower = canon["name"].lower()
+            canon_parts = canon_name_lower.split()
+            draft_parts = draft_name_lower.split()
+
+            score = 0
+            for dp in draft_parts:
+                for cp in canon_parts:
+                    if dp in cp or cp in dp:
+                        score += len(min(dp, cp, key=len))
+
+            for un in draft.get("trello_usernames", []):
+                if un.lower().replace("_", "") in canon_name_lower.replace(" ", ""):
+                    score += 50
+
+            if score > best_score and score >= 4:
+                best = canon
+                best_score = score
+
+        if best:
+            text = best["file"].read_text(encoding="utf-8")
+            end = text.find("---", 3)
+            canon_fm = yaml.safe_load(text[3:end]) or {}
+
+            for key in ("source_keys", "trello_ids", "trello_usernames", "github_logins"):
+                existing = set(canon_fm.get(key, []))
+                for val in draft.get(key, []):
+                    if val not in existing:
+                        canon_fm.setdefault(key, []).append(val)
+
+            body = text[end + 3:]
+            fm_text = yaml.dump(canon_fm, default_flow_style=False, sort_keys=False)
+            best["file"].write_text(f"---\n{fm_text}---{body}", encoding="utf-8")
+            draft["file"].unlink()
+            merged += 1
+
+    return merged
+
+
 def run_crosslink(
     vault_root: Path,
     dry_run: bool = False,
@@ -839,6 +910,14 @@ def run_crosslink(
         pass
     try:
         _update_meeting_context(vault_root, card_project_edges, pr_project_edges)
+    except Exception:
+        pass
+
+    # Dedup draft persons into canonicals
+    try:
+        deduped = _dedup_draft_persons(vault_root)
+        if deduped:
+            stats["persons_deduped"] = deduped
     except Exception:
         pass
 

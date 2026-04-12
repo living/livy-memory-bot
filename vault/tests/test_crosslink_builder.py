@@ -742,3 +742,77 @@ class TestGetSchemaDirFallback:
         vault.mkdir(parents=True)
         # No schema dir at all
         assert get_schema_dir(vault) == parent / "schema"
+
+
+# ---------------------------------------------------------------------------
+# Person dedup — merge draft persons into canonicals
+# ---------------------------------------------------------------------------
+
+class TestPersonDedup:
+    def test_draft_merged_into_canonical(self, tmp_path):
+        from vault.ingest.crosslink_builder import _dedup_draft_persons
+        persons = tmp_path / "entities" / "persons"
+        persons.mkdir(parents=True)
+
+        # Canonical
+        canon = persons / "Esteves Marques.md"
+        canon.write_text(
+            "---\nentity: Esteves Marques\nsource_keys:\n  - trello/abc\n---\nBio text.\n",
+            encoding="utf-8",
+        )
+
+        # Draft
+        draft = persons / "estevesm.md"
+        draft.write_text(
+            "---\nentity: estevesm\nsource_keys:\n  - github/123\ngithub_logins:\n  - estevesm\n---\n",
+            encoding="utf-8",
+        )
+
+        merged = _dedup_draft_persons(tmp_path)
+        assert merged == 1
+        assert not draft.exists()
+        text = canon.read_text(encoding="utf-8")
+        assert "github/123" in text
+        assert "trello/abc" in text
+        assert "estevesm" in text
+
+    def test_no_canonical_match_keeps_draft(self, tmp_path):
+        from vault.ingest.crosslink_builder import _dedup_draft_persons
+        persons = tmp_path / "entities" / "persons"
+        persons.mkdir(parents=True)
+
+        draft = persons / "unknownuser.md"
+        draft.write_text(
+            "---\nentity: unknownuser\nsource_keys:\n  - github/999\n---\n",
+            encoding="utf-8",
+        )
+
+        merged = _dedup_draft_persons(tmp_path)
+        assert merged == 0
+        assert draft.exists()
+
+    def test_merge_preserves_existing_keys(self, tmp_path):
+        from vault.ingest.crosslink_builder import _dedup_draft_persons
+        persons = tmp_path / "entities" / "persons"
+        persons.mkdir(parents=True)
+
+        canon = persons / "Lincoln Quinan Junior.md"
+        canon.write_text(
+            "---\nentity: Lincoln Quinan Junior\nsource_keys:\n  - trello/t1\ntrello_ids:\n  - id123\n---\nBody.\n",
+            encoding="utf-8",
+        )
+
+        draft = persons / "lincolnqjunior.md"
+        draft.write_text(
+            "---\nentity: lincolnqjunior\nsource_keys:\n  - github/g1\ngithub_logins:\n  - lincolnqj\ntrello_usernames:\n  - lincolnqjunior\n---\n",
+            encoding="utf-8",
+        )
+
+        merged = _dedup_draft_persons(tmp_path)
+        assert merged == 1
+        text = canon.read_text(encoding="utf-8")
+        assert "trello/t1" in text
+        assert "github/g1" in text
+        assert "id123" in text
+        assert "lincolnqj" in text
+        assert "lincolnqjunior" in text
