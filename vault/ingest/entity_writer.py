@@ -572,7 +572,19 @@ def upsert_pr(entity: dict, vault_root: Path | None = None) -> tuple[Path, bool]
     author = entity.get("author")
     confidence = entity.get("confidence", "medium")
     merged_at = entity.get("merged_at")
+    created_at = entity.get("created_at")
+    updated_at = entity.get("updated_at")
+    state = entity.get("state", "")
     draft = entity.get("draft", False)
+    body = entity.get("body", "")
+    labels = entity.get("labels", [])
+    additions = entity.get("additions")
+    deletions = entity.get("deletions")
+    changed_files = entity.get("changed_files")
+    base_branch = entity.get("base_branch", "")
+    head_branch = entity.get("head_branch", "")
+    reviewers = entity.get("reviewers", [])
+    comments = entity.get("comments", [])
     source_keys = entity.get("source_keys", [])
     now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     today = now_iso[:10]
@@ -588,6 +600,8 @@ def upsert_pr(entity: dict, vault_root: Path | None = None) -> tuple[Path, bool]
     if project_ref:
         lines.append(f"project_ref: {project_ref}")
     lines.extend([
+        f"state: {state}",
+        f"draft: {str(draft).lower()}",
         f"confidence: {confidence}",
         "source_keys:",
     ])
@@ -607,9 +621,14 @@ def upsert_pr(entity: dict, vault_root: Path | None = None) -> tuple[Path, bool]
         "",
     ])
 
-    # Callout
+    # Callout with key info
     repo_short = repo.split("/")[-1] if repo else "?"
-    lines.append(f"> [!info] {repo_short} · PR #{pr_id_source}")
+    state_icon = "✅" if state == "closed" and merged_at else ("🔴" if state == "closed" else "🟡")
+    lines.append(f"> [!info] {state_icon} {repo_short} · PR #{pr_id_source} · {state}")
+    if base_branch and head_branch:
+        lines.append(f"> `{head_branch}` → `{base_branch}`")
+    if additions is not None and deletions is not None:
+        lines.append(f"> +{additions} / -{deletions} · {changed_files or '?'} files")
     lines.append("")
 
     # Dados section
@@ -619,9 +638,37 @@ def upsert_pr(entity: dict, vault_root: Path | None = None) -> tuple[Path, bool]
         lines.append(f"- **Autor:** [[{author}]]")
     if project_ref:
         lines.append(f"- **Projeto:** [[{project_ref}]]")
+    if created_at:
+        lines.append(f"- **Criado:** {created_at[:10]}")
     if merged_at:
-        lines.append(f"- **Merged:** {merged_at}")
+        lines.append(f"- **Merged:** {merged_at[:10]}")
+    elif updated_at:
+        lines.append(f"- **Atualizado:** {updated_at[:10]}")
+    if labels:
+        lines.append(f"- **Labels:** {', '.join(labels)}")
+    if reviewers:
+        reviewer_names = ", ".join(f"[[{r}]]" for r in reviewers)
+        lines.append(f"- **Reviewers:** {reviewer_names}")
     lines.append("")
+
+    # Descrição section
+    if body and body.strip():
+        lines.extend(["## Descrição", ""])
+        clean_body = body.strip()[:3000]
+        lines.append(clean_body)
+        lines.append("")
+
+    # Comentários section
+    if comments:
+        lines.extend(["## Comentários", ""])
+        for c in comments[:20]:
+            c_author = c.get("author", "?")
+            c_body = (c.get("body") or "").strip()[:500]
+            c_date = (c.get("created_at") or "")[:10]
+            if c_body:
+                lines.append(f"**{c_author}** ({c_date}):")
+                lines.append(f"> {c_body}")
+                lines.append("")
 
     path.write_text("\n".join(lines), encoding="utf-8")
     return path, True

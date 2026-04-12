@@ -17,6 +17,7 @@ from typing import Any
 from datetime import datetime, timezone
 import json
 import os
+import requests
 
 from vault.ingest.meeting_ingest import (
     fetch_meetings_from_supabase,
@@ -510,14 +511,71 @@ def _run_ingest_inner(
             import re as _re
             pr_url = pr_data.get("html_url", "")
             pr_num_match = _re.search(r'/pull/(\d+)', pr_url)
-            pr_num = pr_num_match.group(1) if pr_num_match else "?"
+            pr_num = pr_num_match.group(1) if pr_num_match else str(pr_data.get("number", "?"))
+            pr_number = pr_data.get("number") or (int(pr_num) if pr_num.isdigit() else None)
+
+            # Fetch reviewers
+            reviewers = []
+            if github_token and pr_number:
+                try:
+                    rev_resp = requests.get(
+                        f"https://api.github.com/repos/{repo}/pulls/{pr_number}/reviews",
+                        headers={"Authorization": f"Bearer {github_token}", "Accept": "application/vnd.github+json"},
+                        timeout=10,
+                    )
+                    if rev_resp.status_code == 200:
+                        for rev in rev_resp.json():
+                            rev_login = (rev.get("user") or {}).get("login", "")
+                            if rev_login and rev_login != (pr_data.get("user_login") or ""):
+                                from vault.ingest.crosslink_resolver import _load_github_login_map, _load_person_names, _fuzzy_find
+                                login_map = _load_github_login_map(vault_root)
+                                resolved = login_map.get(rev_login.lower())
+                                if not resolved:
+                                    person_names = _load_person_names(vault_root)
+                                    resolved = _fuzzy_find(rev_login, person_names)
+                                reviewers.append(resolved or rev_login)
+                except Exception:
+                    pass
+
+            # Fetch comments
+            comments = []
+            if github_token and pr_number:
+                try:
+                    c_resp = requests.get(
+                        f"https://api.github.com/repos/{repo}/issues/{pr_number}/comments",
+                        headers={"Authorization": f"Bearer {github_token}", "Accept": "application/vnd.github+json"},
+                        timeout=10,
+                    )
+                    if c_resp.status_code == 200:
+                        for c in c_resp.json()[:15]:
+                            comments.append({
+                                "author": (c.get("user") or {}).get("login", "?"),
+                                "body": (c.get("body") or "")[:500],
+                                "created_at": c.get("created_at", ""),
+                            })
+                except Exception:
+                    pass
+
             entity = {
                 "id_canonical": f"pr:{repo}:{pr_num}",
                 "title": pr_data.get("title", ""),
                 "pr_id_source": pr_num,
                 "repo": repo,
                 "author": author,
+                "state": pr_data.get("state", ""),
+                "draft": pr_data.get("draft", False),
                 "merged_at": pr_data.get("merged_at"),
+                "created_at": pr_data.get("created_at"),
+                "updated_at": pr_data.get("updated_at"),
+                "body": pr_data.get("body", ""),
+                "labels": pr_data.get("labels", []),
+                "additions": pr_data.get("additions"),
+                "deletions": pr_data.get("deletions"),
+                "changed_files": pr_data.get("changed_files"),
+                "base_branch": pr_data.get("base_branch", ""),
+                "head_branch": pr_data.get("head_branch", ""),
+                "reviewers": reviewers,
+                "comments": comments,
                 "source_keys": [f"github:{repo}:{pr_num}"],
                 "confidence": "medium",
             }

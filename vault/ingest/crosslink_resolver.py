@@ -226,10 +226,23 @@ def fetch_prs_for_repos(
                         pass
                 all_prs.append({
                     "repo": repo,
+                    "number": pr.get("number"),
                     "title": pr.get("title", ""),
                     "html_url": pr.get("html_url", ""),
+                    "body": pr.get("body") or "",
+                    "state": pr.get("state", ""),
+                    "draft": pr.get("draft", False),
                     "merged_at": merged,
-                    "user_login": pr.get("user", {}).get("login"),
+                    "created_at": pr.get("created_at"),
+                    "updated_at": pr.get("updated_at"),
+                    "user_login": (pr.get("user") or {}).get("login"),
+                    "labels": [l.get("name") for l in (pr.get("labels") or []) if isinstance(l, dict)],
+                    "additions": pr.get("additions"),
+                    "deletions": pr.get("deletions"),
+                    "changed_files": pr.get("changed_files"),
+                    "merge_commit_sha": pr.get("merge_commit_sha"),
+                    "base_branch": (pr.get("base") or {}).get("ref", ""),
+                    "head_branch": (pr.get("head") or {}).get("ref", ""),
                 })
         except Exception:
             continue
