@@ -1,4 +1,4 @@
-"""Crosslink resolver — person resolution from Trello/GitHub sources."""
+"""Crosslink resolver — person resolution from Trello/GitHub sources — person resolution from Trello/GitHub sources."""
 from __future__ import annotations
 
 import json
@@ -11,6 +11,8 @@ from pathlib import Path
 from typing import Any
 
 import requests
+import yaml
+
 from vault.ingest.meeting_ingest import _fuzzy_name_key, _is_name_prefix
 
 logger = logging.getLogger(__name__)
@@ -131,127 +133,57 @@ def _create_draft_person_from_login(vault_root: Path, login: str) -> None:
     _atomic_write(persons_dir / f"{slug}.md", content)
 
 
-# Bot accounts to skip during PR author resolution
-_BOT_PATTERNS = {
-    "dependabot[bot]",
-    "pre-commit-ci[bot]",
-    "github-actions[bot]",
-    "renovate[bot]",
-    "mergify[bot]",
-}
-
-
-def _is_bot_login(login: str) -> bool:
-    """Check if a GitHub login is a bot/app account."""
-    if login in _BOT_PATTERNS:
-        return True
-    return login.endswith("[bot]") or login.endswith("-bot")
-
-
-def _load_github_login_map_yaml(schema_dir: Path | None) -> dict[str, str]:
-    """Load github-login-map.yaml → {github_login_lower: person_name}."""
-    if schema_dir is None:
-        return {}
-    path = schema_dir / "github-login-map.yaml"
-    if not path.exists():
-        return {}
-    import yaml as _yaml
-    data = _yaml.safe_load(path.read_text())
-    if not data or not isinstance(data, dict):
-        return {}
-    return {k.lower(): v for k, v in (data.get("logins") or {}).items()}
-
-
 def resolve_pr_author(
     pr_data: dict,
     vault_root: Path,
     github_token: str | None = None,
-    schema_dir: Path | None = None,
-    pr_author_cache: dict | None = None,
 ) -> str | None:
     """Resolve a PR's author to a person name.
 
     Resolution chain:
-      0. Check pr_author_cache (batch-fetched)
       1. Fetch PR from GitHub API → get user.login
-      2. Match against github-login-map.yaml
-      3. Match against person files via github_login frontmatter
-      4. Fuzzy name match against existing person names
-      5. Create draft person if no match
+      2. Match against person files via github_login frontmatter
+      3. Fuzzy name match against existing person names
+      4. Create draft person if no match
     """
-    repo = pr_data.get("repo", "")
-    number = pr_data.get("number", "")
+    if not github_token:
+        return None
+
     pr_url = pr_data.get("url", "")
+    m = re.match(r'https://github\.com/([^/]+/[^/]+)/pull/(\d+)', pr_url)
+    if not m:
+        return None
 
-    # 0. Check cache first
-    if pr_author_cache is not None:
-        cache_key = (repo, str(number))
-        cached = pr_author_cache.get(cache_key)
-        if cached is not None:
-            login = cached
-        else:
-            login = None
-    else:
-        login = None
+    owner_repo, number = m.group(1), int(m.group(2))
+    api_url = f"https://api.github.com/repos/{owner_repo}/pulls/{number}"
+    headers = {
+        "Authorization": f"Bearer {github_token}",
+        "Accept": "application/vnd.github+json",
+    }
 
-    # If not in cache, try API
-    if login is None:
-        if not github_token:
-            logger.warning("no_token: cannot resolve PR author for %s#%s", repo, number)
+    try:
+        resp = requests.get(api_url, headers=headers, timeout=10)
+        if resp.status_code != 200:
             return None
-
-        m = re.match(r'https://github\.com/([^/]+/[^/]+)/pull/(\d+)', pr_url)
-        if not m:
-            return None
-
-        owner_repo, pr_num = m.group(1), int(m.group(2))
-        api_url = f"https://api.github.com/repos/{owner_repo}/pulls/{pr_num}"
-        headers = {
-            "Authorization": f"Bearer {github_token}",
-            "Accept": "application/vnd.github+json",
-        }
-
-        try:
-            resp = requests.get(api_url, headers=headers, timeout=10)
-            if resp.status_code == 403:
-                remaining = resp.headers.get("X-RateLimit-Remaining", "?")
-                logger.warning("rate_limited: GitHub API 403 for %s (remaining: %s)", pr_url, remaining)
-                return None
-            if resp.status_code != 200:
-                logger.warning("api_error: GitHub API %d for %s", resp.status_code, pr_url)
-                return None
-            login = resp.json().get("user", {}).get("login")
-        except Exception as exc:
-            logger.warning("api_error: exception fetching %s: %s", pr_url, exc)
-            return None
+        login = resp.json().get("user", {}).get("login")
+    except Exception:
+        return None
 
     if not login:
         return None
 
-    # Skip bot accounts
-    if _is_bot_login(login):
-        logger.debug("Skipping bot account: %s", login)
-        return None
-
-    # 2. Match by github-login-map.yaml
-    yaml_map = _load_github_login_map_yaml(schema_dir)
-    if login.lower() in yaml_map:
-        resolved = yaml_map[login.lower()]
-        logger.debug("Resolved %s → %s via github-login-map.yaml", login, resolved)
-        return resolved
-
-    # 3. Match by github_login frontmatter
+    # 2. Match by github_login
     login_map = _load_github_login_map(vault_root)
     if login.lower() in login_map:
         return login_map[login.lower()]
 
-    # 4. Fuzzy match by login as name
+    # 3. Fuzzy match by login as name
     person_names = _load_person_names(vault_root)
     match = _fuzzy_find(login, person_names)
     if match:
         return match
 
-    # 5. Create draft
+    # 4. Create draft
     _create_draft_person_from_login(vault_root, login)
     return login
 
@@ -297,8 +229,20 @@ def fetch_prs_for_repos(
                     "number": pr.get("number"),
                     "title": pr.get("title", ""),
                     "html_url": pr.get("html_url", ""),
+                    "body": pr.get("body") or "",
+                    "state": pr.get("state", ""),
+                    "draft": pr.get("draft", False),
                     "merged_at": merged,
-                    "user_login": pr.get("user", {}).get("login"),
+                    "created_at": pr.get("created_at"),
+                    "updated_at": pr.get("updated_at"),
+                    "user_login": (pr.get("user") or {}).get("login"),
+                    "labels": [l.get("name") for l in (pr.get("labels") or []) if isinstance(l, dict)],
+                    "additions": pr.get("additions"),
+                    "deletions": pr.get("deletions"),
+                    "changed_files": pr.get("changed_files"),
+                    "merge_commit_sha": pr.get("merge_commit_sha"),
+                    "base_branch": (pr.get("base") or {}).get("ref", ""),
+                    "head_branch": (pr.get("head") or {}).get("ref", ""),
                 })
         except Exception:
             continue

@@ -1,188 +1,170 @@
 {
   "edges": [
     {
-      "from_id": "pr:living/livy-memory-bot:1",
-      "to_id": "person:Lincoln Quinan Junior",
-      "role": "author",
-      "confidence": "high"
-    },
-    {
-      "from_id": "pr:living/AbsRio-ApiCRM:18",
-      "to_id": "person:Esteves",
-      "role": "author",
-      "confidence": "high"
-    },
-    {
-      "from_id": "pr:living/AbsRio-ApiCRM:17",
-      "to_id": "person:Esteves",
-      "role": "author",
-      "confidence": "high"
-    },
-    {
-      "from_id": "pr:living/AbsRio-ApiCRM:16",
-      "to_id": "person:Esteves",
-      "role": "author",
-      "confidence": "high"
-    },
-    {
-      "from_id": "pr:living/AbsRio-ApiCRM:15",
-      "to_id": "person:Esteves",
-      "role": "author",
-      "confidence": "high"
-    },
-    {
-      "from_id": "pr:living/AbsRio-ApiCRM:14",
-      "to_id": "person:Esteves",
-      "role": "author",
-      "confidence": "high"
-    },
-    {
-      "from_id": "pr:living/AbsRio-ApiCRM:13",
-      "to_id": "person:Esteves",
-      "role": "author",
-      "confidence": "high"
-    },
-    {
-      "from_id": "pr:living/AbsRio-ApiCRM:12",
-      "to_id": "person:Esteves",
-      "role": "author",
-      "confidence": "high"
-    },
-    {
-      "from_id": "pr:living/AbsRio-ApiCRM:11",
-      "to_id": "person:Esteves",
-      "role": "author",
-      "confidence": "high"
-    },
-    {
-      "from_id": "pr:living/AbsRio-ApiCRM:10",
-      "to_id": "person:Esteves",
-      "role": "author",
-      "confidence": "high"
-    },
-    {
-      "from_id": "pr:living/AbsRio-ApiCRM:9",
-      "to_id": "person:Esteves",
-      "role": "author",
-      "confidence": "high"
-    },
-    {
-      "from_id": "pr:living/AbsRio-ApiCRM:8",
-      "to_id": "person:Esteves",
-      "role": "author",
-      "confidence": "high"
-    },
-    {
-      "from_id": "pr:living/RetailAuditRulesDashboard:129",
-      "to_id": "person:Marcio Rocha",
-      "role": "author",
-      "confidence": "high"
-    },
-    {
-      "from_id": "pr:living/livy-tldv-jobs:12",
-      "to_id": "person:Lincoln Quinan Junior",
-      "role": "author",
-      "confidence": "high"
-    },
-    {
-      "from_id": "pr:living/livy-tldv-jobs:10",
-      "to_id": "person:Lincoln Quinan Junior",
+      "from_id": "pr:living/livy-forge-platform:4",
+      "to_id": "person:lincolnqjunior",
       "role": "author",
       "confidence": "high"
     },
     {
       "from_id": "pr:living/livy-tldv-jobs:11",
-      "to_id": "person:Lincoln Quinan Junior",
+      "to_id": "person:lincolnqjunior",
+      "role": "author",
+      "confidence": "high"
+    },
+    {
+      "from_id": "pr:living/livy-memory-bot:1",
+      "to_id": "person:lincolnqjunior",
+      "role": "author",
+      "confidence": "high"
+    },
+    {
+      "from_id": "pr:living/livy-memory-bot:5",
+      "to_id": "person:lincolnqjunior",
+      "role": "author",
+      "confidence": "high"
+    },
+    {
+      "from_id": "pr:living/livy-tldv-jobs:3",
+      "to_id": "person:lincolnqjunior",
+      "role": "author",
+      "confidence": "high"
+    },
+    {
+      "from_id": "pr:living/livy-memory-bot:3",
+      "to_id": "person:lincolnqjunior",
+      "role": "author",
+      "confidence": "high"
+    },
+    {
+      "from_id": "pr:living/livy-tldv-jobs:12",
+      "to_id": "person:lincolnqjunior",
+      "role": "author",
+      "confidence": "high"
+    },
+    {
+      "from_id": "pr:living/livy-memory-bot:8",
+      "to_id": "person:lincolnqjunior",
       "role": "author",
       "confidence": "high"
     },
     {
       "from_id": "pr:living/livy-tldv-jobs:9",
-      "to_id": "person:Lincoln Quinan Junior",
+      "to_id": "person:lincolnqjunior",
+      "role": "author",
+      "confidence": "high"
+    },
+    {
+      "from_id": "pr:living/livy-forge-platform:6",
+      "to_id": "person:lincolnqjunior",
+      "role": "author",
+      "confidence": "high"
+    },
+    {
+      "from_id": "pr:living/livy-tldv-jobs:13",
+      "to_id": "person:lincolnqjunior",
       "role": "author",
       "confidence": "high"
     },
     {
       "from_id": "pr:living/livy-tldv-jobs:8",
-      "to_id": "person:Lincoln Quinan Junior",
+      "to_id": "person:lincolnqjunior",
+      "role": "author",
+      "confidence": "high"
+    },
+    {
+      "from_id": "pr:living/livy-tldv-jobs:10",
+      "to_id": "person:lincolnqjunior",
+      "role": "author",
+      "confidence": "high"
+    },
+    {
+      "from_id": "pr:living/livy-bat-jobs:2",
+      "to_id": "person:lincolnqjunior",
+      "role": "author",
+      "confidence": "high"
+    },
+    {
+      "from_id": "pr:living/livy-forge-platform:12",
+      "to_id": "person:lincolnqjunior",
+      "role": "author",
+      "confidence": "high"
+    },
+    {
+      "from_id": "pr:living/livy-memory-bot:10",
+      "to_id": "person:lincolnqjunior",
+      "role": "author",
+      "confidence": "high"
+    },
+    {
+      "from_id": "pr:living/livy-memory-bot:9",
+      "to_id": "person:lincolnqjunior",
+      "role": "author",
+      "confidence": "high"
+    },
+    {
+      "from_id": "pr:living/livy-memory-bot:7",
+      "to_id": "person:lincolnqjunior",
+      "role": "author",
+      "confidence": "high"
+    },
+    {
+      "from_id": "pr:living/livy-forge-platform:10",
+      "to_id": "person:lincolnqjunior",
+      "role": "author",
+      "confidence": "high"
+    },
+    {
+      "from_id": "pr:living/livy-memory-bot:12",
+      "to_id": "person:lincolnqjunior",
+      "role": "author",
+      "confidence": "high"
+    },
+    {
+      "from_id": "pr:living/livy-memory-bot:6",
+      "to_id": "person:lincolnqjunior",
+      "role": "author",
+      "confidence": "high"
+    },
+    {
+      "from_id": "pr:living/livy-tldv-jobs:6",
+      "to_id": "person:lincolnqjunior",
+      "role": "author",
+      "confidence": "high"
+    },
+    {
+      "from_id": "pr:living/livy-memory-bot:11",
+      "to_id": "person:lincolnqjunior",
+      "role": "author",
+      "confidence": "high"
+    },
+    {
+      "from_id": "pr:living/livy-memory-bot:2",
+      "to_id": "person:lincolnqjunior",
+      "role": "author",
+      "confidence": "high"
+    },
+    {
+      "from_id": "pr:living/livy-forge-platform:11",
+      "to_id": "person:lincolnqjunior",
       "role": "author",
       "confidence": "high"
     },
     {
       "from_id": "pr:living/livy-tldv-jobs:7",
-      "to_id": "person:Lincoln Quinan Junior",
+      "to_id": "person:lincolnqjunior",
       "role": "author",
       "confidence": "high"
     },
     {
-      "from_id": "pr:living/bot-ai-api:116",
-      "to_id": "person:Marcio Rocha",
+      "from_id": "pr:living/livy-memory-bot:4",
+      "to_id": "person:lincolnqjunior",
       "role": "author",
       "confidence": "high"
     },
     {
-      "from_id": "pr:living/AbsRio-ApiCRM:7",
-      "to_id": "person:Esteves",
-      "role": "author",
-      "confidence": "high"
-    },
-    {
-      "from_id": "pr:living/AbsRio-ApiCRM:6",
-      "to_id": "person:Victor Neves",
-      "role": "author",
-      "confidence": "high"
-    },
-    {
-      "from_id": "pr:living/AbsRio-ApiCRM:5",
-      "to_id": "person:Victor Neves",
-      "role": "author",
-      "confidence": "high"
-    },
-    {
-      "from_id": "pr:living/AbsRio-ApiCRM:4",
-      "to_id": "person:Esteves",
-      "role": "author",
-      "confidence": "high"
-    },
-    {
-      "from_id": "pr:living/AbsRio-ApiCRM:3",
-      "to_id": "person:Esteves",
-      "role": "author",
-      "confidence": "high"
-    },
-    {
-      "from_id": "pr:living/AbsRio-ApiCRM:2",
-      "to_id": "person:Esteves",
-      "role": "author",
-      "confidence": "high"
-    },
-    {
-      "from_id": "pr:living/AbsRio-ApiCRM:1",
-      "to_id": "person:Esteves",
-      "role": "author",
-      "confidence": "high"
-    },
-    {
-      "from_id": "pr:living/elcano-robo-ocr:40",
-      "to_id": "person:Lincoln Quinan Junior",
-      "role": "author",
-      "confidence": "high"
-    },
-    {
-      "from_id": "pr:living/bot-ai-api:114",
-      "to_id": "person:Marcio Rocha",
-      "role": "author",
-      "confidence": "high"
-    },
-    {
-      "from_id": "pr:living/bot-ai-api:113",
-      "to_id": "person:Marcio Rocha",
-      "role": "author",
-      "confidence": "high"
-    },
-    {
-      "from_id": "pr:living/living-energy:3",
-      "to_id": "person:Lincoln Quinan Junior",
+      "from_id": "pr:living/livy-tldv-jobs:4",
+      "to_id": "person:lincolnqjunior",
       "role": "author",
       "confidence": "high"
     }

@@ -1,0 +1,44 @@
+# vault/domain/identity_map.yaml
+# Canonical identity map for Living Memory vault.
+
+persons:
+  - canonical: "Lincoln Quinan Junior"
+    github_login: lincolnqjunior
+    trello_names: [Lincoln]
+    email: lincoln@livingnet.com.br
+    aliases: [lincolnqjunior, Lincoln, Lincoln Quinan]
+
+  - canonical: "Esteves Marques"
+    github_login: estevesm
+    trello_names: [esteves]
+    aliases: [esteves, estevesm, Esteves]
+
+  - canonical: "Victor Neves"
+    github_login: victor-living
+    trello_names: [victor neves, victorliving]
+    aliases: [victor neves, victor-living, victorliving, Victor Hugo]
+
+  - canonical: "Marcio Rocha"
+    github_login: marcioxrocha
+    trello_names: [marcio rocha]
+    aliases: [marcio rocha, marcioxrocha, Marcio]
+
+  - canonical: "Rafael Bernardi"
+    trello_names: [Rafael Bernardi]
+    aliases: [Rafael Bernardi]
+
+  - canonical: "Caroliny Impellizieri"
+    trello_names: [Caroliny Impellizieri]
+    aliases: [Caroliny Impellizieri]
+
+  - canonical: "Sergio Fraga"
+    trello_names: [Sergio Fraga]
+    aliases: [Sergio Fraga]
+
+  - canonical: "Luiz Rogério"
+    trello_names: [LuizR, "Luiz Rogério"]
+    aliases: [LuizR, "Luiz Rogério", Luiz Rogerio]
+
+  - canonical: "Jaime"
+    trello_names: [jaime_living]
+    aliases: [jaime_living, Jaime]

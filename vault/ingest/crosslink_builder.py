@@ -12,11 +12,26 @@ from typing import Any
 
 import yaml
 
-from vault.ingest.entity_writer import _split_frontmatter, upsert_card
-from vault.ingest.meeting_ingest import _fuzzy_name_key, _is_name_prefix
+from vault.ingest.mapping_loader import (
+    load_trello_member_map,
+    load_repo_project_map,
+    load_board_project_map,
+    get_schema_dir,
+)
+from vault.ingest.entity_writer import upsert_pr, upsert_card
+from vault.ingest.crosslink_resolver import (
+    resolve_card_members,
+    resolve_pr_author,
+    save_trello_member_map,
+)
+from vault.ingest.crosslink_enrichment import (
+    enrich_project_files,
+    enrich_person_files_with_crosslinks,
+    update_meeting_context,
+)
+from vault.ingest.crosslink_dedup import dedup_draft_persons
 
 logger = logging.getLogger(__name__)
-
 
 def _atomic_write(path: Path, content: str, encoding: str = "utf-8") -> None:
     """Write content to file atomically using tmp + rename."""
@@ -27,6 +42,16 @@ def _atomic_write(path: Path, content: str, encoding: str = "utf-8") -> None:
     except Exception:
         tmp.unlink(missing_ok=True)
         raise
+
+
+# Reuse fuzzy matching from meeting_ingest
+from vault.ingest.meeting_ingest import _fuzzy_name_key, _is_name_prefix
+from vault.ingest.mapping_loader import (
+    load_trello_member_map,
+    load_repo_project_map,
+    load_board_project_map,
+)
+from vault.ingest.entity_writer import upsert_card, upsert_pr, _split_frontmatter
 
 
 def run_crosslink(
@@ -41,25 +66,14 @@ def run_crosslink(
     Reads enrichment_context from meeting entities, resolves cards/PRs to
     persons and projects via mapping configs, and writes relationship files.
     """
+    import json
     from vault.ingest.mapping_loader import (
         load_trello_member_map,
         load_repo_project_map,
         load_board_project_map,
         get_schema_dir,
     )
-    from vault.ingest.crosslink_resolver import (
-        resolve_card_members,
-        resolve_pr_author,
-        fetch_prs_for_repos,
-        save_trello_member_map,
-    )
-    from vault.ingest.crosslink_enrichment import (
-        enrich_project_files,
-        enrich_person_files_with_crosslinks,
-        update_meeting_context,
-    )
-    from vault.ingest.crosslink_dedup import dedup_draft_persons
-    from vault.ingest.entity_writer import upsert_pr
+    from vault.ingest.entity_writer import upsert_pr, _split_frontmatter
 
     schema_dir = get_schema_dir(vault_root)
     rel_dir = vault_root / "relationships"
@@ -70,10 +84,70 @@ def run_crosslink(
     repo_map = load_repo_project_map(schema_dir)
     board_map = load_board_project_map(schema_dir)
 
-    # Collect all cards and PRs from meeting entities
+    # Collect all cards and PRs — primary source: entity files on disk
     all_cards: dict[str, dict] = {}  # card_id → card
-    all_prs: dict[str, dict] = {}    # pr_url → pr
+    all_prs: dict[str, dict] = {}    # pr_key → pr
 
+    # ── Primary: read card entity files ────────────────────────────────────
+    cards_dir = vault_root / "entities" / "cards"
+    if cards_dir.exists():
+        for cf in cards_dir.glob("*.md"):
+            try:
+                text = cf.read_text(encoding="utf-8")
+                if not text.startswith("---"):
+                    continue
+                end = text.find("---", 3)
+                if end == -1:
+                    continue
+                fm = yaml.safe_load(text[3:end]) or {}
+                # card_id_source is the Trello card ID; fall back to id_canonical
+                cid = fm.get("card_id_source") or fm.get("card_id") or ""
+                # Also extract short card ID from id_canonical if needed
+                if not cid:
+                    idc = fm.get("id_canonical", "")
+                    # card:BOARD:SHORTID format
+                    parts = idc.split(":")
+                    if len(parts) >= 3:
+                        cid = parts[-1]
+                if cid:
+                    all_cards[str(cid)] = {
+                        "id": str(cid),
+                        "name": fm.get("title", fm.get("entity", "")),
+                        "board_id": fm.get("board", fm.get("board_id", "")),
+                        "members": fm.get("members", []),
+                    }
+            except Exception as exc:
+                logger.warning("Failed to parse card entity %s: %s", cf.name, exc)
+
+    # ── Primary: read PR entity files ─────────────────────────────────────
+    prs_dir = vault_root / "entities" / "prs"
+    if prs_dir.exists():
+        for pf in prs_dir.glob("*.md"):
+            try:
+                text = pf.read_text(encoding="utf-8")
+                if not text.startswith("---"):
+                    continue
+                end = text.find("---", 3)
+                if end == -1:
+                    continue
+                fm = yaml.safe_load(text[3:end]) or {}
+                repo = fm.get("repo", "")
+                number = fm.get("pr_id_source", fm.get("number", ""))
+                purl = fm.get("url", f"https://github.com/{repo}/pull/{number}") if repo else ""
+                pr_key = purl or f"{repo}#{number}"
+                if pr_key and pr_key not in all_prs:
+                    all_prs[pr_key] = {
+                        "url": purl,
+                        "repo": repo,
+                        "number": number,
+                        "title": fm.get("title", fm.get("entity", "")),
+                        "author": fm.get("author", ""),
+                        "project_ref": fm.get("project_ref", ""),
+                    }
+            except Exception as exc:
+                logger.warning("Failed to parse PR entity %s: %s", pf.name, exc)
+
+    # ── Secondary: meeting enrichment_context (merge, don't overwrite) ────
     if meetings_dir.exists():
         for mf in meetings_dir.glob("*.md"):
             try:
@@ -125,21 +199,29 @@ def run_crosslink(
                     if not dest.exists():
                         pf.rename(dest)
                     logger.info("Quarantined stale PR entity: %s", pf.name)
-            except Exception as exc:
-                logger.warning("Failed to process PR file %s: %s", pf.name, exc)
+            except Exception:
+                pass  # Don't delete broken files
 
-    # Build PR author cache via batch fetch (one API call per repo)
-    pr_author_cache: dict[tuple[str, str], str] = {}  # (repo, number) → login
-    if all_prs and github_token:
-        unique_repos = list({pr.get("repo", "") for pr in all_prs.values() if pr.get("repo")})
-        try:
-            batch_prs = fetch_prs_for_repos(unique_repos, github_token=github_token, days=365)
-            for bpr in batch_prs:
-                if bpr.get("user_login"):
-                    pr_author_cache[(bpr["repo"], str(bpr.get("number", "")))] = bpr["user_login"]
-            logger.info("Batch PR cache: %d authors from %d repos", len(pr_author_cache), len(unique_repos))
-        except Exception as exc:
-            logger.warning("Batch PR fetch failed, falling back to individual: %s", exc)
+    # ── Enrich cards with member info from Trello API if missing ──────────
+    if trello_api_key and trello_token:
+        import requests as _requests
+        for cid, card in all_cards.items():
+            if card.get("members"):
+                continue
+            # Fetch members from Trello API
+            board_id = card.get("board_id", card.get("board", ""))
+            card_trello_id = cid
+            if not board_id or not card_trello_id:
+                continue
+            try:
+                url = f"https://api.trello.com/1/cards/{card_trello_id}/members"
+                resp = _requests.get(url, params={"key": trello_api_key, "token": trello_token}, timeout=10)
+                if resp.status_code == 200:
+                    api_members = resp.json()
+                    if api_members:
+                        card["members"] = [{"id": m["id"], "fullName": m.get("fullName", m.get("username", ""))} for m in api_members]
+            except Exception as exc:
+                logger.warning("Failed to fetch members for card %s: %s", cid, exc)
 
     # Resolve and build edges
     card_person_edges: list[dict] = []
@@ -170,11 +252,7 @@ def run_crosslink(
 
     # PRs → Persons + Projects
     for purl, pr in all_prs.items():
-        author = resolve_pr_author(
-            pr, vault_root, github_token,
-            schema_dir=schema_dir,
-            pr_author_cache=pr_author_cache,
-        )
+        author = resolve_pr_author(pr, vault_root, github_token)
         if author:
             pr_person_edges.append({
                 "from_id": f"pr:{pr.get('repo', '')}:{pr.get('number', '')}",
@@ -237,23 +315,24 @@ def run_crosslink(
     # Enrich project/person/meeting files (Tasks 8-10)
     try:
         enrich_project_files(vault_root)
-    except Exception as exc:
-        logger.warning("enrich_project_files failed: %s", exc)
+    except Exception:
+        pass
     try:
         enrich_person_files_with_crosslinks(vault_root)
-    except Exception as exc:
-        logger.warning("enrich_person_files_with_crosslinks failed: %s", exc)
+    except Exception:
+        pass
     try:
         update_meeting_context(vault_root, card_project_edges, pr_project_edges)
-    except Exception as exc:
-        logger.warning("update_meeting_context failed: %s", exc)
+    except Exception:
+        pass
 
     # Dedup draft persons into canonicals
     try:
         deduped = dedup_draft_persons(vault_root)
         if deduped:
             stats["persons_deduped"] = deduped
-    except Exception as exc:
-        logger.warning("dedup_draft_persons failed: %s", exc)
+    except Exception:
+        pass
 
     return stats
+

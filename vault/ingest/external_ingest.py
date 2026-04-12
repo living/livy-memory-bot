@@ -17,6 +17,7 @@ from typing import Any
 from datetime import datetime, timezone
 import json
 import os
+import requests
 
 from vault.ingest.meeting_ingest import (
     fetch_meetings_from_supabase,
@@ -29,7 +30,7 @@ from vault.ingest.card_ingest import (
     MAPPER_VERSION as CARD_MAPPER_VERSION,
 )
 from vault.ingest.person_ingest import participant_to_person
-from vault.ingest.entity_writer import upsert_meeting, upsert_card, upsert_person
+from vault.ingest.entity_writer import upsert_meeting, upsert_card, upsert_person, upsert_pr
 from vault.domain.normalize import build_source_record
 from vault.domain.relationship_builder import build_person_meeting_edge
 from vault.ingest.cursor import (
@@ -438,7 +439,7 @@ def _run_ingest_inner(
                 cards_written += 1
                 if verbose:
                     print(f"  [card] written: {path.name}")
-                _index_entity(vault_root, entity)
+                _index_entity_by_path(vault_root, path, entity)
             else:
                 cards_skipped += 1
                 if verbose:
@@ -488,6 +489,108 @@ def _run_ingest_inner(
             print(f"[external-ingest] ERROR crosslink: {exc}")
         errors.append({"source": "crosslink", "error": str(exc), "type": type(exc).__name__})
 
+    # Stage 9 — PR Ingestion from GitHub
+    prs_written = 0
+    prs_skipped = 0
+    try:
+        from vault.ingest.crosslink_resolver import fetch_prs_for_repos, resolve_pr_author
+        github_token = os.environ.get("GITHUB_PERSONAL_ACCESS_TOKEN")
+        living_repos = [
+            "living/livy-memory-bot",
+            "living/livy-bat-jobs",
+            "living/livy-delphos-jobs",
+            "living/livy-tldv-jobs",
+            "living/livy-forge-platform",
+        ]
+        prs = fetch_prs_for_repos(living_repos, github_token=github_token, days=30)
+        if verbose:
+            print(f"[external-ingest] fetched {len(prs)} PRs from {len(living_repos)} repos")
+        for pr_data in prs:
+            author = resolve_pr_author(pr_data, vault_root, github_token=github_token)
+            repo = pr_data.get("repo", "")
+            import re as _re
+            pr_url = pr_data.get("html_url", "")
+            pr_num_match = _re.search(r'/pull/(\d+)', pr_url)
+            pr_num = pr_num_match.group(1) if pr_num_match else str(pr_data.get("number", "?"))
+            pr_number = pr_data.get("number") or (int(pr_num) if pr_num.isdigit() else None)
+
+            # Fetch reviewers
+            reviewers = []
+            if github_token and pr_number:
+                try:
+                    rev_resp = requests.get(
+                        f"https://api.github.com/repos/{repo}/pulls/{pr_number}/reviews",
+                        headers={"Authorization": f"Bearer {github_token}", "Accept": "application/vnd.github+json"},
+                        timeout=10,
+                    )
+                    if rev_resp.status_code == 200:
+                        for rev in rev_resp.json():
+                            rev_login = (rev.get("user") or {}).get("login", "")
+                            if rev_login and rev_login != (pr_data.get("user_login") or ""):
+                                from vault.ingest.crosslink_resolver import _load_github_login_map, _load_person_names, _fuzzy_find
+                                login_map = _load_github_login_map(vault_root)
+                                resolved = login_map.get(rev_login.lower())
+                                if not resolved:
+                                    person_names = _load_person_names(vault_root)
+                                    resolved = _fuzzy_find(rev_login, person_names)
+                                reviewers.append(resolved or rev_login)
+                except Exception:
+                    pass
+
+            # Fetch comments
+            comments = []
+            if github_token and pr_number:
+                try:
+                    c_resp = requests.get(
+                        f"https://api.github.com/repos/{repo}/issues/{pr_number}/comments",
+                        headers={"Authorization": f"Bearer {github_token}", "Accept": "application/vnd.github+json"},
+                        timeout=10,
+                    )
+                    if c_resp.status_code == 200:
+                        for c in c_resp.json()[:15]:
+                            comments.append({
+                                "author": (c.get("user") or {}).get("login", "?"),
+                                "body": (c.get("body") or "")[:500],
+                                "created_at": c.get("created_at", ""),
+                            })
+                except Exception:
+                    pass
+
+            entity = {
+                "id_canonical": f"pr:{repo}:{pr_num}",
+                "title": pr_data.get("title", ""),
+                "pr_id_source": pr_num,
+                "repo": repo,
+                "author": author,
+                "state": pr_data.get("state", ""),
+                "draft": pr_data.get("draft", False),
+                "merged_at": pr_data.get("merged_at"),
+                "created_at": pr_data.get("created_at"),
+                "updated_at": pr_data.get("updated_at"),
+                "body": pr_data.get("body", ""),
+                "labels": pr_data.get("labels", []),
+                "additions": pr_data.get("additions"),
+                "deletions": pr_data.get("deletions"),
+                "changed_files": pr_data.get("changed_files"),
+                "base_branch": pr_data.get("base_branch", ""),
+                "head_branch": pr_data.get("head_branch", ""),
+                "reviewers": reviewers,
+                "comments": comments,
+                "source_keys": [f"github:{repo}:{pr_num}"],
+                "confidence": "medium",
+            }
+            path, written = upsert_pr(entity, vault_root=vault_root)
+            if written:
+                prs_written += 1
+                if verbose:
+                    print(f"  [pr] written: {path.name}")
+            else:
+                prs_skipped += 1
+    except Exception as exc:
+        if verbose:
+            print(f"[external-ingest] ERROR pr ingestion: {exc}")
+        errors.append({"source": "pr_ingest", "error": str(exc), "type": type(exc).__name__})
+
     # Rebuild structured index
     if not dry_run:
         from vault.ingest.index_manager import rebuild_index
@@ -508,6 +611,8 @@ def _run_ingest_inner(
         "cards_skipped": cards_skipped,
         "github_decisions": github_decisions,
         "github_errors": github_errors,
+        "prs_written": prs_written,
+        "prs_skipped": prs_skipped,
         "dry_run": dry_run,
         "errors": errors,
         "skips": skips,
@@ -538,7 +643,9 @@ def _enrich_person_files_with_meetings(
         meeting = unit["meeting"]
         participants = unit.get("participants", [])
         for p in participants:
-            pname = p.get("name", "?")
+            pname = p.get("name", "")
+            if not pname or not pname.strip():
+                continue
             norm = _slugify(pname)
             person_meetings.setdefault(norm, []).append({
                 "title": meeting.get("title") or meeting.get("entity") or "",

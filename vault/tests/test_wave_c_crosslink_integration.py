@@ -92,7 +92,7 @@ class TestCrosslinkIntegration:
         vault = _setup_full_vault(tmp_path)
 
         # Run crosslink
-        with patch("vault.ingest.crosslink_resolver.resolve_pr_author",
+        with patch("vault.ingest.crosslink_builder.resolve_pr_author",
                     side_effect=lambda pr, *a, **kw: "Lincoln Quinan Junior"):
             result = run_crosslink(vault, dry_run=False, github_token="fake")
 
@@ -128,7 +128,7 @@ class TestCrosslinkIntegration:
     def test_index_after_crosslink(self, tmp_path):
         vault = _setup_full_vault(tmp_path)
 
-        with patch("vault.ingest.crosslink_resolver.resolve_pr_author",
+        with patch("vault.ingest.crosslink_builder.resolve_pr_author",
                     side_effect=lambda pr, *a, **kw: "Lincoln Quinan Junior"):
             run_crosslink(vault, dry_run=False, github_token="fake")
 
@@ -140,7 +140,7 @@ class TestCrosslinkIntegration:
     def test_lint_after_crosslink(self, tmp_path):
         vault = _setup_full_vault(tmp_path)
 
-        with patch("vault.ingest.crosslink_resolver.resolve_pr_author",
+        with patch("vault.ingest.crosslink_builder.resolve_pr_author",
                     side_effect=lambda pr, *a, **kw: "Lincoln Quinan Junior"):
             run_crosslink(vault, dry_run=False, github_token="fake")
 
@@ -154,7 +154,7 @@ class TestCrosslinkIntegration:
     def test_idempotent(self, tmp_path):
         vault = _setup_full_vault(tmp_path)
 
-        with patch("vault.ingest.crosslink_resolver.resolve_pr_author",
+        with patch("vault.ingest.crosslink_builder.resolve_pr_author",
                     side_effect=lambda pr, *a, **kw: "Lincoln Quinan Junior"):
             r1 = run_crosslink(vault, dry_run=False, github_token="fake")
             r2 = run_crosslink(vault, dry_run=False, github_token="fake")

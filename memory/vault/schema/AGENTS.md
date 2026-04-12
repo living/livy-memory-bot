@@ -112,16 +112,16 @@ draft: false
 # Vault Index
 
 ## Entities (<N>)
-- [[entity-name]] — <descrição> · updated: YYYY-MM-DD
+-  — <descrição> · updated: YYYY-MM-DD
 
 ## Decisions (<N>)
-- [[YYYY-MM-DD-decision-title]] — <resumo> · status: <status>
+-  — <resumo> · status: <status>
 
 ## Evidence (<N>)
-- [[evidence-name]] — <confidence> · last_verified: YYYY-MM-DD
+-  — <confidence> · last_verified: YYYY-MM-DD
 
 ## Lint Reports
-- [[YYYY-MM-DD-lint]] — <resumo>
+-  — <resumo>
 ```
 
 ## Estrutura de Diretórios
@@ -153,7 +153,7 @@ memory/vault/
 ## Backlinks
 
 Toda página deve ter backlinks. Ao criar/atualizar uma página:
-1. Adicionar links para páginas relacionadas (`[[page-name]]`).
+1. Adicionar links para páginas relacionadas (``).
 2. Se link para página que não existe → criar stub com `draft: true`.
 
 ## Identity Resolution (Crosslink)
