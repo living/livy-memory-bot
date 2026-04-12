@@ -674,7 +674,9 @@ def run_crosslink(
     )
     from vault.ingest.entity_writer import upsert_pr, _split_frontmatter
 
-    schema_dir = vault_root.parent / "schema"
+    schema_dir = vault_root / "schema"
+    if not (schema_dir / "trello-member-map.yaml").exists():
+        schema_dir = vault_root.parent / "schema"
     rel_dir = vault_root / "relationships"
     meetings_dir = vault_root / "entities" / "meetings"
 
