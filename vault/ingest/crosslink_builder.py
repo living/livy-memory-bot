@@ -14,6 +14,20 @@ from pathlib import Path
 
 import requests
 import yaml
+import logging
+
+logger = logging.getLogger(__name__)
+
+def _atomic_write(path: Path, content: str, encoding: str = "utf-8") -> None:
+    """Write content to file atomically using tmp + rename."""
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    try:
+        tmp.write_text(content, encoding=encoding)
+        os.replace(str(tmp), str(path))
+    except Exception:
+        tmp.unlink(missing_ok=True)
+        raise
+
 
 # Reuse fuzzy matching from meeting_ingest
 from vault.ingest.meeting_ingest import _fuzzy_name_key, _is_name_prefix
@@ -343,7 +357,8 @@ def _enrich_project_files(vault_root: Path) -> None:
                     pr_details.get(pr.get("url", ""), pr)
                     # Also key by repo+number
                     pr_details[pr.get("url", "")] = pr
-            except Exception:
+            except Exception as exc:
+                logger.warning("Failed to parse meeting %s: %s", mf.name, exc)
                 continue
 
     # Build per-project data
@@ -475,7 +490,8 @@ def _enrich_person_files_with_crosslinks(vault_root: Path) -> None:
                     card_details[card.get("id", "")] = card
                 for pr in ec.get("github", {}).get("pull_requests", []):
                     pr_details[pr.get("url", "")] = pr
-            except Exception:
+            except Exception as exc:
+                logger.warning("Failed to parse meeting %s: %s", mf.name, exc)
                 continue
 
     # Build person → cards/PRs
@@ -674,8 +690,38 @@ def _update_meeting_context(vault_root: Path, card_project_edges: list[dict], pr
 
 
 
+def _is_fuzzy_match(draft_name: str, canonical_name: str) -> bool:
+    """Conservative fuzzy match: require word-level overlap."""
+    import unicodedata, re
+
+    def normalize(s):
+        return re.sub(
+            r'[^a-z0-9]', '',
+            unicodedata.normalize('NFKD', s.lower()).encode('ascii', 'ignore').decode()
+        )
+
+    dn = normalize(draft_name)
+    cn = normalize(canonical_name)
+
+    # Exact substring of normalized name (at least 5 chars to avoid false positives)
+    if len(dn) >= 5 and dn in cn:
+        return True
+
+    # Check if draft username is a prefix of any canonical name part
+    canon_parts = (
+        cn.split() if ' ' not in canonical_name
+        else [normalize(p) for p in canonical_name.split()]
+    )
+    for part in canon_parts:
+        if len(part) >= 4 and (dn.startswith(part) or part.startswith(dn)):
+            if min(len(dn), len(part)) >= 4:
+                return True
+
+    return False
+
+
 def _dedup_draft_persons(vault_root: Path) -> int:
-    """Merge draft persons into canonicals by fuzzy name matching."""
+    """Merge draft persons into canonicals by conservative fuzzy name matching."""
     persons_dir = vault_root / "entities" / "persons"
     if not persons_dir.exists():
         return 0
@@ -703,27 +749,17 @@ def _dedup_draft_persons(vault_root: Path) -> int:
     merged = 0
     for draft in drafts:
         best = None
-        best_score = 0
-        draft_name_lower = draft["name"].lower().replace("-", " ").replace("_", " ")
-
         for canon in canonicals:
-            canon_name_lower = canon["name"].lower()
-            canon_parts = canon_name_lower.split()
-            draft_parts = draft_name_lower.split()
-
-            score = 0
-            for dp in draft_parts:
-                for cp in canon_parts:
-                    if dp in cp or cp in dp:
-                        score += len(min(dp, cp, key=len))
-
-            for un in draft.get("trello_usernames", []):
-                if un.lower().replace("_", "") in canon_name_lower.replace(" ", ""):
-                    score += 50
-
-            if score > best_score and score >= 4:
+            if _is_fuzzy_match(draft["name"], canon["name"]):
                 best = canon
-                best_score = score
+                break
+            # Also check trello usernames as a matching signal
+            for un in draft.get("trello_usernames", []):
+                if _is_fuzzy_match(un, canon["name"]):
+                    best = canon
+                    break
+            if best:
+                break
 
         if best:
             text = best["file"].read_text(encoding="utf-8")
@@ -738,8 +774,19 @@ def _dedup_draft_persons(vault_root: Path) -> int:
 
             body = text[end + 3:]
             fm_text = yaml.dump(canon_fm, default_flow_style=False, sort_keys=False)
-            best["file"].write_text(f"---\n{fm_text}---{body}", encoding="utf-8")
-            draft["file"].unlink()
+            _atomic_write(best["file"], f"---\n{fm_text}---{body}")
+
+            # Quarantine draft instead of deleting
+            quarantine = persons_dir / ".quarantine"
+            quarantine.mkdir(exist_ok=True)
+            dest = quarantine / draft["file"].name
+            if not dest.exists():
+                draft["file"].rename(dest)
+
+            logger.info(
+                "Dedup: merged draft '%s' into canonical '%s' (quarantined to %s)",
+                draft["name"], best["name"], dest.name,
+            )
             merged += 1
 
     return merged
@@ -800,7 +847,8 @@ def run_crosslink(
                     purl = pr.get("url", "")
                     if purl and purl not in all_prs:
                         all_prs[purl] = pr
-            except Exception:
+            except Exception as exc:
+                logger.warning("Failed to parse meeting %s: %s", mf.name, exc)
                 continue
 
     stats = {"cards": len(all_cards), "prs": len(all_prs), "dry_run": dry_run}
@@ -808,19 +856,29 @@ def run_crosslink(
     if dry_run:
         return stats
 
-    # Clean stale PR entities (created with incomplete data)
+    # Clean stale auto-generated PR entities (quarantine, don't delete)
     prs_dir = vault_root / "entities" / "prs"
     if prs_dir.exists():
+        quarantine = prs_dir / ".quarantine"
         for pf in prs_dir.glob("*.md"):
             try:
                 text = pf.read_text(encoding="utf-8")
                 end = text.find("---", 3)
+                if end == -1:
+                    continue
                 fm = yaml.safe_load(text[3:end]) or {}
-                # Delete if missing repo or project_ref
-                if not fm.get("repo") or fm.get("project_ref", "?") == "?":
-                    pf.unlink()
+                # Only clean auto-generated PR entities
+                if fm.get("type") != "pr" or fm.get("last_touched_by") != "livy-agent":
+                    continue
+                # Only if missing critical field
+                if not fm.get("repo") or fm.get("id_canonical", "").endswith(":"):
+                    quarantine.mkdir(exist_ok=True)
+                    dest = quarantine / pf.name
+                    if not dest.exists():
+                        pf.rename(dest)
+                    logger.info("Quarantined stale PR entity: %s", pf.name)
             except Exception:
-                pf.unlink()  # Delete broken frontmatter too
+                pass  # Don't delete broken files
 
     # Resolve and build edges
     card_person_edges: list[dict] = []
@@ -887,8 +945,8 @@ def run_crosslink(
             if merged:
                 pr_entity["merged_at"] = merged
             upsert_pr(pr_entity, vault_root)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("Failed to upsert PR entity: %s", exc)
 
     # Write relationship files
     rel_dir.mkdir(parents=True, exist_ok=True)
