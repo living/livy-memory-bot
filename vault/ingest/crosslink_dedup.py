@@ -125,3 +125,85 @@ def dedup_draft_persons(vault_root: Path) -> int:
     return merged
 
 
+def dedup_with_identity_map(vault_root: Path) -> int:
+    """Merge duplicate persons using IdentityMap as ground truth.
+
+    Falls back to existing fuzzy matching (dedup_draft_persons) for
+    persons not in the identity map.
+    """
+    from vault.domain.identity_map import IdentityMap
+
+    im = IdentityMap.load()
+    if not im.all_canonical_names():
+        return dedup_draft_persons(vault_root)
+
+    persons_dir = vault_root / "entities" / "persons"
+    if not persons_dir.exists():
+        return 0
+
+    # Index existing files by canonical name
+    canonical_files: dict[str, list[dict]] = {}
+    unmapped: list[dict] = []
+    for f in persons_dir.glob("*.md"):
+        text = f.read_text(encoding="utf-8")
+        end = text.find("---", 3)
+        if end == -1:
+            continue
+        fm = yaml.safe_load(text[3:end]) or {}
+        entity_name = fm.get("entity", f.stem)
+        gh_login = fm.get("github_login")
+
+        canonical = (
+            im.resolve(entity_name)
+            or im.resolve_by_github(gh_login or "")
+            or im.resolve_by_trello_name(entity_name)
+        )
+        entry = {"file": f, "name": entity_name, "fm": fm}
+        if canonical:
+            canonical_files.setdefault(canonical, []).append(entry)
+        else:
+            unmapped.append(entry)
+
+    # Merge duplicates within each canonical group
+    merged = 0
+    for canonical, entries in canonical_files.items():
+        if len(entries) < 2:
+            continue
+        entries.sort(key=lambda e: len(e["fm"].get("source_keys", [])), reverse=True)
+        keep = entries[0]
+        for absorb in entries[1:]:
+            keep_fm = keep["fm"]
+            absorb_fm = absorb["fm"]
+            keep_fm["entity"] = canonical
+            keep_keys = set(keep_fm.get("source_keys", []) or [])
+            absorb_keys = set(absorb_fm.get("source_keys", []) or [])
+            keep_fm["source_keys"] = sorted(keep_keys | absorb_keys)
+            if not keep_fm.get("github_login") and absorb_fm.get("github_login"):
+                keep_fm["github_login"] = absorb_fm["github_login"]
+            if not keep_fm.get("email") and absorb_fm.get("email"):
+                keep_fm["email"] = absorb_fm["email"]
+            keep_fm["draft"] = False
+
+            body = keep["file"].read_text(encoding="utf-8")
+            end = body.find("---", 3)
+            original_body = body[end + 3:]
+            if original_body.lstrip("\n").startswith("# "):
+                lines = original_body.lstrip("\n").split("\n")
+                lines[0] = f"# {canonical}"
+                original_body = "\n".join(lines)
+            fm_text = yaml.dump(keep_fm, default_flow_style=False, sort_keys=False)
+            _atomic_write(keep["file"], f"---\n{fm_text}---{original_body}")
+
+            quarantine = persons_dir / ".quarantine"
+            quarantine.mkdir(exist_ok=True)
+            dest = quarantine / absorb["file"].name
+            if not dest.exists():
+                absorb["file"].rename(dest)
+            logger.info("Dedup (identity): merged '%s' into canonical '%s'", absorb["name"], canonical)
+            merged += 1
+
+    # Also run fuzzy dedup for any remaining unmapped drafts
+    merged += dedup_draft_persons(vault_root)
+    return merged
+
+
