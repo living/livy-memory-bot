@@ -816,3 +816,126 @@ class TestPersonDedup:
         assert "id123" in text
         assert "lincolnqj" in text
         assert "lincolnqjunior" in text
+
+
+class TestDedupSafety:
+    def test_quarantine_not_delete(self, tmp_path):
+        """Drafts are moved to .quarantine/, not deleted."""
+        from vault.ingest.crosslink_builder import _dedup_draft_persons
+        persons = tmp_path / "entities" / "persons"
+        persons.mkdir(parents=True)
+
+        canon = persons / "Esteves Marques.md"
+        canon.write_text(
+            "---\nentity: Esteves Marques\nsource_keys:\n  - trello/abc\n---\nBio.\n",
+            encoding="utf-8",
+        )
+        draft = persons / "estevesm.md"
+        draft.write_text(
+            "---\nentity: estevesm\nsource_keys:\n  - github/123\n---\n",
+            encoding="utf-8",
+        )
+
+        merged = _dedup_draft_persons(tmp_path)
+        assert merged == 1
+        assert not draft.exists()
+        quarantine = persons / ".quarantine" / "estevesm.md"
+        assert quarantine.exists()
+
+    def test_conservative_no_false_positive(self, tmp_path):
+        """Short names don't trigger false matches."""
+        from vault.ingest.crosslink_builder import _dedup_draft_persons
+        persons = tmp_path / "entities" / "persons"
+        persons.mkdir(parents=True)
+
+        canon = persons / "Alice Amazonas.md"
+        canon.write_text(
+            "---\nentity: Alice Amazonas\nsource_keys:\n  - trello/x\n---\nBio.\n",
+            encoding="utf-8",
+        )
+        draft = persons / "alex.md"
+        draft.write_text(
+            "---\nentity: alex\nsource_keys:\n  - github/y\n---\n",
+            encoding="utf-8",
+        )
+
+        merged = _dedup_draft_persons(tmp_path)
+        assert merged == 0
+        assert draft.exists()
+
+    def test_exact_match_still_works(self, tmp_path):
+        """Known good matches still merge."""
+        from vault.ingest.crosslink_builder import _dedup_draft_persons
+        persons = tmp_path / "entities" / "persons"
+        persons.mkdir(parents=True)
+
+        canon = persons / "Esteves Marques.md"
+        canon.write_text(
+            "---\nentity: Esteves Marques\nsource_keys:\n  - trello/abc\n---\nBio.\n",
+            encoding="utf-8",
+        )
+        draft = persons / "estevesm.md"
+        draft.write_text(
+            "---\nentity: estevesm\nsource_keys:\n  - github/123\ngithub_logins:\n  - estevesm\n---\n",
+            encoding="utf-8",
+        )
+
+        merged = _dedup_draft_persons(tmp_path)
+        assert merged == 1
+        text = canon.read_text(encoding="utf-8")
+        assert "github/123" in text
+        assert "estevesm" in text
+
+
+class TestStalePRCleanupSafety:
+    def _make_pr_file(self, path, fm_dict, body=""):
+        import yaml
+        fm = yaml.dump(fm_dict, default_flow_style=False, sort_keys=False)
+        path.write_text(f"---\n{fm}---\n{body}\n", encoding="utf-8")
+
+    def test_quarantine_not_delete(self, tmp_path):
+        """Stale auto-generated PRs moved to .quarantine/, not deleted."""
+        prs = tmp_path / "entities" / "prs"
+        prs.mkdir(parents=True)
+        pf = prs / "pr-123.md"
+        self._make_pr_file(pf, {
+            "entity": "pr-123",
+            "type": "pr",
+            "last_touched_by": "livy-agent",
+            "id_canonical": "repo:pr:123",
+        })
+
+        from vault.ingest.crosslink_builder import run_crosslink
+        run_crosslink(tmp_path, dry_run=False, trello_api_key="x", trello_token="y", github_token="z")
+
+        # File missing repo => quarantined
+        assert not pf.exists()
+        assert (prs / ".quarantine" / "pr-123.md").exists()
+
+    def test_skips_non_auto_generated(self, tmp_path):
+        """Files without livy-agent marker are NOT touched."""
+        prs = tmp_path / "entities" / "prs"
+        prs.mkdir(parents=True)
+        pf = prs / "manual-pr.md"
+        self._make_pr_file(pf, {
+            "entity": "manual-pr",
+            "type": "pr",
+            "repo": "",
+        })
+
+        from vault.ingest.crosslink_builder import run_crosslink
+        run_crosslink(tmp_path, dry_run=False, trello_api_key="x", trello_token="y", github_token="z")
+
+        assert pf.exists()
+
+    def test_broken_yaml_not_deleted(self, tmp_path):
+        """Broken YAML files are NOT deleted."""
+        prs = tmp_path / "entities" / "prs"
+        prs.mkdir(parents=True)
+        pf = prs / "broken.md"
+        pf.write_text("---\n: invalid: yaml: [[[\n---\nBody\n", encoding="utf-8")
+
+        from vault.ingest.crosslink_builder import run_crosslink
+        run_crosslink(tmp_path, dry_run=False, trello_api_key="x", trello_token="y", github_token="z")
+
+        assert pf.exists()
