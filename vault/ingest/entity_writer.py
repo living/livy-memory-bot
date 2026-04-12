@@ -311,6 +311,19 @@ def upsert_person(entity: dict, vault_root: Path | None = None) -> tuple[Path, b
     new_email = entity.get("email")
     new_source_keys = entity.get("source_keys", [])
 
+    # --- Identity map lookup ---
+    from vault.domain.identity_map import IdentityMap
+    _identity_map = IdentityMap.load()
+    _canonical = (
+        _identity_map.resolve(new_name)
+        or _identity_map.resolve_by_github(entity.get("github_login", ""))
+    )
+    if _canonical and _canonical != new_name:
+        entity["display_name"] = _canonical
+        entity["entity"] = _canonical
+        entity["id_canonical"] = f"person:canonical:{_slugify(_canonical).lower().replace(' ', '-')}"
+        new_name = _canonical
+
     # --- Fuzzy cross-entity dedup ---
     existing_path = _find_existing_person_fuzzy(entities_dir, new_name)
     if existing_path is not None and existing_path != _entity_path(vault_root, entity):
