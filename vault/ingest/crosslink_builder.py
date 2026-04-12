@@ -362,7 +362,6 @@ def _enrich_project_files(vault_root: Path) -> None:
     for edge in pr_project:
         proj = edge.get("to_id", "").replace("project:", "")
         pr_id = edge.get("from_id", "")
-        pr = pr_details.get("", {})
         # Find PR by matching from_id pattern pr:repo:number
         title = ""
         for purl, pdata in pr_details.items():
