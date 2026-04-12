@@ -41,9 +41,12 @@ def _call_llm(messages: list[dict], model: str | None = None) -> str:
     import requests
 
     base_url = os.environ.get("OPENAI_BASE_URL", "http://localhost:20128/v1")
-    api_key = os.environ.get("OPENAI_API_KEY", os.environ.get("OMNIROUT_API_KEY", "sk-placeholder"))
+    api_key = os.environ.get(
+        "VAULT_LLM_API_KEY",
+        os.environ.get("OMNIROUT_API_KEY", "sk-666bb73565412876-w1unhf-b4a81e18"),
+    )
 
-    model = model or os.environ.get("VAULT_ENRICH_MODEL", "omniroute/PremiumFirst")
+    model = model or os.environ.get("VAULT_ENRICH_MODEL", "PremiumFirst")
 
     resp = requests.post(
         f"{base_url}/chat/completions",
@@ -53,6 +56,8 @@ def _call_llm(messages: list[dict], model: str | None = None) -> str:
             "messages": messages,
             "temperature": 0.3,
             "max_tokens": 2000,
+            "stream": False,
+            "stream": False,
         },
         timeout=60,
     )
