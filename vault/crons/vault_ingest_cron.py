@@ -40,6 +40,34 @@ def main():
     )
 
     # Output structured JSON for cron logging
+    # Stage: Auto-fix orphan links
+    try:
+        from vault.lint.auto_fix import auto_fix_orphan_links
+        fix_result = auto_fix_orphan_links(vault_root)
+        result["auto_fix"] = fix_result
+    except Exception as exc:
+        print(f"[WARN] Auto-fix failed: {exc}", file=sys.stderr)
+
+    # Stage: LLM enrichment for meetings with empty summaries
+    try:
+        from vault.enrich.llm_summarize import enrich_meeting_file
+
+        meetings_dir = vault_root / "entities" / "meetings"
+        enriched = 0
+        if meetings_dir.exists():
+            for mf in meetings_dir.glob("*.md"):
+                text = mf.read_text(encoding="utf-8")
+                # Only enrich meetings that have the placeholder comment
+                if "<!-- Enriquecimento TLDV: tópicos e pontos-chave -->" not in text:
+                    continue
+                # For now, skip LLM enrichment if no transcript available
+                # (transcripts come from Supabase, not stored in the md file)
+                # This stage will be enhanced later when transcript storage is added
+                pass
+        result["meetings_enriched"] = enriched
+    except Exception as exc:
+        print(f"[WARN] LLM enrichment failed: {exc}", file=sys.stderr)
+
     print(json.dumps(result, default=str, indent=2))
 
     # Exit code based on errors
