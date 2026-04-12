@@ -17,6 +17,17 @@ from vault.ingest.meeting_ingest import _fuzzy_name_key, _is_name_prefix
 
 logger = logging.getLogger(__name__)
 
+
+def _atomic_write(path: Path, content: str, encoding: str = "utf-8") -> None:
+    """Write content to file atomically using tmp + rename."""
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    try:
+        tmp.write_text(content, encoding=encoding)
+        os.replace(str(tmp), str(path))
+    except Exception:
+        tmp.unlink(missing_ok=True)
+        raise
+
 def _strip_accents(s: str) -> str:
     return unicodedata.normalize("NFD", s).encode("ascii", "ignore").decode("ascii")
 
@@ -76,7 +87,7 @@ def _create_draft_person(vault_root: Path, member: dict) -> None:
         f"\n"
         f"*Auto-created from Trello card membership. Needs manual review.*\n"
     )
-    (persons_dir / f"{slug}.md").write_text(content, encoding="utf-8")
+    _atomic_write(persons_dir / f"{slug}.md", content)
 
 
 def _load_github_login_map(vault_root: Path) -> dict[str, str]:
@@ -119,7 +130,7 @@ def _create_draft_person_from_login(vault_root: Path, login: str) -> None:
         f"\n"
         f"*Auto-created from GitHub PR author. Needs manual review.*\n"
     )
-    (persons_dir / f"{slug}.md").write_text(content, encoding="utf-8")
+    _atomic_write(persons_dir / f"{slug}.md", content)
 
 
 def resolve_pr_author(
@@ -236,7 +247,7 @@ def save_trello_member_map(schema_dir: Path, member_map: dict[str, str]) -> None
     ]
     for mid, name in sorted(member_map.items()):
         lines.append(f'  "{mid}": "{name}"\n')
-    path.write_text("".join(lines), encoding="utf-8")
+    _atomic_write(path, "".join(lines))
 
 
 def resolve_card_members(

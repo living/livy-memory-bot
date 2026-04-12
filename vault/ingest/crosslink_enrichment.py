@@ -161,7 +161,7 @@ def enrich_project_files(vault_root: Path) -> None:
         if sections:
             body = body.rstrip() + "\n\n" + "\n".join(sections)
 
-        pf.write_text(_join_frontmatter(fm, body), encoding="utf-8")
+        _atomic_write(pf, _join_frontmatter(fm, body))
 
 
 def enrich_person_files_with_crosslinks(vault_root: Path) -> None:
@@ -273,7 +273,7 @@ def enrich_person_files_with_crosslinks(vault_root: Path) -> None:
         else:
             body = body.rstrip() + "\n\n" + new_text
 
-        pf.write_text(_join_frontmatter(fm, body), encoding="utf-8")
+        _atomic_write(pf, _join_frontmatter(fm, body))
 
 
 def update_meeting_context(vault_root: Path, card_project_edges: list[dict], pr_project_edges: list[dict]) -> None:
@@ -398,7 +398,7 @@ def update_meeting_context(vault_root: Path, card_project_edges: list[dict], pr_
 
         # Write with yaml.dump to preserve nested frontmatter
         fm_text = yaml.dump(fm, default_flow_style=False, sort_keys=False)
-        mf.write_text(f"---\n{fm_text}---\n\n{body}", encoding="utf-8")
+        _atomic_write(mf, f"---\n{fm_text}---\n\n{body}")
 
 
 
