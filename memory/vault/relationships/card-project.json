@@ -1,3 +1,52 @@
 {
-  "edges": []
+  "edges": [
+    {
+      "from_id": "card:trello:69d7bb44290524b8df5cab46",
+      "to_id": "project:Delphos Integração 2026",
+      "role": "belongs_to",
+      "confidence": "high"
+    },
+    {
+      "from_id": "card:trello:69d7bb43995d717f074f3b72",
+      "to_id": "project:Delphos Integração 2026",
+      "role": "belongs_to",
+      "confidence": "high"
+    },
+    {
+      "from_id": "card:trello:69d8f50d097267a768563f3f",
+      "to_id": "project:Delphos Integração 2026",
+      "role": "belongs_to",
+      "confidence": "high"
+    },
+    {
+      "from_id": "card:trello:69d3a822a6d76475542cc3f6",
+      "to_id": "project:Delphos Integração 2026",
+      "role": "belongs_to",
+      "confidence": "high"
+    },
+    {
+      "from_id": "card:trello:69d64b30731832986691ea8f",
+      "to_id": "project:Delphos Integração 2026",
+      "role": "belongs_to",
+      "confidence": "high"
+    },
+    {
+      "from_id": "card:trello:69d6b5a301407d8e175f0272",
+      "to_id": "project:Delphos Integração 2026",
+      "role": "belongs_to",
+      "confidence": "high"
+    },
+    {
+      "from_id": "card:trello:69d64b2fe65e688808704dd9",
+      "to_id": "project:Delphos Integração 2026",
+      "role": "belongs_to",
+      "confidence": "high"
+    },
+    {
+      "from_id": "card:trello:69d8063fe598be246290297e",
+      "to_id": "project:Delphos Integração 2026",
+      "role": "belongs_to",
+      "confidence": "high"
+    }
+  ]
 }
