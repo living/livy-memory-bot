@@ -100,12 +100,20 @@ def run_crosslink(
                 if end == -1:
                     continue
                 fm = yaml.safe_load(text[3:end]) or {}
-                cid = fm.get("card_id") or fm.get("id_canonical", "")
+                # card_id_source is the Trello card ID; fall back to id_canonical
+                cid = fm.get("card_id_source") or fm.get("card_id") or ""
+                # Also extract short card ID from id_canonical if needed
+                if not cid:
+                    idc = fm.get("id_canonical", "")
+                    # card:BOARD:SHORTID format
+                    parts = idc.split(":")
+                    if len(parts) >= 3:
+                        cid = parts[-1]
                 if cid:
                     all_cards[str(cid)] = {
                         "id": str(cid),
                         "name": fm.get("title", fm.get("entity", "")),
-                        "board_id": fm.get("board_id", ""),
+                        "board_id": fm.get("board", fm.get("board_id", "")),
                         "members": fm.get("members", []),
                     }
             except Exception as exc:
@@ -193,6 +201,27 @@ def run_crosslink(
                     logger.info("Quarantined stale PR entity: %s", pf.name)
             except Exception:
                 pass  # Don't delete broken files
+
+    # ── Enrich cards with member info from Trello API if missing ──────────
+    if trello_api_key and trello_token:
+        import requests as _requests
+        for cid, card in all_cards.items():
+            if card.get("members"):
+                continue
+            # Fetch members from Trello API
+            board_id = card.get("board_id", card.get("board", ""))
+            card_trello_id = cid
+            if not board_id or not card_trello_id:
+                continue
+            try:
+                url = f"https://api.trello.com/1/cards/{card_trello_id}/members"
+                resp = _requests.get(url, params={"key": trello_api_key, "token": trello_token}, timeout=10)
+                if resp.status_code == 200:
+                    api_members = resp.json()
+                    if api_members:
+                        card["members"] = [{"id": m["id"], "fullName": m.get("fullName", m.get("username", ""))} for m in api_members]
+            except Exception as exc:
+                logger.warning("Failed to fetch members for card %s: %s", cid, exc)
 
     # Resolve and build edges
     card_person_edges: list[dict] = []
