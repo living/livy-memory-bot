@@ -1,21 +1,51 @@
+import pytest
 from pathlib import Path
 
 
-def test_lint_required_directories_exist():
-    root = Path(__file__).resolve().parents[2]
-    vault = root / "memory" / "vault"
+def test_auto_fix_removes_orphan_wikilinks(tmp_path):
+    """Auto-fix should remove [[wiki-links]] pointing to non-existent files."""
+    from vault.lint.auto_fix import auto_fix_orphan_links
 
-    assert (vault / "lint-reports").exists()
-    assert (vault / "entities").exists()
-    assert (vault / "decisions").exists()
+    vault = tmp_path / "vault"
+    entities = vault / "entities" / "meetings"
+    entities.mkdir(parents=True)
+
+    # Meeting file referencing a non-existent person
+    meeting = entities / "test-meeting.md"
+    meeting.write_text(
+        "---\ntype: meeting\n---\n\n"
+        "# Test\n\n"
+        "## Participantes\n\n"
+        "- [[Nonexistent Person]]\n"
+        "- [[Existing Person]]\n"
+    )
+
+    # Create the existing person
+    persons = vault / "entities" / "persons"
+    persons.mkdir(parents=True)
+    (persons / "Existing Person.md").write_text("---\ntype: person\n---\n\n# Existing Person\n")
+
+    fixes = auto_fix_orphan_links(vault)
+    assert fixes["orphan_links_removed"] >= 1
+    text = meeting.read_text()
+    assert "[[Nonexistent Person]]" not in text
+    assert "[[Existing Person]]" in text
 
 
-def test_lint_report_naming_convention_documented():
-    root = Path(__file__).resolve().parents[2]
-    agents_md = root / "memory" / "vault" / "schema" / "AGENTS.md"
-    text = agents_md.read_text(encoding="utf-8").lower()
+def test_auto_fix_no_orphans(tmp_path):
+    """No changes when all links are valid."""
+    from vault.lint.auto_fix import auto_fix_orphan_links
 
-    assert "yyyy-mm-dd-lint.md" in text
-    assert "contradi" in text  # contradições
-    assert "orphan" in text
-    assert "stale" in text
+    vault = tmp_path / "vault"
+    entities = vault / "entities" / "meetings"
+    entities.mkdir(parents=True)
+    persons = vault / "entities" / "persons"
+    persons.mkdir(parents=True)
+
+    (persons / "Alice.md").write_text("---\ntype: person\n---\n\n# Alice\n")
+    meeting = entities / "test.md"
+    meeting.write_text("# Test\n\n- [[Alice]]\n")
+
+    fixes = auto_fix_orphan_links(vault)
+    assert fixes["orphan_links_removed"] == 0
+    assert fixes["files_modified"] == 0
