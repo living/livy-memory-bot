@@ -208,7 +208,9 @@ def upsert_meeting(entity: dict, vault_root: Path | None = None) -> tuple[Path, 
         lines.append("## Participantes")
         lines.append("")
         for p in participants:
-            pname = p.get("name", "?")
+            pname = p.get("name", "")
+            if not pname or not pname.strip():
+                continue
             lines.append(f"- [[{_slugify(pname)}]]")
         lines.append("")
 

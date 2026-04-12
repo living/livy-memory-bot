@@ -438,7 +438,7 @@ def _run_ingest_inner(
                 cards_written += 1
                 if verbose:
                     print(f"  [card] written: {path.name}")
-                _index_entity(vault_root, entity)
+                _index_entity_by_path(vault_root, path, entity)
             else:
                 cards_skipped += 1
                 if verbose:
@@ -538,7 +538,9 @@ def _enrich_person_files_with_meetings(
         meeting = unit["meeting"]
         participants = unit.get("participants", [])
         for p in participants:
-            pname = p.get("name", "?")
+            pname = p.get("name", "")
+            if not pname or not pname.strip():
+                continue
             norm = _slugify(pname)
             person_meetings.setdefault(norm, []).append({
                 "title": meeting.get("title") or meeting.get("entity") or "",
