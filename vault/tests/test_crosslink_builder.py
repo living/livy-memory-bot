@@ -939,3 +939,101 @@ class TestStalePRCleanupSafety:
         run_crosslink(tmp_path, dry_run=False, trello_api_key="x", trello_token="y", github_token="z")
 
         assert pf.exists()
+
+
+# ---------------------------------------------------------------------------
+# Fix 5: Regression tests — dedup false positive + cleanup safety
+# ---------------------------------------------------------------------------
+
+class TestDedupFalsePositive:
+    """Ensure dedup doesn't merge unrelated short names."""
+
+    def test_short_name_no_match(self, tmp_path):
+        """'alex' should NOT match 'Alice Amazonas'."""
+        from vault.ingest.crosslink_builder import _dedup_draft_persons
+        vault = tmp_path / "vault"
+        persons = vault / "entities" / "persons"
+        persons.mkdir(parents=True)
+
+        # Canonical
+        (persons / "Alice Amazonas.md").write_text(
+            '---\nentity: "Alice Amazonas"\ntype: person\nsource_keys:\n  - tldv:123\n---\n\n# Alice Amazonas\n',
+            encoding="utf-8",
+        )
+        # Draft — "alex" is too short to match "Alice Amazonas"
+        (persons / "alex.md").write_text(
+            '---\nentity: "alex"\ntype: draft\nsource_keys: []\n---\n\n# alex\n',
+            encoding="utf-8",
+        )
+
+        merged = _dedup_draft_persons(vault)
+        # "alex" should NOT match "Alice Amazonas"
+        assert (persons / "alex.md").exists(), "Short draft should not be merged"
+
+    def test_known_good_match(self, tmp_path):
+        """'estevesm' should match 'Esteves Marques' (substring >= 5 chars)."""
+        from vault.ingest.crosslink_builder import _dedup_draft_persons
+        vault = tmp_path / "vault"
+        persons = vault / "entities" / "persons"
+        persons.mkdir(parents=True)
+
+        (persons / "Esteves Marques.md").write_text(
+            '---\nentity: "Esteves Marques"\ntype: person\nsource_keys:\n  - tldv:456\n---\n\n# Esteves Marques\n',
+            encoding="utf-8",
+        )
+        (persons / "estevesm.md").write_text(
+            '---\nentity: "estevesm"\ntype: draft\nsource_keys:\n  - github:estevesm\n---\n\n# estevesm\n',
+            encoding="utf-8",
+        )
+
+        merged = _dedup_draft_persons(vault)
+        # estevesm should match Esteves Marques
+        assert not (persons / "estevesm.md").exists(), "Draft should be merged"
+        # Check quarantine
+        quarantine = persons / ".quarantine"
+        assert quarantine.exists(), "Quarantine dir should exist"
+        assert (quarantine / "estevesm.md").exists(), "Draft should be in quarantine"
+        # Canonical should have merged source_keys
+        canon = yaml.safe_load((persons / "Esteves Marques.md").read_text().split("---")[1])
+        sources = canon.get("source_keys", [])
+        assert any("github" in s for s in sources), "Canonical should have GitHub source"
+
+
+class TestStalePRCleanupRegression:
+    """Ensure cleanup doesn't delete files it shouldn't."""
+
+    def test_manual_pr_not_cleaned(self, tmp_path):
+        """PR file without livy-agent marker should NOT be cleaned."""
+        from vault.ingest.crosslink_builder import run_crosslink
+        vault = _setup_vault_with_enrichment(tmp_path)
+        prs_dir = vault / "entities" / "prs"
+        prs_dir.mkdir(exist_ok=True)
+
+        # Manual PR (no last_touched_by)
+        (prs_dir / "manual-pr.md").write_text(
+            '---\nentity: "Manual PR"\ntype: pr\nrepo: "some/repo"\n---\n\n# Manual PR\n',
+            encoding="utf-8",
+        )
+
+        with patch("vault.ingest.crosslink_builder.resolve_pr_author", return_value="Someone"):
+            run_crosslink(vault, dry_run=False, github_token="fake")
+
+        assert (prs_dir / "manual-pr.md").exists(), "Manual PR should not be cleaned"
+
+    def test_broken_yaml_not_deleted(self, tmp_path):
+        """Broken YAML file should NOT be deleted."""
+        from vault.ingest.crosslink_builder import run_crosslink
+        vault = _setup_vault_with_enrichment(tmp_path)
+        prs_dir = vault / "entities" / "prs"
+        prs_dir.mkdir(exist_ok=True)
+
+        # Broken YAML
+        (prs_dir / "broken.md").write_text(
+            "---\nentity: broken\nrepo: living/test\n: invalid\n---\n# Broken\n",
+            encoding="utf-8",
+        )
+
+        with patch("vault.ingest.crosslink_builder.resolve_pr_author", return_value="Someone"):
+            run_crosslink(vault, dry_run=False, github_token="fake")
+
+        assert (prs_dir / "broken.md").exists(), "Broken YAML should not be deleted"
