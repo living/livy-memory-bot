@@ -29,7 +29,7 @@ from vault.ingest.card_ingest import (
     MAPPER_VERSION as CARD_MAPPER_VERSION,
 )
 from vault.ingest.person_ingest import participant_to_person
-from vault.ingest.entity_writer import upsert_meeting, upsert_card, upsert_person
+from vault.ingest.entity_writer import upsert_meeting, upsert_card, upsert_person, upsert_pr
 from vault.domain.normalize import build_source_record
 from vault.domain.relationship_builder import build_person_meeting_edge
 from vault.ingest.cursor import (
@@ -488,6 +488,51 @@ def _run_ingest_inner(
             print(f"[external-ingest] ERROR crosslink: {exc}")
         errors.append({"source": "crosslink", "error": str(exc), "type": type(exc).__name__})
 
+    # Stage 9 — PR Ingestion from GitHub
+    prs_written = 0
+    prs_skipped = 0
+    try:
+        from vault.ingest.crosslink_resolver import fetch_prs_for_repos, resolve_pr_author
+        github_token = os.environ.get("GITHUB_PERSONAL_ACCESS_TOKEN")
+        living_repos = [
+            "living/livy-memory-bot",
+            "living/livy-bat-jobs",
+            "living/livy-delphos-jobs",
+            "living/livy-tldv-jobs",
+            "living/livy-forge-platform",
+        ]
+        prs = fetch_prs_for_repos(living_repos, github_token=github_token, days=30)
+        if verbose:
+            print(f"[external-ingest] fetched {len(prs)} PRs from {len(living_repos)} repos")
+        for pr_data in prs:
+            author = resolve_pr_author(pr_data, vault_root, github_token=github_token)
+            repo = pr_data.get("repo", "")
+            import re as _re
+            pr_url = pr_data.get("html_url", "")
+            pr_num_match = _re.search(r'/pull/(\d+)', pr_url)
+            pr_num = pr_num_match.group(1) if pr_num_match else "?"
+            entity = {
+                "id_canonical": f"pr:{repo}:{pr_num}",
+                "title": pr_data.get("title", ""),
+                "pr_id_source": pr_num,
+                "repo": repo,
+                "author": author,
+                "merged_at": pr_data.get("merged_at"),
+                "source_keys": [f"github:{repo}:{pr_num}"],
+                "confidence": "medium",
+            }
+            path, written = upsert_pr(entity, vault_root=vault_root)
+            if written:
+                prs_written += 1
+                if verbose:
+                    print(f"  [pr] written: {path.name}")
+            else:
+                prs_skipped += 1
+    except Exception as exc:
+        if verbose:
+            print(f"[external-ingest] ERROR pr ingestion: {exc}")
+        errors.append({"source": "pr_ingest", "error": str(exc), "type": type(exc).__name__})
+
     # Rebuild structured index
     if not dry_run:
         from vault.ingest.index_manager import rebuild_index
@@ -508,6 +553,8 @@ def _run_ingest_inner(
         "cards_skipped": cards_skipped,
         "github_decisions": github_decisions,
         "github_errors": github_errors,
+        "prs_written": prs_written,
+        "prs_skipped": prs_skipped,
         "dry_run": dry_run,
         "errors": errors,
         "skips": skips,

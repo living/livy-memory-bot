@@ -19,34 +19,57 @@ MAPPER_VERSION = "external-ingest-card-v1"
 DEFAULT_LOOKBACK_DAYS = 7
 
 
+def _get_board_ids() -> list[str]:
+    """Resolve board IDs from environment.
+
+    Supports TRELLO_BOARD_IDS (comma-separated) or TRELLO_BOARD_ID (single).
+    """
+    ids_str = os.environ.get("TRELLO_BOARD_IDS", "").strip()
+    if ids_str:
+        return [bid.strip() for bid in ids_str.split(",") if bid.strip()]
+    single = os.environ.get("TRELLO_BOARD_ID", "").strip()
+    if single:
+        return [single]
+    return []
+
+
 def _fetch_from_trello(days: int = DEFAULT_LOOKBACK_DAYS) -> list[dict[str, Any]]:
     """Fetch recently-active cards from Trello.
 
-    Reads TRELLO_API_KEY, TRELLO_TOKEN, TRELLO_BOARD_ID from environment.
-    Returns list of raw card dicts.
+    Reads TRELLO_API_KEY, TRELLO_TOKEN, TRELLO_BOARD_IDS (comma-separated)
+    or TRELLO_BOARD_ID (single) from environment.
+    Returns list of raw card dicts across all configured boards.
     """
     import requests
 
     api_key = os.environ.get("TRELLO_API_KEY")
     token = os.environ.get("TRELLO_TOKEN")
-    board_id = os.environ.get("TRELLO_BOARD_ID")
-    if not api_key or not token or not board_id:
-        print("[WARN] TRELLO_API_KEY or token or board not set; skipping fetch", file=sys.stderr)
+    board_ids = _get_board_ids()
+    if not api_key or not token or not board_ids:
+        print("[WARN] TRELLO_API_KEY or token or board(s) not set; skipping fetch", file=sys.stderr)
         return []
 
     cutoff = datetime.now(timezone.utc) - timedelta(days=days)
-    url = f"https://api.trello.com/1/boards/{board_id}/cards"
-    params = {
-        "key": api_key,
-        "token": token,
-        "fields": "id,name,desc,idBoard,idList,dateLastActivity,idMembers",
-        "members": "true",
-        "member_fields": "fullName,username",
-    }
-    resp = requests.get(url, params=params, timeout=30)
-    resp.raise_for_status()
-    cards = resp.json()
-    return [c for c in cards if _is_recent(c, cutoff)]
+    all_cards: list[dict[str, Any]] = []
+
+    for board_id in board_ids:
+        try:
+            url = f"https://api.trello.com/1/boards/{board_id}/cards"
+            params = {
+                "key": api_key,
+                "token": token,
+                "fields": "id,name,desc,idBoard,idList,dateLastActivity,idMembers",
+                "members": "true",
+                "member_fields": "fullName,username",
+            }
+            resp = requests.get(url, params=params, timeout=30)
+            resp.raise_for_status()
+            cards = resp.json()
+            all_cards.extend(c for c in cards if _is_recent(c, cutoff))
+        except Exception as exc:
+            print(f"[WARN] Failed to fetch board {board_id}: {exc}", file=sys.stderr)
+
+    return all_cards
 
 
 def _is_recent(card: dict[str, Any], cutoff: datetime) -> bool:

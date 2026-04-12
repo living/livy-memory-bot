@@ -87,10 +87,10 @@ source_keys:
 > 📝 [Transcrição](https://livingnetopenclawstorage.blob.core.windows.net/...)
 
 ## Participantes
-- [[Robert Urech]]
-- [[Lincoln Quinan Junior]]
-- [[Sergio Fraga]]
-- [[Jaime dos Santos Jr]]
+- 
+- 
+- 
+- 
 
 ## Resumo
 <!-- Enriquecimento TLDV -->
@@ -131,9 +131,9 @@ email: robert@livingnet.com.br
 **Email:** robert@livingnet.com.br
 
 ## Reuniões
-- [[2026-04-10 Status Kaba - BAT - BOT]]
-- [[2026-03-18 Processo NW + Roadmap Futuro]]
-- [[2026-02-20 Daily Operações - Infra - Suporte B3]]
+- 
+- 
+- 
 ```
 
 ### Index (Dashboard)
@@ -252,7 +252,7 @@ Cobertura: deduplicação de nomes, resolução de participantes, pipeline end-t
 
 1. **Azure blob URLs** (não TLDV) para vídeo — SAS token válido até 2028, sem dependência de auth TLDV
 2. **Subdiretórios por tipo** — `meetings/` e `persons/` para organização no Obsidian
-3. **Wiki-links por filename** — Obsidian resolve `[[Nome]]` independente do path
+3. **Wiki-links por filename** — Obsidian resolve `` independente do path
 4. **Slug com espaços** — `_slugify()` preserva acentos e espaços para legibilidade
 5. **Index rebuild (não incremental)** — Evita stale entries, mais simples de manter
 6. **Frontmatter YAML + body Markdown** — Máquina lê frontmatter, humano lê body

@@ -1,19 +1,36 @@
 ---
 entity: Sergio Fraga
 type: person
-id_canonical: person:Sergio Fraga
+id_canonical: person:tldv:64674ae7f98e6d001328f891
+confidence: medium
+first_seen_at: 2026-04-12 18:00:05+00:00
+last_seen_at: 2026-04-12 18:00:05+00:00
+email: sfraga@livingnet.com.br
 source_keys:
-- trello-member:Sergio Fraga
+- tldv_api:participant:69ca6cbdac4fcb001312659e:64674ae7f98e6d001328f891
+sources:
+- source_type: tldv_api
+  source_ref: tldv_api:participant:69ca6cbdac4fcb001312659e:64674ae7f98e6d001328f891
+  retrieved_at: '2026-04-12T18:00:05Z'
+  mapper_version: external-ingest-person-ingest-v1
+last_verified: 2026-04-12
+verification_log: []
+last_touched_by: livy-agent
+draft: false
 ---
 
 # Sergio Fraga
 
-## Cards
+**Email:** sfraga@livingnet.com.br
+## Projetos
 
-- [[67597d568be2f7d366fa9dfd|Gerar log para uso da mediação]]
-- [[67597e2aeca3d33886b01c0c|Trava para execução de batch ativo]]
-- [[67597ec4bfa7761fed6aa6dc|Impedir duplo clique nos botões da mediação]]
-- [[67e2d2d675e28b579f0433c3|Adapter para execução de automações]]
-- [[68b0554607b03cde402627ba|Reunião: Daily Operações/Infra/Suporte B3]]
-- [[672a2723f1e3022346236302|Reuniões de status de Billing]]
-- [[6902354c7ae40dc27bc2880b|Reuniões de Melhorias nos Processos Internos Living]]
+- [[Daily Operações B3]] (3 reuniões)
+- [[Nelway]] (1 reuniões)
+
+## Reuniões
+
+- [[2026-03-30 Daily Operações - Infra - Suporte B3]]
+- [[2026-03-23 Daily Operações - Infra - Suporte B3]]
+- [[2026-03-18 Processo NW + Roadmap Futuro]]
+- [[2026-03-18 Daily Operações - Infra - Suporte B3]]
+
