@@ -8,11 +8,22 @@ import yaml
 from unittest.mock import patch, MagicMock
 
 from vault.ingest.crosslink_builder import (
+    run_crosslink,
+)
+from vault.ingest.crosslink_resolver import (
     resolve_card_members,
     save_trello_member_map,
     resolve_pr_author,
     fetch_prs_for_repos,
-    run_crosslink,
+)
+from vault.ingest.crosslink_enrichment import (
+    enrich_project_files,
+    enrich_person_files_with_crosslinks,
+    update_meeting_context,
+)
+from vault.ingest.crosslink_dedup import (
+    dedup_draft_persons,
+    _is_fuzzy_match,
 )
 
 
@@ -140,7 +151,7 @@ class TestResolvePRAuthorByGithubLogin:
         mock_resp = MagicMock()
         mock_resp.status_code = 200
         mock_resp.json.return_value = {"user": {"login": "lincolnq"}}
-        with patch("vault.ingest.crosslink_builder.requests.get", return_value=mock_resp):
+        with patch("vault.ingest.crosslink_resolver.requests.get", return_value=mock_resp):
             result = resolve_pr_author(pr_data, vault, github_token="fake")
         assert result == "Lincoln Quinan"
 
@@ -157,7 +168,7 @@ class TestResolvePRAuthorFuzzyMatch:
         mock_resp = MagicMock()
         mock_resp.status_code = 200
         mock_resp.json.return_value = {"user": {"login": "Victor"}}
-        with patch("vault.ingest.crosslink_builder.requests.get", return_value=mock_resp):
+        with patch("vault.ingest.crosslink_resolver.requests.get", return_value=mock_resp):
             result = resolve_pr_author(pr_data, vault, github_token="fake")
         assert result == "Victor"
 
@@ -171,7 +182,7 @@ class TestResolvePRAuthorCreatesDraft:
         mock_resp = MagicMock()
         mock_resp.status_code = 200
         mock_resp.json.return_value = {"user": {"login": "newcontributor"}}
-        with patch("vault.ingest.crosslink_builder.requests.get", return_value=mock_resp):
+        with patch("vault.ingest.crosslink_resolver.requests.get", return_value=mock_resp):
             result = resolve_pr_author(pr_data, vault, github_token="fake")
         assert result == "newcontributor"
         drafts = list(persons.glob("*.md"))
@@ -201,7 +212,7 @@ class TestFetchPRsForReposSuccess:
             {"title": "feat: add X", "html_url": "https://github.com/living/repo/pull/1",
              "merged_at": "2026-04-10T00:00:00Z", "user": {"login": "dev1"}},
         ]
-        with patch("vault.ingest.crosslink_builder.requests.get", return_value=mock_resp):
+        with patch("vault.ingest.crosslink_resolver.requests.get", return_value=mock_resp):
             result = fetch_prs_for_repos(["living/repo"], github_token="fake")
         assert len(result) == 1
         assert result[0]["repo"] == "living/repo"
@@ -219,7 +230,7 @@ class TestFetchPRsForReposAPIError:
         mock_resp = MagicMock()
         mock_resp.status_code = 403
         mock_resp.text = "rate limited"
-        with patch("vault.ingest.crosslink_builder.requests.get", return_value=mock_resp):
+        with patch("vault.ingest.crosslink_resolver.requests.get", return_value=mock_resp):
             result = fetch_prs_for_repos(["living/repo"], github_token="fake")
         assert result == []
 
@@ -453,7 +464,7 @@ def _make_project_file(vault: Path, project_name: str, extra_body: str = "") -> 
 
 class TestEnrichProjectAddsCards:
     def test_enrich_project_adds_cards(self, tmp_path):
-        from vault.ingest.crosslink_builder import _enrich_project_files
+        from vault.ingest.crosslink_enrichment import enrich_project_files as _enrich_project_files
         vault = _setup_vault_with_enrichment(tmp_path)
         # Run crosslink to create relationship files first
         with patch("vault.ingest.crosslink_builder.resolve_pr_author", return_value="Lincoln Quinan"):
@@ -461,7 +472,7 @@ class TestEnrichProjectAddsCards:
         # Create a project file
         _make_project_file(vault, "BAT/Kaba")
         # Enrich
-        _enrich_project_files(vault)
+        enrich_project_files(vault)
         from vault.ingest.entity_writer import _slugify as _ew_s
         slug = _ew_s("BAT/Kaba")
         content = (vault / "entities" / "projects" / f"{slug}.md").read_text()
@@ -470,12 +481,12 @@ class TestEnrichProjectAddsCards:
 
 class TestEnrichProjectAddsPRs:
     def test_enrich_project_adds_prs(self, tmp_path):
-        from vault.ingest.crosslink_builder import _enrich_project_files
+        from vault.ingest.crosslink_enrichment import enrich_project_files as _enrich_project_files
         vault = _setup_vault_with_enrichment(tmp_path)
         with patch("vault.ingest.crosslink_builder.resolve_pr_author", return_value="Lincoln Quinan"):
             run_crosslink(vault, dry_run=False, github_token="fake")
         _make_project_file(vault, "BAT/Kaba")
-        _enrich_project_files(vault)
+        enrich_project_files(vault)
         from vault.ingest.entity_writer import _slugify as _ew_s
         slug = _ew_s("BAT/Kaba")
         content = (vault / "entities" / "projects" / f"{slug}.md").read_text()
@@ -484,12 +495,12 @@ class TestEnrichProjectAddsPRs:
 
 class TestEnrichProjectAddsPersons:
     def test_enrich_project_adds_persons(self, tmp_path):
-        from vault.ingest.crosslink_builder import _enrich_project_files
+        from vault.ingest.crosslink_enrichment import enrich_project_files as _enrich_project_files
         vault = _setup_vault_with_enrichment(tmp_path)
         with patch("vault.ingest.crosslink_builder.resolve_pr_author", return_value="Lincoln Quinan"):
             run_crosslink(vault, dry_run=False, github_token="fake")
         _make_project_file(vault, "BAT/Kaba")
-        _enrich_project_files(vault)
+        enrich_project_files(vault)
         from vault.ingest.entity_writer import _slugify as _ew_s
         slug = _ew_s("BAT/Kaba")
         content = (vault / "entities" / "projects" / f"{slug}.md").read_text()
@@ -516,12 +527,12 @@ def _make_person_file(vault: Path, name: str, extra_body: str = "") -> Path:
 
 class TestEnrichPersonAddsCards:
     def test_enrich_person_adds_cards(self, tmp_path):
-        from vault.ingest.crosslink_builder import _enrich_person_files_with_crosslinks
+        from vault.ingest.crosslink_enrichment import enrich_person_files_with_crosslinks as _enrich_person_files_with_crosslinks
         vault = _setup_vault_with_enrichment(tmp_path)
         with patch("vault.ingest.crosslink_builder.resolve_pr_author", return_value="Lincoln Quinan"):
             run_crosslink(vault, dry_run=False, github_token="fake")
         _make_person_file(vault, "Lincoln Quinan")
-        _enrich_person_files_with_crosslinks(vault)
+        enrich_person_files_with_crosslinks(vault)
         from vault.ingest.entity_writer import _slugify
         slug = _slugify("Lincoln Quinan")
         content = (vault / "entities" / "persons" / f"{slug}.md").read_text()
@@ -530,12 +541,12 @@ class TestEnrichPersonAddsCards:
 
 class TestEnrichPersonAddsPRs:
     def test_enrich_person_adds_prs(self, tmp_path):
-        from vault.ingest.crosslink_builder import _enrich_person_files_with_crosslinks
+        from vault.ingest.crosslink_enrichment import enrich_person_files_with_crosslinks as _enrich_person_files_with_crosslinks
         vault = _setup_vault_with_enrichment(tmp_path)
         with patch("vault.ingest.crosslink_builder.resolve_pr_author", return_value="Lincoln Quinan"):
             run_crosslink(vault, dry_run=False, github_token="fake")
         _make_person_file(vault, "Lincoln Quinan")
-        _enrich_person_files_with_crosslinks(vault)
+        enrich_person_files_with_crosslinks(vault)
         from vault.ingest.entity_writer import _slugify
         slug = _slugify("Lincoln Quinan")
         content = (vault / "entities" / "persons" / f"{slug}.md").read_text()
@@ -544,12 +555,12 @@ class TestEnrichPersonAddsPRs:
 
 class TestEnrichPersonPreservesMeetings:
     def test_preserves_meetings(self, tmp_path):
-        from vault.ingest.crosslink_builder import _enrich_person_files_with_crosslinks
+        from vault.ingest.crosslink_enrichment import enrich_person_files_with_crosslinks as _enrich_person_files_with_crosslinks
         vault = _setup_vault_with_enrichment(tmp_path)
         with patch("vault.ingest.crosslink_builder.resolve_pr_author", return_value="Lincoln Quinan"):
             run_crosslink(vault, dry_run=False, github_token="fake")
         _make_person_file(vault, "Lincoln Quinan", "## Reuniões\n\n- [[test-meeting]]\n")
-        _enrich_person_files_with_crosslinks(vault)
+        enrich_person_files_with_crosslinks(vault)
         from vault.ingest.entity_writer import _slugify
         slug = _slugify("Lincoln Quinan")
         content = (vault / "entities" / "persons" / f"{slug}.md").read_text()
@@ -563,7 +574,7 @@ class TestEnrichPersonPreservesMeetings:
 
 class TestUpdateMeetingContextReplaces:
     def test_replaces_with_project_scoped(self, tmp_path):
-        from vault.ingest.crosslink_builder import _update_meeting_context
+        from vault.ingest.crosslink_enrichment import update_meeting_context as _update_meeting_context
         vault = _setup_vault_with_enrichment(tmp_path)
         with patch("vault.ingest.crosslink_builder.resolve_pr_author", return_value="Lincoln Quinan"):
             run_crosslink(vault, dry_run=False, github_token="fake")
@@ -589,7 +600,7 @@ class TestUpdateMeetingContextReplaces:
             for cid in card_ids if cid
         ]
         pr_proj_edges: list[dict] = []
-        _update_meeting_context(vault, card_proj_edges, pr_proj_edges)
+        update_meeting_context(vault, card_proj_edges, pr_proj_edges)
         new = meeting_path.read_text(encoding="utf-8")
         assert "### Projeto:" in new
         assert "[Old card](url)" not in new
@@ -750,7 +761,7 @@ class TestGetSchemaDirFallback:
 
 class TestPersonDedup:
     def test_draft_merged_into_canonical(self, tmp_path):
-        from vault.ingest.crosslink_builder import _dedup_draft_persons
+        from vault.ingest.crosslink_dedup import dedup_draft_persons as _dedup_draft_persons
         persons = tmp_path / "entities" / "persons"
         persons.mkdir(parents=True)
 
@@ -768,7 +779,7 @@ class TestPersonDedup:
             encoding="utf-8",
         )
 
-        merged = _dedup_draft_persons(tmp_path)
+        merged = dedup_draft_persons(tmp_path)
         assert merged == 1
         assert not draft.exists()
         text = canon.read_text(encoding="utf-8")
@@ -777,7 +788,7 @@ class TestPersonDedup:
         assert "estevesm" in text
 
     def test_no_canonical_match_keeps_draft(self, tmp_path):
-        from vault.ingest.crosslink_builder import _dedup_draft_persons
+        from vault.ingest.crosslink_dedup import dedup_draft_persons as _dedup_draft_persons
         persons = tmp_path / "entities" / "persons"
         persons.mkdir(parents=True)
 
@@ -787,12 +798,12 @@ class TestPersonDedup:
             encoding="utf-8",
         )
 
-        merged = _dedup_draft_persons(tmp_path)
+        merged = dedup_draft_persons(tmp_path)
         assert merged == 0
         assert draft.exists()
 
     def test_merge_preserves_existing_keys(self, tmp_path):
-        from vault.ingest.crosslink_builder import _dedup_draft_persons
+        from vault.ingest.crosslink_dedup import dedup_draft_persons as _dedup_draft_persons
         persons = tmp_path / "entities" / "persons"
         persons.mkdir(parents=True)
 
@@ -808,7 +819,7 @@ class TestPersonDedup:
             encoding="utf-8",
         )
 
-        merged = _dedup_draft_persons(tmp_path)
+        merged = dedup_draft_persons(tmp_path)
         assert merged == 1
         text = canon.read_text(encoding="utf-8")
         assert "trello/t1" in text
@@ -821,7 +832,7 @@ class TestPersonDedup:
 class TestDedupSafety:
     def test_quarantine_not_delete(self, tmp_path):
         """Drafts are moved to .quarantine/, not deleted."""
-        from vault.ingest.crosslink_builder import _dedup_draft_persons
+        from vault.ingest.crosslink_dedup import dedup_draft_persons as _dedup_draft_persons
         persons = tmp_path / "entities" / "persons"
         persons.mkdir(parents=True)
 
@@ -836,7 +847,7 @@ class TestDedupSafety:
             encoding="utf-8",
         )
 
-        merged = _dedup_draft_persons(tmp_path)
+        merged = dedup_draft_persons(tmp_path)
         assert merged == 1
         assert not draft.exists()
         quarantine = persons / ".quarantine" / "estevesm.md"
@@ -844,7 +855,7 @@ class TestDedupSafety:
 
     def test_conservative_no_false_positive(self, tmp_path):
         """Short names don't trigger false matches."""
-        from vault.ingest.crosslink_builder import _dedup_draft_persons
+        from vault.ingest.crosslink_dedup import dedup_draft_persons as _dedup_draft_persons
         persons = tmp_path / "entities" / "persons"
         persons.mkdir(parents=True)
 
@@ -859,13 +870,13 @@ class TestDedupSafety:
             encoding="utf-8",
         )
 
-        merged = _dedup_draft_persons(tmp_path)
+        merged = dedup_draft_persons(tmp_path)
         assert merged == 0
         assert draft.exists()
 
     def test_exact_match_still_works(self, tmp_path):
         """Known good matches still merge."""
-        from vault.ingest.crosslink_builder import _dedup_draft_persons
+        from vault.ingest.crosslink_dedup import dedup_draft_persons as _dedup_draft_persons
         persons = tmp_path / "entities" / "persons"
         persons.mkdir(parents=True)
 
@@ -880,7 +891,7 @@ class TestDedupSafety:
             encoding="utf-8",
         )
 
-        merged = _dedup_draft_persons(tmp_path)
+        merged = dedup_draft_persons(tmp_path)
         assert merged == 1
         text = canon.read_text(encoding="utf-8")
         assert "github/123" in text
@@ -950,7 +961,7 @@ class TestDedupFalsePositive:
 
     def test_short_name_no_match(self, tmp_path):
         """'alex' should NOT match 'Alice Amazonas'."""
-        from vault.ingest.crosslink_builder import _dedup_draft_persons
+        from vault.ingest.crosslink_dedup import dedup_draft_persons as _dedup_draft_persons
         vault = tmp_path / "vault"
         persons = vault / "entities" / "persons"
         persons.mkdir(parents=True)
@@ -966,13 +977,13 @@ class TestDedupFalsePositive:
             encoding="utf-8",
         )
 
-        merged = _dedup_draft_persons(vault)
+        merged = dedup_draft_persons(vault)
         # "alex" should NOT match "Alice Amazonas"
         assert (persons / "alex.md").exists(), "Short draft should not be merged"
 
     def test_known_good_match(self, tmp_path):
         """'estevesm' should match 'Esteves Marques' (substring >= 5 chars)."""
-        from vault.ingest.crosslink_builder import _dedup_draft_persons
+        from vault.ingest.crosslink_dedup import dedup_draft_persons as _dedup_draft_persons
         vault = tmp_path / "vault"
         persons = vault / "entities" / "persons"
         persons.mkdir(parents=True)
@@ -986,7 +997,7 @@ class TestDedupFalsePositive:
             encoding="utf-8",
         )
 
-        merged = _dedup_draft_persons(vault)
+        merged = dedup_draft_persons(vault)
         # estevesm should match Esteves Marques
         assert not (persons / "estevesm.md").exists(), "Draft should be merged"
         # Check quarantine
