@@ -156,6 +156,51 @@ Toda página deve ter backlinks. Ao criar/atualizar uma página:
 1. Adicionar links para páginas relacionadas (`[[page-name]]`).
 2. Se link para página que não existe → criar stub com `draft: true`.
 
+## Identity Resolution (Crosslink)
+
+### `github-login-map.yaml`
+
+Arquivo: `memory/vault/schema/github-login-map.yaml`
+
+Objetivo: mapear `login` do GitHub para o **nome canônico de pessoa** usado no vault.
+
+Exemplo:
+- `estevesm` → `Esteves`
+- `marcioxrocha-living` → `Marcio Rocha`
+
+Sem esse mapa, o pipeline depende apenas de similaridade textual e tende a gerar baixa taxa de match para logins técnicos.
+
+### Fluxo oficial de resolução de identidade
+
+Ordem de resolução (determinística → heurística):
+
+1. **cache** (autor já resolvido em execução anterior)
+2. **API** (dados da origem: GitHub/Trello/TLDV)
+3. **login-map** (`github-login-map.yaml` / `trello-member-map.yaml`)
+4. **frontmatter** (aliases e metadados já gravados nas páginas de pessoa)
+5. **fuzzy** (fallback com score conservador)
+6. **draft** (se não resolver, criar/usar entidade draft para revisão)
+
+Regra: a primeira resolução válida interrompe a cadeia.
+
+### Bot filtering
+
+Filtro de contas de bot é obrigatório no enriquecimento de PRs e relações:
+
+- ignora autores `*bot*`, `*-bot`, contas de automação e usuários técnicos marcados
+- evita auto-referência e poluição das relações `pr-person`
+- eventos filtrados não geram edge e devem ser contabilizados em métricas de skip
+
+### Correções do Pipeline Stage 8
+
+Stage 8 (deduplicação/finalização de arestas) deve garantir:
+
+1. dedup determinístico por chave canônica (`source|target|relation|origin`)
+2. merge de metadados sem perder proveniência
+3. preservação de `confidence` mais alto quando houver conflito
+4. escrita idempotente dos arquivos de relacionamento
+5. fallback seguro para `draft` quando identidade permanecer ambígua
+
 ## Segurança
 
 - **Path traversal:** bloquear `../`, caminhos absolutos, bytes nulos.
@@ -182,4 +227,4 @@ Antes de qualquer mudança no vault:
 
 ---
 
-_Last updated: 2026-04-10 by Livy Memory_
+_Last updated: 2026-04-12 by Livy Memory_

@@ -1,7 +1,7 @@
 # Plano: Fix Crosslink Pipeline — PR Authors + Meeting-Project Associations
 
 **Data:** 2026-04-12
-**Branch:** `feature/wave-b-entity-model` (worktree `wave-c-pipeline-wiring`)
+**Branch:** `feature/vault-entity-model` (worktree `vault-crosslink-pipeline`)
 **Round 2:** Após implementação de todas as correções do review Round 1
 
 ---
@@ -86,7 +86,7 @@
 | `vault/ingest/mapping_loader.py` | Added load_github_login_map() |
 | `vault/tests/test_crosslink_fixes_r1.py` | 14 new test cases covering all fixes |
 | `vault/tests/test_crosslink_builder.py` | Patch paths updated for new import structure |
-| `vault/tests/test_wave_c_crosslink_integration.py` | Patch paths updated |
+| `vault/tests/test_crosslink_integration.py` | Patch paths updated |
 | `memory/vault/schema/github-login-map.yaml` | NEW: 9 login→person mappings |
 
 ---
@@ -96,7 +96,7 @@
 ```
 vault/tests/test_crosslink_fixes_r1.py: 14/14 passed
 vault/tests/test_crosslink_builder.py: 54/54 passed  
-vault/tests/test_wave_c_crosslink_integration.py: 4/4 passed
+vault/tests/test_crosslink_integration.py: 4/4 passed
 ```
 
 ---

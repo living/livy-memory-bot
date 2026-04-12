@@ -62,6 +62,7 @@ openclaw agents list             # agentes registrados
 | `delphos-daily` | 20h BRT | main | ✅ ok | |
 | `evo-analyze` | 02h BRT | livy-evo | ✅ ok | recuperou |
 | `evo-watchdog` | 08h BRT | livy-evo | ✅ ok | |
+| `vault-crosslink` | 01h BRT | memory-agent | ✅ ok | enrich PR→project/person |
 | `autoresearch` | 21h BRT | memory-agent | ✅ ok | |
 | `tldv-archive-videos` | 03h BRT | — | ✅ ok | |
 | `memory-agent-sonhar` | 07h BRT | memory-agent | 🔴 error (3x) | delivery telegram |
@@ -116,6 +117,7 @@ Skills de workspace em `workspace/skills/` têm precedência sobre skills bundle
 - ✅ Plugin claude-mem carregado (v1.0.0)
 - ✅ OmniRoute v3.4.9 operacional (PremiumFirst combo)
 - ✅ 5 canais Telegram configurados + rodando
+- ✅ vault-crosslink cron ativo (01h BRT) — enrich PR→project/person via github-login-map.yaml
 - 🔴 18 cron jobs, 8 em error (delivery telegram + timeouts)
 - ✅ Hardening de segurança aplicado (2026-03-04)
 - ✅ VPS conectado a Living network via Tailscale Node Sharing
@@ -179,6 +181,14 @@ Skills de workspace em `workspace/skills/` têm precedência sobre skills bundle
 
 **MOTIVO:** Aviso de segurança `plugins.allow is empty` indicando que plugins não estavam explicitamente permitidos. Adicionar à allowlist suprime o aviso e explicita confiança no plugin mem0.
 
+### 2026-04-12 — github-login-map.yaml como schema de identity resolution
+
+**Decisão:** Adotar `github-login-map.yaml` como schema canônico para mapear GitHub logins a person entities no vault.
+
+**MOTIVO:** O resolver de crosslink PR→person precisa de mapeamento explícito github-login → source_key para evitar fuzzy matching fraco. O arquivo contém 9 mapeamentos (estevesgs, lucasfsouza, etc.) e é lido por `get_schema_dir()` que agora suporta qualquer mapping file arbitrário.
+
+**Commit:** `dd0f7c1` — crosslink resolver stage 8 fix + github-login-map.yaml
+
 ### 2026-04-01 — Gateway loopback-only (bind=127.0.0.1)
 
 **Decisão:** Manter gateway em loopback, não expô-lo diretamente à rede.
@@ -195,6 +205,7 @@ Skills de workspace em `workspace/skills/` têm precedência sobre skills bundle
 - [ ] Corrigir `memory-agent-feedback-learn` — chatId missing no delivery
 - [x] Verificar se chat ID `-5158607302` é o grupo correto para o canal `memory` — ✅ CONFIRMADO
 - [ ] Simlink `~/.claude/skills/meetings-tldv` pendente (referenciado em #1661)
+- [x] vault-crosslink cron criado (01h BRT, agent memory-agent) — PR→project/person enrichment via github-login-map.yaml
 
 ---
 

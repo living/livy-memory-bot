@@ -24,7 +24,7 @@
 | Forge Platform | `memory/curated/forge-platform.md` | em progresso |
 | BAT Observability | `memory/curated/bat-conectabot-observability.md` | monitorando |
 | Delphos Video Vistoria | `memory/curated/delphos-video-vistoria.md` | OK |
-| TLDV Pipeline | `memory/curated/tldv-pipeline-state.md` | ativo_com_bugs (whisper migrado) |
+| TLDV Pipeline | `memory/curated/tldv-pipeline-state.md` | ativo_com_bugs (whisper migrado; gw.tldv.io 502 persiste) |
 | Super Memória Corporativa | `memory/curated/projeto-super-memoria-robert.md` | proposta (Robert, 2026-04-03) |
 | livy-evo | `memory/curated/livy-evo.md` | conforme cronograma |
 
@@ -39,6 +39,17 @@
 ---
 
 ## 🗂️ Decisões Registradas
+
+### 2026-04-12 — Crosslink pipeline fix: PR author resolution via `github-login-map.yaml`
+
+Correção do pipeline `vault-crosslink` para resolver autores de PR com mapeamento explícito login→identidade. Resultado validado em produção/desenvolvimento: 729 edges com 31 PR authors resolvidos.
+Topic file: `memory/curated/livy-memory-agent.md`
+
+### 2026-04-12 — Bot PR filtering, batch cache e identity resolution
+
+Pipeline de crosslink atualizado com filtros para contas de bot, cache em lote e melhorias de resolução de identidade no `crosslink_resolver`/`crosslink_builder`.
+Impacto: redução de ruído, deduplicação mais estável e geração de arestas mais confiável.
+Topic file: `memory/curated/livy-memory-agent.md`
 
 ### 2026-04-03 — Whisper Migration: faster-whisper → OmniRoute API-first
 
@@ -88,8 +99,8 @@ Monitorando — não é bug, mas volume elevado.
 
 ## 🧠 Notas de Consolidação
 
-- Consolidação executada: 2026-03-31 15:01 BRT
-- 6 arquivos marcados para monitoramento (30-60d, stale entries)
+- Consolidação executada: 2026-04-08 00:02 BRT
+- 18 mudanças aplicadas/propostas (stale:TODO / stale:pendente, janela 30-60d)
 - 0 arquivos arquivados (>60d threshold)
 - Log: `memory/consolidation-log.md`
 
@@ -105,4 +116,4 @@ Monitorando — não é bug, mas volume elevado.
 
 ---
 
-_Last updated: 2026-04-03_
+_Last updated: 2026-04-12_

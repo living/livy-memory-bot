@@ -78,14 +78,77 @@ status: ativo
 
 ---
 
+## Crosslink Pipeline (Vault Ingest)
+
+Pipeline de enriquecimento de grafo que conecta PRs a projects e persons via GitHub API.
+
+### Evolução Recente (2026-04-12)
+
+| Item | Detalhe |
+|---|---|
+| Stage 8 | Corrigido (commit `dd0f7c1`) — dedup edge conflict |
+| PR author resolution | `github-login-map.yaml` com 9 mapeamentos (github-login → person source_key) |
+| Bot filtering | `dependabot`, `pre-commit-ci`, `renovate[bot]`, `github-actions[bot]`, `allcontributor[bot]` |
+| Batch PR cache | 1 API call/repo vs N individual calls |
+| Production validation | **31/31 PR authors resolvidos**, 729 edges totais |
+| Testes | 4 rounds de review, **70 testes passando** |
+
+### Schema de Identity Resolution
+
+`github-login-map.yaml` é o novo schema para mapear GitHub logins a person entities no vault:
+
+```yaml
+# Exemplo de mapeamento
+github_logins:
+  estevesgs: person:trello:estevesgs
+  lucasfsouza: person:trello:lucasfsouza
+  # ... 9 total
+```
+
+**Commit:** `dd0f7c1` — crosslink resolver stage 8 fix + github-login-map.yaml
+
+### Módulos Principais
+
+| Módulo | Responsabilidade |
+|---|---|
+| `crosslink_resolver.py` | Resolve PR author → person via github-login-map.yaml |
+| `crosslink_builder.py` | Construi edges pr→project e pr→person |
+| `entity_writer.py` | Upsert de PR entities com YAML frontmatter |
+| `mapping_loader.py` | Carrega schema YAML arbitrário via `get_schema_dir()` |
+| `crosslink_dedup.py` | Fuzzy matching conservador para person names |
+
+### Bugs Corrigidos
+
+- **Cache key mismatch** no crosslink resolver (Round 3 review)
+- **Duplicate import** de `upsert_pr` em `crosslink_builder.py`
+- **Low fuzzy match rate** para github logins vs person names
+- **PR details assignment** bug no enrichment pipeline
+
+### Bot Accounts Filtrados
+
+```python
+BOT_ACCOUNTS = {
+    "dependabot",
+    "pre-commit-ci[bot]",
+    "renovate[bot]",
+    "github-actions[bot]",
+    "allcontributor[bot]",
+}
+```
+
+---
+
 ## Status
 
-**ativo** — 2026-04-01
+**ativo** — 2026-04-12
 
 - ✅ Bug #1781 corrigido: agent name era `livy-memory`, deveria ser `memory-agent`
 - ✅ Bug #1661 corrigido: accountId `livy-memory-feed` → `memory`; regra channel-per-agent adicionada
 - ✅ Feature #1778 integrada: evolução automática via round-robin cursor no autoresearch cron
 - ✅ Mente Coletiva (#1727): sistema de consolidação multi-space ativo (memory-agent + Livy Deep)
+- ✅ Crosslink pipeline Stage 8 corrigido (dd0f7c1) — 31/31 PR authors, 729 edges, 70 testes
+- ✅ github-login-map.yaml: 9 mapeamentos github-login → person source_key
+- ✅ Bot filtering: dependabot, pre-commit-ci, renovate, github-actions, allcontributor
 
 ---
 
@@ -131,11 +194,11 @@ status: ativo
 
 **MOTIVO:** Consolidacao centralizada permite visão cross-agent. Lock via PID file (`/tmp/autoresearch.lock`) previne execução concorrente.
 
-### 2026-04-10 — Wave C como extensão balanceada de domínio (meeting+card+person strengthen)
+### 2026-04-10 — Vault Phase 2 como extensão balanceada de domínio (meeting+card+person strengthen)
 
-**Decisão:** Executar ampliação do domain model como **Wave C balanceada** (não Wave B+) com quick wins em entidades navegáveis (`meeting`, `card`) e fortalecimento conservador de `person` por sinais de participação.
+**Decisão:** Executar ampliação do domain model como **Vault Phase 2 balanceada** (não Vault Phase 1+) com quick wins em entidades navegáveis (`meeting`, `card`) e fortalecimento conservador de `person` por sinais de participação.
 
-**MOTIVO:** A Wave B já foi entregue/mergeada. A extensão para visão 360° requer ciclo novo com guardrails explícitos para evitar regressão no resolver de identidade e manter compatibilidade com contratos existentes.
+**MOTIVO:** A Vault Phase 1 já foi entregue/mergeada. A extensão para visão 360° requer ciclo novo com guardrails explícitos para evitar regressão no resolver de identidade e manter compatibilidade com contratos existentes.
 
 ### 2026-04-10 — Karpathy LLM Wiki como referência semântica, não fonte factual
 

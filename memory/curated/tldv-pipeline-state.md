@@ -107,7 +107,29 @@ hook_pre_enrich → transcript_analyzer (participants + topics + context)
 **12-step TDD plan:** `docs/superpowers/plans/2026-04-01-autoresearch-tldv-pipeline-plan.md`
 **SPEC:** `docs/superpowers/specs/2026-04-01-autoresearch-tldv-pipeline-design.md`
 
-## Cross-references
+## Crosslink Enrichment
+
+Pipeline de crosslink conecta meetings a projects e persons via GitHub PRs.
+
+### Status (2026-04-12)
+
+| Item | Status |
+|---|---|
+| PR title enrichment | ✅ Funcionando — PR titles aparecem em project/person files |
+| `pr_details` assignment bug | ✅ **Corrigido** — Assignment bug no enrich pipeline resolvido |
+| Meeting → Project associations | ✅ **29/31 working** |
+| PR → Person via github-login-map | ✅ 9 mapeamentos em `github-login-map.yaml` |
+
+### Bugs Corrigidos
+
+| Bug | Fix |
+|---|---|
+| `pr_details` assignment bug | Assignment corrigido no pipeline de enrich |
+| Low fuzzy match rate github-login vs person name | Substituído por mapeamento explícito via github-login-map.yaml |
+
+### Meeting-Project Associations
+
+29 de 31 meetings têm associação project via PR title matching. 2 meetings sem associação aguardam investigation.
 
 - [bat-conectabot-observability.md](bat-conectabot-observability.md) — ambos são pipelines com Sev2/problems
 - [livy-memory-agent.md](livy-memory-agent.md) — agente monitora este pipeline via cron jobs
@@ -117,7 +139,7 @@ hook_pre_enrich → transcript_analyzer (participants + topics + context)
 
 ## Status
 
-**ativo_com_bugs** — 2026-04-04
+**ativo_com_bugs** — 2026-04-12
 
 - ✅ Pipeline operacional
 - ✅ Whisper migrado para OmniRoute API-first (2026-04-03)
@@ -126,6 +148,9 @@ hook_pre_enrich → transcript_analyzer (participants + topics + context)
 - 🔴 7 bugs em aberto (incluindo OmniRoute provider keys e cron desaparecido)
 - 🔴 `gw.tldv.io` 502 — unarchive travado
 - 🟡 AutoResearch em implementação (feat branch)
+- ✅ Crosslink enrichment funcionando (PR titles em project/person files)
+- ✅ pr_details assignment bug corrigido
+- ✅ Meeting-project associations: 29/31 working
 
 ---
 
