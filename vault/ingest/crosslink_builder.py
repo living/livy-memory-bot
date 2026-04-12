@@ -84,10 +84,62 @@ def run_crosslink(
     repo_map = load_repo_project_map(schema_dir)
     board_map = load_board_project_map(schema_dir)
 
-    # Collect all cards and PRs from meeting entities
+    # Collect all cards and PRs — primary source: entity files on disk
     all_cards: dict[str, dict] = {}  # card_id → card
-    all_prs: dict[str, dict] = {}    # pr_url → pr
+    all_prs: dict[str, dict] = {}    # pr_key → pr
 
+    # ── Primary: read card entity files ────────────────────────────────────
+    cards_dir = vault_root / "entities" / "cards"
+    if cards_dir.exists():
+        for cf in cards_dir.glob("*.md"):
+            try:
+                text = cf.read_text(encoding="utf-8")
+                if not text.startswith("---"):
+                    continue
+                end = text.find("---", 3)
+                if end == -1:
+                    continue
+                fm = yaml.safe_load(text[3:end]) or {}
+                cid = fm.get("card_id") or fm.get("id_canonical", "")
+                if cid:
+                    all_cards[str(cid)] = {
+                        "id": str(cid),
+                        "name": fm.get("title", fm.get("entity", "")),
+                        "board_id": fm.get("board_id", ""),
+                        "members": fm.get("members", []),
+                    }
+            except Exception as exc:
+                logger.warning("Failed to parse card entity %s: %s", cf.name, exc)
+
+    # ── Primary: read PR entity files ─────────────────────────────────────
+    prs_dir = vault_root / "entities" / "prs"
+    if prs_dir.exists():
+        for pf in prs_dir.glob("*.md"):
+            try:
+                text = pf.read_text(encoding="utf-8")
+                if not text.startswith("---"):
+                    continue
+                end = text.find("---", 3)
+                if end == -1:
+                    continue
+                fm = yaml.safe_load(text[3:end]) or {}
+                repo = fm.get("repo", "")
+                number = fm.get("pr_id_source", fm.get("number", ""))
+                purl = fm.get("url", f"https://github.com/{repo}/pull/{number}") if repo else ""
+                pr_key = purl or f"{repo}#{number}"
+                if pr_key and pr_key not in all_prs:
+                    all_prs[pr_key] = {
+                        "url": purl,
+                        "repo": repo,
+                        "number": number,
+                        "title": fm.get("title", fm.get("entity", "")),
+                        "author": fm.get("author", ""),
+                        "project_ref": fm.get("project_ref", ""),
+                    }
+            except Exception as exc:
+                logger.warning("Failed to parse PR entity %s: %s", pf.name, exc)
+
+    # ── Secondary: meeting enrichment_context (merge, don't overwrite) ────
     if meetings_dir.exists():
         for mf in meetings_dir.glob("*.md"):
             try:

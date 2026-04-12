@@ -76,16 +76,43 @@ def _scan_concepts(vault_root: Path) -> set[str]:
 
 
 def _read_index_paths(vault_root: Path) -> set[str]:
-    """Parse index.md for registered entity paths (relative to vault root)."""
+    """Parse index.md for registered entity paths (relative to vault root).
+
+    Recognises both Markdown links ``[Title](path/to/file.md)`` and Obsidian
+    wiki-links ``[[Entity Name]]``.  For wiki-links the bare name is resolved
+    to an actual file under entities/ by matching the filename stem.
+    """
     idx = vault_root / "index.md"
     if not idx.exists():
         return set()
+    text = idx.read_text(encoding="utf-8")
     paths: set[str] = set()
-    for line in idx.read_text(encoding="utf-8").splitlines():
-        # Match Markdown table rows like: | [Title](path/to/file.md) |
-        lm = re.search(r'\]\(([^)]+)\)', line)
-        if lm:
-            paths.add(lm.group(1))
+
+    # 1. Markdown links: [Title](path/to/file.md)
+    for lm in re.finditer(r'\]\(([^)]+)\)', text):
+        paths.add(lm.group(1))
+
+    # 2. Obsidian wiki-links: [[Entity Name]]
+    entities_dir = vault_root / "entities"
+    if entities_dir.exists():
+        # Build filename stem → relative-path lookup (lazy)
+        _stem_cache: dict[str, str] | None = None
+
+        for wm in re.finditer(r'\[\[([^\]]+)\]\]', text):
+            link_text = wm.group(1).strip()
+            # Skip if it looks like a path already
+            if "/" in link_text:
+                paths.add(link_text)
+                continue
+            # Resolve stem to actual file
+            if _stem_cache is None:
+                _stem_cache = {}
+                for f in entities_dir.rglob("*.md"):
+                    _stem_cache[f.stem] = str(f.relative_to(vault_root))
+            resolved = _stem_cache.get(link_text)
+            if resolved:
+                paths.add(resolved)
+
     return paths
 
 
