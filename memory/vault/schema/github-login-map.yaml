@@ -1,0 +1,11 @@
+# GitHub login → canonical person name (for identity resolution in crosslink pipeline)
+# Maps GitHub usernames to the canonical person name used in the vault
+logins:
+  lincolnqjunior: "Lincoln Quinan Junior"
+  estevesm: "Esteves"
+  marcioxrocha: "Marcio Rocha"
+  marcioxrocha-living: "Marcio Rocha"
+  victor-living: "Victor Neves"
+  LuizRLiving: "LuizR"
+  alexandrakfcosta: "Alexandra Costa"
+  rurech: "Rafael Bernardi"
