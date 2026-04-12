@@ -808,6 +808,20 @@ def run_crosslink(
     if dry_run:
         return stats
 
+    # Clean stale PR entities (created with incomplete data)
+    prs_dir = vault_root / "entities" / "prs"
+    if prs_dir.exists():
+        for pf in prs_dir.glob("*.md"):
+            try:
+                text = pf.read_text(encoding="utf-8")
+                end = text.find("---", 3)
+                fm = yaml.safe_load(text[3:end]) or {}
+                # Delete if missing repo or project_ref
+                if not fm.get("repo") or fm.get("project_ref", "?") == "?":
+                    pf.unlink()
+            except Exception:
+                pf.unlink()  # Delete broken frontmatter too
+
     # Resolve and build edges
     card_person_edges: list[dict] = []
     card_project_edges: list[dict] = []
