@@ -548,31 +548,36 @@ def _enrich_person_files_with_crosslinks(vault_root: Path) -> None:
         pf.write_text(_join_frontmatter(fm, body), encoding="utf-8")
 
 
-def _update_meeting_context(vault_root: Path) -> None:
-    """Task 10: Replace date-proximity ## Contexto with project-scoped links."""
+def _update_meeting_context(vault_root: Path, card_project_edges: list[dict], pr_project_edges: list[dict]) -> None:
+    """Task 10: Replace date-proximity ## Contexto with project-scoped links.
+
+    Derives projects from relationship edges (card-project and pr-project)
+    instead of regex-based title detection.
+    """
     from vault.ingest.entity_writer import _slugify, _split_frontmatter, _join_frontmatter
-    from vault.ingest.external_ingest import _detect_project
 
-    rel_dir = vault_root / "relationships"
-    if not rel_dir.exists():
-        return
-
-    def _load_edges(filename: str) -> list[dict]:
-        p = rel_dir / filename
-        if p.exists():
-            return json.loads(p.read_text(encoding="utf-8")).get("edges", [])
-        return []
-
-    card_project = _load_edges("card-project.json")
-    pr_project = _load_edges("pr-project.json")
-
-    # Load card/PR details
-    card_details: dict[str, dict] = {}
-    pr_details: dict[str, dict] = {}
     meetings_dir = vault_root / "entities" / "meetings"
     if not meetings_dir.exists():
         return
 
+    # Build card_id → project and pr_id → project lookups
+    card_to_proj: dict[str, str] = {}
+    for edge in card_project_edges:
+        cid = edge.get("from_id", "").replace("card:trello:", "")
+        proj = edge.get("to_id", "").replace("project:", "")
+        if cid and proj:
+            card_to_proj[cid] = proj
+
+    pr_to_proj: dict[str, str] = {}
+    for edge in pr_project_edges:
+        pr_id = edge.get("from_id", "")
+        proj = edge.get("to_id", "").replace("project:", "")
+        if pr_id and proj:
+            pr_to_proj[pr_id] = proj
+
+    # Load card/PR details from enrichment contexts
+    card_details: dict[str, dict] = {}
+    pr_details: dict[str, dict] = {}
     for mf in meetings_dir.glob("*.md"):
         try:
             text = mf.read_text(encoding="utf-8")
@@ -591,16 +596,16 @@ def _update_meeting_context(vault_root: Path) -> None:
         except Exception:
             continue
 
-    # Build project → cards/PRs
+    # Build project → cards/PRs display strings
     proj_cards: dict[str, list[str]] = {}
     proj_prs: dict[str, list[str]] = {}
-    for edge in card_project:
+    for edge in card_project_edges:
         proj = edge.get("to_id", "").replace("project:", "")
         cid = edge.get("from_id", "").replace("card:trello:", "")
         card = card_details.get(cid, {})
         title = card.get("name", cid)
         proj_cards.setdefault(proj, []).append(f"📋 {cid}: {title}")
-    for edge in pr_project:
+    for edge in pr_project_edges:
         proj = edge.get("to_id", "").replace("project:", "")
         pr_id = edge.get("from_id", "")
         pr = None
@@ -611,30 +616,44 @@ def _update_meeting_context(vault_root: Path) -> None:
         title = pr.get("title", pr_id) if pr else pr_id
         proj_prs.setdefault(proj, []).append(f"🔀 {pr_id}: {title}")
 
-    # Update each meeting file
+    # Update each meeting file — derive projects from edges, not title
     for mf in meetings_dir.glob("*.md"):
-        text = mf.read_text(encoding="utf-8")
-        # Parse with yaml.safe_load to preserve nested structures
-        if not text.startswith("---"):
+        raw = mf.read_text(encoding="utf-8")
+        if not raw.startswith("---"):
             continue
-        end = text.find("---", 3)
+        end = raw.find("---", 3)
         if end == -1:
             continue
-        fm = yaml.safe_load(text[3:end]) or {}
-        body = text[end + 3:].lstrip("\n")
-        title = fm.get("entity", "")
-        project = _detect_project(title)
-        if not project:
+        fm = yaml.safe_load(raw[3:end]) or {}
+        body = raw[end + 3:].lstrip("\n")
+        ec = fm.get("enrichment_context", {})
+        if not isinstance(ec, dict):
             continue
 
-        # Build new context
+        # Find projects from this meeting's cards/PRs via edges
+        projects_found: set[str] = set()
+        for card in ec.get("trello", {}).get("cards", []):
+            proj = card_to_proj.get(card.get("id", ""))
+            if proj:
+                projects_found.add(proj)
+        for pr in ec.get("github", {}).get("pull_requests", []):
+            pr_id = f"pr:{pr.get('repo', '')}:{pr.get('number', '')}"
+            proj = pr_to_proj.get(pr_id)
+            if proj:
+                projects_found.add(proj)
+
+        if not projects_found:
+            continue
+
+        # Build new context grouped by project
         lines = ["## Contexto", ""]
-        lines.append(f"### Projeto: [[{project}]]")
-        for item in proj_cards.get(project, []):
-            lines.append(f"- {item}")
-        for item in proj_prs.get(project, []):
-            lines.append(f"- {item}")
-        lines.append("")
+        for proj in sorted(projects_found):
+            lines.append(f"### Projeto: [[{proj}]]")
+            for item in proj_cards.get(proj, []):
+                lines.append(f"- {item}")
+            for item in proj_prs.get(proj, []):
+                lines.append(f"- {item}")
+            lines.append("")
         new_context = "\n".join(lines)
 
         # Remove ALL existing ## Contexto sections
@@ -652,6 +671,7 @@ def _update_meeting_context(vault_root: Path) -> None:
         # Write with yaml.dump to preserve nested frontmatter
         fm_text = yaml.dump(fm, default_flow_style=False, sort_keys=False)
         mf.write_text(f"---\n{fm_text}---\n\n{body}", encoding="utf-8")
+
 
 
 def run_crosslink(
@@ -818,7 +838,7 @@ def run_crosslink(
     except Exception:
         pass
     try:
-        _update_meeting_context(vault_root)
+        _update_meeting_context(vault_root, card_project_edges, pr_project_edges)
     except Exception:
         pass
 

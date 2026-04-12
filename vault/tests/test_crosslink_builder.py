@@ -567,20 +567,29 @@ class TestUpdateMeetingContextReplaces:
         vault = _setup_vault_with_enrichment(tmp_path)
         with patch("vault.ingest.crosslink_builder.resolve_pr_author", return_value="Lincoln Quinan"):
             run_crosslink(vault, dry_run=False, github_token="fake")
-        # Rewrite meeting with a title that _detect_project will match
         meetings_dir = vault / "entities" / "meetings"
         meeting_path = meetings_dir / "test-meeting.md"
         import yaml as _y
         old = meeting_path.read_text(encoding="utf-8")
-        # Parse frontmatter
+        # Parse frontmatter to get enrichment_context with card IDs
         end = old.find("---", 3)
         fm = _y.safe_load(old[3:end]) or {}
-        fm["entity"] = "Status Kaba/BAT/BOT 2024-04-11"
+        # Add old context section that should be replaced
         body = old[end + 3:].lstrip("\n")
         body = body.rstrip() + "\n\n## Contexto\n\n- 📋 [Old card](url)\n"
         new_fm = _y.dump(fm, default_flow_style=False, sort_keys=False)
         meeting_path.write_text(f"---\n{new_fm}---\n\n{body}", encoding="utf-8")
-        _update_meeting_context(vault)
+        # Build card-project edges from the enrichment_context cards
+        ec = fm.get("enrichment_context", {})
+        card_ids = [c.get("id", "") for c in ec.get("trello", {}).get("cards", [])]
+        # Pick a project that the cards belong to (use board mapping from setup)
+        proj_name = "bat"
+        card_proj_edges = [
+            {"from_id": f"card:trello:{cid}", "to_id": f"project:{proj_name}", "role": "belongs_to", "confidence": "high"}
+            for cid in card_ids if cid
+        ]
+        pr_proj_edges: list[dict] = []
+        _update_meeting_context(vault, card_proj_edges, pr_proj_edges)
         new = meeting_path.read_text(encoding="utf-8")
         assert "### Projeto:" in new
         assert "[Old card](url)" not in new
