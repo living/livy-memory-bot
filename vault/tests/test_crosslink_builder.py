@@ -646,3 +646,90 @@ class TestRunCrosslinkUnmappedEntities:
             result = run_crosslink(vault, dry_run=False, github_token=None)
         assert isinstance(result, dict)
         # Should not crash — edges may be empty
+
+
+# ---------------------------------------------------------------------------
+# Fix 1: _split_frontmatter nested YAML roundtrip
+# ---------------------------------------------------------------------------
+
+class TestSplitFrontmatterNestedYaml:
+    def test_nested_dicts_survive_roundtrip(self):
+        from vault.ingest.entity_writer import _split_frontmatter, _join_frontmatter
+
+        fm = {
+            "entity": "Test Meeting",
+            "enrichment_context": {
+                "trello": {"cards": [{"name": "Card 1", "url": "http://x"}]},
+                "github": {"pull_requests": [{"title": "PR 1", "repo": "foo/bar"}]},
+            },
+            "source_keys": ["tldv:abc", "trello:def"],
+        }
+        body = "# Test Meeting\n\nSome content."
+        text = _join_frontmatter(fm, body)
+        parsed_fm, parsed_body = _split_frontmatter(text)
+        assert parsed_fm["enrichment_context"]["trello"]["cards"] == [{"name": "Card 1", "url": "http://x"}]
+        assert parsed_fm["enrichment_context"]["github"]["pull_requests"] == [{"title": "PR 1", "repo": "foo/bar"}]
+        assert parsed_body.strip() == body.strip()
+
+    def test_no_frontmatter(self):
+        from vault.ingest.entity_writer import _split_frontmatter
+        fm, body = _split_frontmatter("Just plain text")
+        assert fm == {}
+        assert body == "Just plain text"
+
+
+# ---------------------------------------------------------------------------
+# Fix 2: Atomic relationship writes
+# ---------------------------------------------------------------------------
+
+class TestAtomicRelationshipWrites:
+    def test_no_tmp_file_left_after_run(self, tmp_path):
+        vault = tmp_path / "vault"
+        vault.mkdir()
+        (vault / "entities" / "meetings").mkdir(parents=True)
+
+        # Schema with empty maps so crosslink runs
+        schema = vault / "schema"
+        schema.mkdir()
+        (schema / "trello-member-map.yaml").write_text("members: {}\n", encoding="utf-8")
+        (schema / "repo-project-map.yaml").write_text("repos: {}\n", encoding="utf-8")
+        (schema / "board-project-map.yaml").write_text("boards: {}\n", encoding="utf-8")
+
+        result = run_crosslink(vault, dry_run=False, github_token=None)
+        assert isinstance(result, dict)
+        # No .tmp files should remain
+        rel_dir = vault / "relationships"
+        if rel_dir.exists():
+            tmp_files = list(rel_dir.glob("*.tmp"))
+            assert tmp_files == [], f"Leftover .tmp files: {tmp_files}"
+
+
+# ---------------------------------------------------------------------------
+# Fix 3: get_schema_dir fallback
+# ---------------------------------------------------------------------------
+
+class TestGetSchemaDirFallback:
+    def test_primary_when_file_exists(self, tmp_path):
+        from vault.ingest.mapping_loader import get_schema_dir
+        primary = tmp_path / "schema"
+        primary.mkdir()
+        (primary / "trello-member-map.yaml").write_text("members: {}\n")
+        assert get_schema_dir(tmp_path) == primary
+
+    def test_fallback_when_primary_missing(self, tmp_path):
+        from vault.ingest.mapping_loader import get_schema_dir
+        parent = tmp_path / "parent"
+        vault = parent / "vault"
+        vault.mkdir(parents=True)
+        fallback = parent / "schema"
+        fallback.mkdir()
+        (fallback / "trello-member-map.yaml").write_text("members: {}\n")
+        assert get_schema_dir(vault) == fallback
+
+    def test_fallback_when_primary_empty(self, tmp_path):
+        from vault.ingest.mapping_loader import get_schema_dir
+        parent = tmp_path / "parent"
+        vault = parent / "vault"
+        vault.mkdir(parents=True)
+        # No schema dir at all
+        assert get_schema_dir(vault) == parent / "schema"

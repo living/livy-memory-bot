@@ -39,6 +39,14 @@ def resolve_board_to_project(
     return board_map.get(board_id)
 
 
+def get_schema_dir(vault_root: Path) -> Path:
+    """Resolve schema directory, checking vault_root/schema first."""
+    primary = vault_root / "schema"
+    if (primary / "trello-member-map.yaml").exists():
+        return primary
+    return vault_root.parent / "schema"
+
+
 def _load_map(path: Path, key: str) -> dict[str, str]:
     if not path.exists():
         return {}

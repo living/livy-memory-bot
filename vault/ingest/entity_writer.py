@@ -24,44 +24,17 @@ def _split_frontmatter(text: str) -> tuple[dict, str]:
         return {}, text
     yaml_block = text[3:end].strip()
     body = text[end + 3:].lstrip("\n")
-    fm = {}
-    current_key = None
-    current_list: list[str] | None = None
-    for line in yaml_block.split("\n"):
-        stripped = line.strip()
-        if stripped.startswith("- ") and current_list is not None:
-            current_list.append(stripped[2:].strip('"').strip("'"))
-            continue
-        if ":" in stripped and not stripped.startswith("-"):
-            key, _, val = stripped.partition(":")
-            key = key.strip()
-            val = val.strip().strip('"').strip("'")
-            if val == "":
-                current_list = []
-                fm[key] = current_list
-            else:
-                current_list = None
-                fm[key] = val
-            current_key = key
-        else:
-            current_list = None
+    try:
+        fm = yaml.safe_load(yaml_block) or {}
+    except Exception:
+        fm = {}
     return fm, body
 
 
 def _join_frontmatter(fm: dict, body: str) -> str:
     """Serialize frontmatter dict + body back to markdown."""
-    lines = ["---"]
-    for k, v in fm.items():
-        if isinstance(v, list):
-            lines.append(f"{k}:")
-            for item in v:
-                lines.append(f"  - {item}")
-        else:
-            lines.append(f'{k}: "{v}"' if isinstance(v, str) and (" " in str(v) or ":" in str(v)) else f"{k}: {v}")
-    lines.append("---")
-    lines.append("")
-    lines.append(body)
-    return "\n".join(lines)
+    fm_text = yaml.dump(fm, default_flow_style=False, sort_keys=False)
+    return f"---\n{fm_text}---\n\n{body}"
 
 import yaml
 

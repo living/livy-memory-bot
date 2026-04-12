@@ -6,6 +6,7 @@ Stage 8 in the external ingest pipeline.
 from __future__ import annotations
 
 import json
+import os
 import re
 import unicodedata
 from datetime import datetime, timedelta, timezone
@@ -671,12 +672,11 @@ def run_crosslink(
         load_trello_member_map,
         load_repo_project_map,
         load_board_project_map,
+        get_schema_dir,
     )
     from vault.ingest.entity_writer import upsert_pr, _split_frontmatter
 
-    schema_dir = vault_root / "schema"
-    if not (schema_dir / "trello-member-map.yaml").exists():
-        schema_dir = vault_root.parent / "schema"
+    schema_dir = get_schema_dir(vault_root)
     rel_dir = vault_root / "relationships"
     meetings_dir = vault_root / "entities" / "meetings"
 
@@ -794,10 +794,13 @@ def run_crosslink(
         ("pr-person.json", pr_person_edges),
         ("pr-project.json", pr_project_edges),
     ]:
-        (rel_dir / name).write_text(
+        target = rel_dir / name
+        tmp = target.with_suffix(".tmp")
+        tmp.write_text(
             json.dumps({"edges": edges}, indent=2, ensure_ascii=False),
             encoding="utf-8",
         )
+        os.replace(str(tmp), str(target))
 
     stats["edges"] = {
         "card_person": len(card_person_edges),
