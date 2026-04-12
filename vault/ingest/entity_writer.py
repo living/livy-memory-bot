@@ -24,44 +24,17 @@ def _split_frontmatter(text: str) -> tuple[dict, str]:
         return {}, text
     yaml_block = text[3:end].strip()
     body = text[end + 3:].lstrip("\n")
-    fm = {}
-    current_key = None
-    current_list: list[str] | None = None
-    for line in yaml_block.split("\n"):
-        stripped = line.strip()
-        if stripped.startswith("- ") and current_list is not None:
-            current_list.append(stripped[2:].strip('"').strip("'"))
-            continue
-        if ":" in stripped and not stripped.startswith("-"):
-            key, _, val = stripped.partition(":")
-            key = key.strip()
-            val = val.strip().strip('"').strip("'")
-            if val == "":
-                current_list = []
-                fm[key] = current_list
-            else:
-                current_list = None
-                fm[key] = val
-            current_key = key
-        else:
-            current_list = None
+    try:
+        fm = yaml.safe_load(yaml_block) or {}
+    except Exception:
+        fm = {}
     return fm, body
 
 
 def _join_frontmatter(fm: dict, body: str) -> str:
     """Serialize frontmatter dict + body back to markdown."""
-    lines = ["---"]
-    for k, v in fm.items():
-        if isinstance(v, list):
-            lines.append(f"{k}:")
-            for item in v:
-                lines.append(f"  - {item}")
-        else:
-            lines.append(f'{k}: "{v}"' if isinstance(v, str) and (" " in str(v) or ":" in str(v)) else f"{k}: {v}")
-    lines.append("---")
-    lines.append("")
-    lines.append(body)
-    return "\n".join(lines)
+    fm_text = yaml.dump(fm, default_flow_style=False, sort_keys=False)
+    return f"---\n{fm_text}---\n\n{body}"
 
 import yaml
 
@@ -101,6 +74,12 @@ def _entity_path(vault_root: Path, entity: dict) -> Path:
         name = entity.get("display_name") or entity.get("entity") or id_canonical.replace("person:", "")
         return entities_dir / f"{_slugify(name)}.md"
 
+    if id_canonical.startswith("pr:"):
+        entities_dir = vault_root / "entities" / "prs"
+        rest = id_canonical.replace("pr:", "")
+        slug = _slugify(rest)
+        return entities_dir / f"{slug}.md"
+
     if id_canonical.startswith("card:"):
         entities_dir = vault_root / "entities" / "cards"
         rest = id_canonical.replace("card:", "")
@@ -110,6 +89,7 @@ def _entity_path(vault_root: Path, entity: dict) -> Path:
         return entities_dir / f"card-{_slugify(rest)}.md"
 
     # Fallback
+    entities_dir = vault_root / "entities"
     return entities_dir / f"{_slugify(id_canonical)}.md"
 
 
@@ -533,6 +513,98 @@ def upsert_card(entity: dict, vault_root: Path | None = None) -> tuple[Path, boo
         lines.append(f"- **Projeto:** {project_ref}")
     if status:
         lines.append(f"- **Status:** {status}")
+    lines.append("")
+
+    # Pessoas section (from crosslink enrichment)
+    persons = entity.get("_persons", [])
+    if persons:
+        lines.append("## Pessoas")
+        lines.append("")
+        for pname in persons:
+            lines.append(f"- [[{pname}]]")
+        lines.append("")
+
+    # Projeto section (from crosslink enrichment)
+    project = entity.get("_project")
+    if project:
+        lines.append("## Projeto")
+        lines.append("")
+        lines.append(f"- [[{project}]]")
+        lines.append("")
+
+    path.write_text("\n".join(lines), encoding="utf-8")
+    return path, True
+
+
+def upsert_pr(entity: dict, vault_root: Path | None = None) -> tuple[Path, bool]:
+    """Write (or skip) a PR entity. Idempotent."""
+    if vault_root is None:
+        vault_root = Path(__file__).resolve().parents[2] / "memory" / "vault"
+
+    path = _entity_path(vault_root, entity)
+
+    if path.exists():
+        return path, False
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    id_canonical = entity.get("id_canonical", "")
+    title = entity.get("title") or entity.get("entity") or id_canonical
+    pr_id_source = entity.get("pr_id_source", "")
+    repo = entity.get("repo", "")
+    project_ref = entity.get("project_ref")
+    author = entity.get("author")
+    confidence = entity.get("confidence", "medium")
+    merged_at = entity.get("merged_at")
+    draft = entity.get("draft", False)
+    source_keys = entity.get("source_keys", [])
+    now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    today = now_iso[:10]
+
+    lines = [
+        "---",
+        f'entity: "{title}"',
+        "type: pr",
+        f"id_canonical: {id_canonical}",
+        f"pr_id_source: {pr_id_source}",
+        f"repo: {repo}",
+    ]
+    if project_ref:
+        lines.append(f"project_ref: {project_ref}")
+    lines.extend([
+        f"confidence: {confidence}",
+        "source_keys:",
+    ])
+    if isinstance(source_keys, list) and source_keys:
+        for key in source_keys:
+            lines.append(f"  - {key}")
+    else:
+        lines.append("  - github:unknown")
+    lines.extend([
+        f"first_seen_at: {now_iso}",
+        f"last_seen_at: {now_iso}",
+        f"last_verified: {today}",
+        f"draft: {str(draft).lower()}",
+        "---",
+        "",
+        f"# {title}",
+        "",
+    ])
+
+    # Callout
+    repo_short = repo.split("/")[-1] if repo else "?"
+    lines.append(f"> [!info] {repo_short} · PR #{pr_id_source}")
+    lines.append("")
+
+    # Dados section
+    lines.extend(["## Dados", ""])
+    lines.append(f"- **Repo:** [{repo}](https://github.com/{repo}/pull/{pr_id_source})")
+    if author:
+        lines.append(f"- **Autor:** [[{author}]]")
+    if project_ref:
+        lines.append(f"- **Projeto:** [[{project_ref}]]")
+    if merged_at:
+        lines.append(f"- **Merged:** {merged_at}")
     lines.append("")
 
     path.write_text("\n".join(lines), encoding="utf-8")

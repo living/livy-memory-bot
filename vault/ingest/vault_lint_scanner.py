@@ -89,21 +89,30 @@ def _read_index_paths(vault_root: Path) -> set[str]:
     return paths
 
 
-def _count_relationships(vault_root: Path) -> int:
-    """Count relationships from relationships/*.json files."""
+def _count_relationships(vault_root: Path) -> tuple[int, dict[str, int]]:
+    """Count relationships from relationships/*.json files.
+
+    Returns (total_count, crosslink_breakdown) where crosslink_breakdown
+    contains counts for card-person, card-project, pr-person, pr-project.
+    """
     import json
     rel_dir = vault_root / "relationships"
     if not rel_dir.exists():
-        return 0
+        return 0, {}
     total = 0
+    breakdown: dict[str, int] = {}
+    crosslink_files = {"card-person.json", "card-project.json", "pr-person.json", "pr-project.json"}
     for f in rel_dir.glob("*.json"):
         try:
             data = json.loads(f.read_text(encoding="utf-8"))
             edges = data.get("edges", [])
-            total += len(edges)
+            count = len(edges)
+            total += count
+            if f.name in crosslink_files:
+                breakdown[f.name.replace(".json", "")] = count
         except (json.JSONDecodeError, OSError):
             pass
-    return total
+    return total, breakdown
 
 def run_lint_scans(vault_root: Path) -> LintReport:
     """Run all lint scans and return a structured report.
@@ -171,7 +180,19 @@ def run_lint_scans(vault_root: Path) -> LintReport:
                     "confidences": sorted(confidences),
                 })
 
-    relationships = _count_relationships(vault_root)
+    relationships, crosslink_breakdown = _count_relationships(vault_root)
+
+    metrics: dict[str, Any] = {
+        "total_entities": len(entities),
+        "total_concepts": len(concepts),
+        "total_relationships": relationships,
+        "orphans_count": len(orphans),
+        "stale_count": len(stale),
+        "gaps_count": len(gaps),
+        "contradictions_count": len(contradictions),
+    }
+    if crosslink_breakdown:
+        metrics["crosslink_edges"] = crosslink_breakdown
 
     return LintReport(
         orphans=orphans,
@@ -179,13 +200,5 @@ def run_lint_scans(vault_root: Path) -> LintReport:
         gaps=gaps,
         contradictions=contradictions,
         suggestions=[],
-        metrics={
-            "total_entities": len(entities),
-            "total_concepts": len(concepts),
-            "total_relationships": relationships,
-            "orphans_count": len(orphans),
-            "stale_count": len(stale),
-            "gaps_count": len(gaps),
-            "contradictions_count": len(contradictions),
-        },
+        metrics=metrics,
     )

@@ -134,16 +134,69 @@ def rebuild_index(vault_root: Path) -> None:
     lines.append(f"| Pessoas | {len(persons)} |")
     lines.append(f"| Reuniões | {len(meetings)} |")
 
+    # Count PRs and Cards
+    prs_dir = vault_root / "entities" / "prs"
+    cards_dir = vault_root / "entities" / "cards"
+    pr_files = sorted(prs_dir.glob("*.md")) if prs_dir.exists() else []
+    card_files = sorted(cards_dir.glob("*.md")) if cards_dir.exists() else []
+    lines.append(f"| PRs | {len(pr_files)} |")
+    lines.append(f"| Cards | {len(card_files)} |")
+
     # Count relationships
-    rel_file = vault_root / "relationships" / "person-meeting.json"
-    if rel_file.exists():
+    rel_dir = vault_root / "relationships"
+    total_rels = 0
+    if rel_dir.exists():
         import json
-        try:
-            data = json.loads(rel_file.read_text(encoding="utf-8"))
-            n_rels = len(data.get("edges", []))
-            lines.append(f"| Relacionamentos | {n_rels} |")
-        except Exception:
-            pass
+        for rf in rel_dir.glob("*.json"):
+            try:
+                data = json.loads(rf.read_text(encoding="utf-8"))
+                total_rels += len(data.get("edges", []))
+            except Exception:
+                pass
+    lines.append(f"| Relacionamentos | {total_rels} |")
     lines.append("")
 
+    # ── PRs Section ──
+    if pr_files:
+        lines.append(f"## \U0001f500 PRs ({len(pr_files)})")
+        lines.append("")
+        lines.append("| PR | Repo | Projeto | Autor |")
+        lines.append("| --- | --- | --- | --- |")
+        for pf in pr_files:
+            text = pf.read_text(encoding="utf-8")
+            fm = _parse_simple_fm(text)
+            repo = fm.get("repo", "?")
+            proj = fm.get("project_ref", fm.get("project", "?"))
+            author = fm.get("author", "?")
+            lines.append(f"| [[{pf.stem}]] | {repo} | {proj} | {author} |")
+        lines.append("")
+
+    # ── Cards Section ──
+    if card_files:
+        lines.append(f"## \U0001f4cb Cards ({len(card_files)})")
+        lines.append("")
+        lines.append("| Card | Projeto |")
+        lines.append("| --- | --- |")
+        for cf in card_files:
+            text = cf.read_text(encoding="utf-8")
+            fm = _parse_simple_fm(text)
+            proj = fm.get("project", "?")
+            lines.append(f"| [[{cf.stem}]] | {proj} |")
+        lines.append("")
+
     _index_path(vault_root).write_text("\n".join(lines), encoding="utf-8")
+
+
+def _parse_simple_fm(text: str) -> dict[str, str]:
+    """Parse simple key: value frontmatter."""
+    fm: dict[str, str] = {}
+    if not text.startswith("---"):
+        return fm
+    end = text.find("---", 3)
+    if end == -1:
+        return fm
+    for line in text[3:end].strip().splitlines():
+        if ":" in line and not line.startswith(" "):
+            k, _, v = line.partition(":")
+            fm[k.strip()] = v.strip().strip('"').strip("'")
+    return fm
