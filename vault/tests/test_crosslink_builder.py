@@ -351,7 +351,7 @@ class TestRunCrosslinkDryRun:
 
     def test_dry_run(self, tmp_path):
         vault = _setup_vault_with_enrichment(tmp_path)
-        with patch("vault.ingest.crosslink_builder.resolve_pr_author", return_value="Lincoln Quinan"):
+        with patch("vault.ingest.crosslink_resolver.resolve_pr_author", return_value="Lincoln Quinan"):
             result = run_crosslink(vault, dry_run=True, github_token="fake")
         assert isinstance(result, dict)
         assert "cards" in result or "prs" in result or "edges" in result or "dry_run" in result
@@ -366,7 +366,7 @@ class TestRunCrosslinkCreatesRelationships:
 
     def test_creates_all_files(self, tmp_path):
         vault = _setup_vault_with_enrichment(tmp_path)
-        with patch("vault.ingest.crosslink_builder.resolve_pr_author", return_value="Lincoln Quinan"):
+        with patch("vault.ingest.crosslink_resolver.resolve_pr_author", return_value="Lincoln Quinan"):
             result = run_crosslink(vault, dry_run=False, github_token="fake")
         rel_dir = vault / "relationships"
         files = {f.name for f in rel_dir.glob("*.json")}
@@ -381,7 +381,7 @@ class TestRunCrosslinkCardToPerson:
 
     def test_card_person_edge(self, tmp_path):
         vault = _setup_vault_with_enrichment(tmp_path)
-        with patch("vault.ingest.crosslink_builder.resolve_pr_author", return_value="Lincoln Quinan"):
+        with patch("vault.ingest.crosslink_resolver.resolve_pr_author", return_value="Lincoln Quinan"):
             run_crosslink(vault, dry_run=False, github_token="fake")
         data = json.loads((vault / "relationships" / "card-person.json").read_text())
         edges = data.get("edges", [])
@@ -395,7 +395,7 @@ class TestRunCrosslinkPRToPerson:
 
     def test_pr_person_edge(self, tmp_path):
         vault = _setup_vault_with_enrichment(tmp_path)
-        with patch("vault.ingest.crosslink_builder.resolve_pr_author", return_value="Lincoln Quinan"):
+        with patch("vault.ingest.crosslink_resolver.resolve_pr_author", return_value="Lincoln Quinan"):
             run_crosslink(vault, dry_run=False, github_token="fake")
         data = json.loads((vault / "relationships" / "pr-person.json").read_text())
         edges = data.get("edges", [])
@@ -407,7 +407,7 @@ class TestRunCrosslinkCardToProject:
 
     def test_card_project_edge(self, tmp_path):
         vault = _setup_vault_with_enrichment(tmp_path)
-        with patch("vault.ingest.crosslink_builder.resolve_pr_author", return_value="Lincoln Quinan"):
+        with patch("vault.ingest.crosslink_resolver.resolve_pr_author", return_value="Lincoln Quinan"):
             run_crosslink(vault, dry_run=False, github_token="fake")
         data = json.loads((vault / "relationships" / "card-project.json").read_text())
         edges = data.get("edges", [])
@@ -420,7 +420,7 @@ class TestRunCrosslinkPRToProject:
 
     def test_pr_project_edge(self, tmp_path):
         vault = _setup_vault_with_enrichment(tmp_path)
-        with patch("vault.ingest.crosslink_builder.resolve_pr_author", return_value="Lincoln Quinan"):
+        with patch("vault.ingest.crosslink_resolver.resolve_pr_author", return_value="Lincoln Quinan"):
             run_crosslink(vault, dry_run=False, github_token="fake")
         data = json.loads((vault / "relationships" / "pr-project.json").read_text())
         edges = data.get("edges", [])
@@ -467,7 +467,7 @@ class TestEnrichProjectAddsCards:
         from vault.ingest.crosslink_enrichment import enrich_project_files as _enrich_project_files
         vault = _setup_vault_with_enrichment(tmp_path)
         # Run crosslink to create relationship files first
-        with patch("vault.ingest.crosslink_builder.resolve_pr_author", return_value="Lincoln Quinan"):
+        with patch("vault.ingest.crosslink_resolver.resolve_pr_author", return_value="Lincoln Quinan"):
             run_crosslink(vault, dry_run=False, github_token="fake")
         # Create a project file
         _make_project_file(vault, "BAT/Kaba")
@@ -483,7 +483,7 @@ class TestEnrichProjectAddsPRs:
     def test_enrich_project_adds_prs(self, tmp_path):
         from vault.ingest.crosslink_enrichment import enrich_project_files as _enrich_project_files
         vault = _setup_vault_with_enrichment(tmp_path)
-        with patch("vault.ingest.crosslink_builder.resolve_pr_author", return_value="Lincoln Quinan"):
+        with patch("vault.ingest.crosslink_resolver.resolve_pr_author", return_value="Lincoln Quinan"):
             run_crosslink(vault, dry_run=False, github_token="fake")
         _make_project_file(vault, "BAT/Kaba")
         enrich_project_files(vault)
@@ -497,7 +497,7 @@ class TestEnrichProjectAddsPersons:
     def test_enrich_project_adds_persons(self, tmp_path):
         from vault.ingest.crosslink_enrichment import enrich_project_files as _enrich_project_files
         vault = _setup_vault_with_enrichment(tmp_path)
-        with patch("vault.ingest.crosslink_builder.resolve_pr_author", return_value="Lincoln Quinan"):
+        with patch("vault.ingest.crosslink_resolver.resolve_pr_author", return_value="Lincoln Quinan"):
             run_crosslink(vault, dry_run=False, github_token="fake")
         _make_project_file(vault, "BAT/Kaba")
         enrich_project_files(vault)
@@ -529,7 +529,7 @@ class TestEnrichPersonAddsCards:
     def test_enrich_person_adds_cards(self, tmp_path):
         from vault.ingest.crosslink_enrichment import enrich_person_files_with_crosslinks as _enrich_person_files_with_crosslinks
         vault = _setup_vault_with_enrichment(tmp_path)
-        with patch("vault.ingest.crosslink_builder.resolve_pr_author", return_value="Lincoln Quinan"):
+        with patch("vault.ingest.crosslink_resolver.resolve_pr_author", return_value="Lincoln Quinan"):
             run_crosslink(vault, dry_run=False, github_token="fake")
         _make_person_file(vault, "Lincoln Quinan")
         enrich_person_files_with_crosslinks(vault)
@@ -543,7 +543,7 @@ class TestEnrichPersonAddsPRs:
     def test_enrich_person_adds_prs(self, tmp_path):
         from vault.ingest.crosslink_enrichment import enrich_person_files_with_crosslinks as _enrich_person_files_with_crosslinks
         vault = _setup_vault_with_enrichment(tmp_path)
-        with patch("vault.ingest.crosslink_builder.resolve_pr_author", return_value="Lincoln Quinan"):
+        with patch("vault.ingest.crosslink_resolver.resolve_pr_author", return_value="Lincoln Quinan"):
             run_crosslink(vault, dry_run=False, github_token="fake")
         _make_person_file(vault, "Lincoln Quinan")
         enrich_person_files_with_crosslinks(vault)
@@ -557,7 +557,7 @@ class TestEnrichPersonPreservesMeetings:
     def test_preserves_meetings(self, tmp_path):
         from vault.ingest.crosslink_enrichment import enrich_person_files_with_crosslinks as _enrich_person_files_with_crosslinks
         vault = _setup_vault_with_enrichment(tmp_path)
-        with patch("vault.ingest.crosslink_builder.resolve_pr_author", return_value="Lincoln Quinan"):
+        with patch("vault.ingest.crosslink_resolver.resolve_pr_author", return_value="Lincoln Quinan"):
             run_crosslink(vault, dry_run=False, github_token="fake")
         _make_person_file(vault, "Lincoln Quinan", "## Reuniões\n\n- [[test-meeting]]\n")
         enrich_person_files_with_crosslinks(vault)
@@ -576,7 +576,7 @@ class TestUpdateMeetingContextReplaces:
     def test_replaces_with_project_scoped(self, tmp_path):
         from vault.ingest.crosslink_enrichment import update_meeting_context as _update_meeting_context
         vault = _setup_vault_with_enrichment(tmp_path)
-        with patch("vault.ingest.crosslink_builder.resolve_pr_author", return_value="Lincoln Quinan"):
+        with patch("vault.ingest.crosslink_resolver.resolve_pr_author", return_value="Lincoln Quinan"):
             run_crosslink(vault, dry_run=False, github_token="fake")
         meetings_dir = vault / "entities" / "meetings"
         meeting_path = meetings_dir / "test-meeting.md"
@@ -662,7 +662,7 @@ class TestRunCrosslinkUnmappedEntities:
         fm_text = yaml.dump(meeting_fm, default_flow_style=False, sort_keys=False)
         (meetings_dir / "unmapped.md").write_text(f"---\n{fm_text}---\n\n# Unmapped\n", encoding="utf-8")
 
-        with patch("vault.ingest.crosslink_builder.resolve_pr_author", return_value=None):
+        with patch("vault.ingest.crosslink_resolver.resolve_pr_author", return_value=None):
             result = run_crosslink(vault, dry_run=False, github_token=None)
         assert isinstance(result, dict)
         # Should not crash — edges may be empty
@@ -1026,7 +1026,7 @@ class TestStalePRCleanupRegression:
             encoding="utf-8",
         )
 
-        with patch("vault.ingest.crosslink_builder.resolve_pr_author", return_value="Someone"):
+        with patch("vault.ingest.crosslink_resolver.resolve_pr_author", return_value="Someone"):
             run_crosslink(vault, dry_run=False, github_token="fake")
 
         assert (prs_dir / "manual-pr.md").exists(), "Manual PR should not be cleaned"
@@ -1044,7 +1044,7 @@ class TestStalePRCleanupRegression:
             encoding="utf-8",
         )
 
-        with patch("vault.ingest.crosslink_builder.resolve_pr_author", return_value="Someone"):
+        with patch("vault.ingest.crosslink_resolver.resolve_pr_author", return_value="Someone"):
             run_crosslink(vault, dry_run=False, github_token="fake")
 
         assert (prs_dir / "broken.md").exists(), "Broken YAML should not be deleted"

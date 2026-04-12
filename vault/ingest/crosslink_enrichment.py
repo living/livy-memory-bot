@@ -66,8 +66,6 @@ def enrich_project_files(vault_root: Path) -> None:
                 for card in ec.get("trello", {}).get("cards", []):
                     card_details[card.get("id", "")] = card
                 for pr in ec.get("github", {}).get("pull_requests", []):
-                    pr_details.get(pr.get("url", ""), pr)
-                    # Also key by repo+number
                     pr_details[pr.get("url", "")] = pr
             except Exception as exc:
                 logger.warning("Failed to parse meeting %s: %s", mf.name, exc)

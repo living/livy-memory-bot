@@ -40,11 +40,27 @@ def resolve_board_to_project(
 
 
 def get_schema_dir(vault_root: Path) -> Path:
-    """Resolve schema directory, checking vault_root/schema first."""
+    """Resolve schema directory, checking vault_root/schema first.
+    
+    Considers any known mapping file present in the directory.
+    """
     primary = vault_root / "schema"
-    if (primary / "trello-member-map.yaml").exists():
+    if any(
+        (primary / f).exists()
+        for f in (
+            "trello-member-map.yaml",
+            "github-login-map.yaml",
+            "repo-project-map.yaml",
+            "board-project-map.yaml",
+        )
+    ):
         return primary
     return vault_root.parent / "schema"
+
+
+def load_github_login_map(schema_dir: Path) -> dict[str, str]:
+    """Load github-login-map.yaml → {github_login_lower: person_name}."""
+    return _load_map(schema_dir / "github-login-map.yaml", "logins")
 
 
 def _load_map(path: Path, key: str) -> dict[str, str]:

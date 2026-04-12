@@ -12,26 +12,11 @@ from typing import Any
 
 import yaml
 
-from vault.ingest.mapping_loader import (
-    load_trello_member_map,
-    load_repo_project_map,
-    load_board_project_map,
-    get_schema_dir,
-)
-from vault.ingest.entity_writer import upsert_pr, upsert_card
-from vault.ingest.crosslink_resolver import (
-    resolve_card_members,
-    resolve_pr_author,
-    save_trello_member_map,
-)
-from vault.ingest.crosslink_enrichment import (
-    enrich_project_files,
-    enrich_person_files_with_crosslinks,
-    update_meeting_context,
-)
-from vault.ingest.crosslink_dedup import dedup_draft_persons
+from vault.ingest.entity_writer import _split_frontmatter, upsert_card
+from vault.ingest.meeting_ingest import _fuzzy_name_key, _is_name_prefix
 
 logger = logging.getLogger(__name__)
+
 
 def _atomic_write(path: Path, content: str, encoding: str = "utf-8") -> None:
     """Write content to file atomically using tmp + rename."""
@@ -42,16 +27,6 @@ def _atomic_write(path: Path, content: str, encoding: str = "utf-8") -> None:
     except Exception:
         tmp.unlink(missing_ok=True)
         raise
-
-
-# Reuse fuzzy matching from meeting_ingest
-from vault.ingest.meeting_ingest import _fuzzy_name_key, _is_name_prefix
-from vault.ingest.mapping_loader import (
-    load_trello_member_map,
-    load_repo_project_map,
-    load_board_project_map,
-)
-from vault.ingest.entity_writer import upsert_card, upsert_pr, _split_frontmatter
 
 
 def run_crosslink(
@@ -66,14 +41,25 @@ def run_crosslink(
     Reads enrichment_context from meeting entities, resolves cards/PRs to
     persons and projects via mapping configs, and writes relationship files.
     """
-    import json
     from vault.ingest.mapping_loader import (
         load_trello_member_map,
         load_repo_project_map,
         load_board_project_map,
         get_schema_dir,
     )
-    from vault.ingest.entity_writer import upsert_pr, _split_frontmatter
+    from vault.ingest.crosslink_resolver import (
+        resolve_card_members,
+        resolve_pr_author,
+        fetch_prs_for_repos,
+        save_trello_member_map,
+    )
+    from vault.ingest.crosslink_enrichment import (
+        enrich_project_files,
+        enrich_person_files_with_crosslinks,
+        update_meeting_context,
+    )
+    from vault.ingest.crosslink_dedup import dedup_draft_persons
+    from vault.ingest.entity_writer import upsert_pr
 
     schema_dir = get_schema_dir(vault_root)
     rel_dir = vault_root / "relationships"
@@ -139,8 +125,21 @@ def run_crosslink(
                     if not dest.exists():
                         pf.rename(dest)
                     logger.info("Quarantined stale PR entity: %s", pf.name)
-            except Exception:
-                pass  # Don't delete broken files
+            except Exception as exc:
+                logger.warning("Failed to process PR file %s: %s", pf.name, exc)
+
+    # Build PR author cache via batch fetch (one API call per repo)
+    pr_author_cache: dict[tuple[str, str], str] = {}  # (repo, number) → login
+    if all_prs and github_token:
+        unique_repos = list({pr.get("repo", "") for pr in all_prs.values() if pr.get("repo")})
+        try:
+            batch_prs = fetch_prs_for_repos(unique_repos, github_token=github_token, days=365)
+            for bpr in batch_prs:
+                if bpr.get("user_login"):
+                    pr_author_cache[(bpr["repo"], str(bpr.get("number", "")))] = bpr["user_login"]
+            logger.info("Batch PR cache: %d authors from %d repos", len(pr_author_cache), len(unique_repos))
+        except Exception as exc:
+            logger.warning("Batch PR fetch failed, falling back to individual: %s", exc)
 
     # Resolve and build edges
     card_person_edges: list[dict] = []
@@ -171,7 +170,11 @@ def run_crosslink(
 
     # PRs → Persons + Projects
     for purl, pr in all_prs.items():
-        author = resolve_pr_author(pr, vault_root, github_token)
+        author = resolve_pr_author(
+            pr, vault_root, github_token,
+            schema_dir=schema_dir,
+            pr_author_cache=pr_author_cache,
+        )
         if author:
             pr_person_edges.append({
                 "from_id": f"pr:{pr.get('repo', '')}:{pr.get('number', '')}",
@@ -234,24 +237,23 @@ def run_crosslink(
     # Enrich project/person/meeting files (Tasks 8-10)
     try:
         enrich_project_files(vault_root)
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning("enrich_project_files failed: %s", exc)
     try:
         enrich_person_files_with_crosslinks(vault_root)
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning("enrich_person_files_with_crosslinks failed: %s", exc)
     try:
         update_meeting_context(vault_root, card_project_edges, pr_project_edges)
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning("update_meeting_context failed: %s", exc)
 
     # Dedup draft persons into canonicals
     try:
         deduped = dedup_draft_persons(vault_root)
         if deduped:
             stats["persons_deduped"] = deduped
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning("dedup_draft_persons failed: %s", exc)
 
     return stats
-
