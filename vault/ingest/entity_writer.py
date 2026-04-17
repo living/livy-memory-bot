@@ -478,9 +478,10 @@ def upsert_card(entity: dict, vault_root: Path | None = None) -> tuple[Path, boo
             "mapper_version": mapper_version,
         }]
 
+    safe_title = (title or id_canonical).replace("\\", "\\\\")
     lines = [
         "---",
-        f"entity: \"{title or id_canonical}\"",
+        f"entity: \"{safe_title}\"",
         "type: card",
         f"id_canonical: {id_canonical}",
         f"card_id_source: {card_id_source}",
