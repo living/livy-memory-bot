@@ -28,6 +28,18 @@ _HEX_ID_RE = __import__("re").compile(r"^[0-9a-f]{20,}$")
 _BOT_NAMES = {"livy bot", "livy", "zoom", "google meet bot", "fireflies.ai", "otter.ai"}
 
 
+def _name_from_email(email: str | None) -> str:
+    """Build a human-readable display name from an email local-part.
+
+    Example: 'marcio@livingnet.com.br' → 'Marcio'
+             'esteves.marques@living.com' → 'Esteves Marques'
+    """
+    if not email or "@" not in email:
+        return ""
+    local = email.split("@", 1)[0]
+    return local.replace("_", " ").replace(".", " ").strip().title()
+
+
 def fetch_meetings_from_supabase(days: int = DEFAULT_LOOKBACK_DAYS) -> list[dict[str, Any]]:
     """Fetch recent meetings from Supabase TLDV.
 
@@ -183,7 +195,9 @@ def extract_participants(raw: dict[str, Any]) -> list[dict[str, Any]]:
 
     for p in participants:
         pid = p.get("id")
-        name = p.get("name") or p.get("display_name")
+        email = p.get("email")
+        raw_name = (p.get("name") or p.get("display_name") or "").strip()
+        name = raw_name or _name_from_email(email)
         if not pid and not name:
             continue
         pid = str(pid or "unknown")
@@ -194,7 +208,7 @@ def extract_participants(raw: dict[str, Any]) -> list[dict[str, Any]]:
             {
                 "id": pid,
                 "name": name or "unknown",
-                "email": p.get("email"),
+                "email": email,
                 "github_login": p.get("github_login"),
                 "source_key": f"tldv:participant:{meeting_id}:{pid}",
             }
@@ -269,18 +283,20 @@ def fetch_and_build(
 
 
 def _clean_name(name: str, email: str | None = None) -> str:
-    """Resolve a participant name that may be a hex ID.
+    """Resolve participant display name from raw name/email.
 
-    If name looks like a TLDV user ID (24-hex-char), fall back to the
-    local-part of the email, title-cased.
+    Rules:
+    - Empty name → derive from email local-part when available.
+    - Hex-ID-like name (TLDV user id) → derive from email local-part.
     """
-    if not name:
-        return name
-    if _HEX_ID_RE.match(name) and email and "@" in email:
-        local = email.split("@")[0]
-        # Convert 'marcio_rocha' or 'marcio.rocha' → 'Marcio Rocha'
-        return local.replace("_", " ").replace(".", " ").title()
-    return name
+    raw = (name or "").strip()
+    if not raw:
+        return _name_from_email(email) or raw
+    if _HEX_ID_RE.match(raw):
+        fallback = _name_from_email(email)
+        if fallback:
+            return fallback
+    return raw
 
 
 def _is_bot(name: str) -> bool:
