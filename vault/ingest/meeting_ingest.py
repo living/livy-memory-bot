@@ -17,6 +17,7 @@ import json
 from vault.domain.normalize import build_entity_with_traceability
 from vault.domain.canonical_types import is_iso_date
 from vault.ingest.tldv_api_client import fetch_participants_from_tldv_api
+import supabase as supa_client
 
 import unicodedata
 
@@ -565,6 +566,58 @@ def resolve_participants_for_meeting(raw_meeting: dict[str, Any], tldv_token: st
                 "supabase_whisper_speakers",
                 f"supabase:whisper_speaker:{meeting_id}:{speaker_slug}",
             )
+
+    resolved = list(seen_by_real_id.values())
+    for norm_name, rec in seen_names_normalized.items():
+        if rec["id"].startswith("tldv:"):
+            resolved.append(rec)
+    for r in resolved:
+        r.pop("_priority", None)
+
+    if resolved:
+        return {"status": "ok", "participants": resolved}
+
+    # Layer 3.5 — Supabase meeting_participants table (speaker labels from TLDV recovery)
+    tried.append("meeting_participants_table")
+    try:
+        sb_url = os.environ.get("SUPABASE_URL")
+        sb_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+        if sb_url and sb_key:
+            sb_client = supa_client.create_client(sb_url, sb_key)
+            mp_resp = (
+                sb_client.table("meeting_participants")
+                .select("participant_id")
+                .eq("meeting_id", meeting_id)
+                .execute()
+            )
+            if mp_resp.data:
+                for mp in mp_resp.data:
+                    pid = mp.get("participant_id")
+                    name = ""
+                    email = None
+                    if pid:
+                        try:
+                            p_resp = (
+                                sb_client.table("participants")
+                                .select("name,email")
+                                .eq("id", pid)
+                                .limit(1)
+                                .execute()
+                            )
+                            if p_resp.data:
+                                name = (p_resp.data[0].get("name") or "").strip()
+                                email = p_resp.data[0].get("email")
+                        except Exception:
+                            pass
+                    if name or pid:
+                        _add(
+                            pid, name, email,
+                            "meeting_participants_table",
+                            f"mp_table:{meeting_id}:{pid or name}",
+                            priority=2,
+                        )
+    except Exception:
+        pass
 
     resolved = list(seen_by_real_id.values())
     for norm_name, rec in seen_names_normalized.items():
