@@ -22,7 +22,7 @@ Sistema de pesquisa e curadoria automática onde o **evo opera como motor de pes
 
 > **Modelo de trigger v1: polling via cron.** Cada job faz polling na fonte correspondente, detecta eventos novos desde o último checkpoint temporal, e os processa idempotentemente.
 >
-> **Lock de concorrência:** antes de iniciar, cada job adquire lock exclusivo via `flock(2)` em `.research/<source>/lock`. TTL de 10min (protege contra crash). Se lock não disponível, run é skipado.
+> **Lock de concorrência:** antes de iniciar, cada job adquire lock exclusivo via `flock(2)` em `.research/<source>/lock`. Lockfile contém `{"pid": <int>, "start_ts": <unix_ts>}`. Se lock existe: verifica se processo com PID ainda está vivo. Se processo morto ou lock > 10min old, adquire novo lock. Se processo vivo e lock < 10min, run é skipado.
 >
 > **Deduplicação:** o `state/identity-graph/state.json` mantém `processed_event_keys[]` por fonte. Só eventos com `event_key` não existente no state são processados.
 >
@@ -131,7 +131,7 @@ superseded_by: null
 **Ordem de resolução (do mais forte ao mais fraco):**
 
 1. **Email exato** (mesmo domínio ou mesmo e-mail canônico) → auto-link imediato (`confidence ≥ 0.90`)
-2. **Username parcial** (mesmo username em fontes diferentes, ex: `lincolnq` no Trello + `lincolnq` no GitHub) → candidado forte (`+0.15` boost)
+2. **Username parcial** (mesmo username em fontes diferentes, ex: `lincolnq` no Trello + `lincolnq` no GitHub) → candidato forte (`+0.15` boost)
 3. **Contexto compartilhado** (mesmos projetos, mesmas reuniões, decisões em comum) → LLM decide com base em evidências cruzadas
 
 **Regras de desempate (review_band tiebreaker):**
@@ -339,6 +339,35 @@ Fluxo:
 5. aplicar updates de acordo com tipo de evento
 6. detectar se novo owner/contributor deve ser adicionado
 ```
+
+---
+
+## 8.1 Retenção de `processed_event_keys` e compactação de state
+
+`state/identity-graph/state.json` mantém `processed_event_keys[]` por fonte. Para evitar crescimento indefinido:
+
+- **Janela de retenção:** manter apenas os últimos 180 dias de `event_key`
+- **Poda automática:** remover keys com `event_at` fora da janela na consolidação diária
+- **Compactação mensal:** gerar snapshot limpo do state no 1º dia do mês
+- **Observabilidade:** registrar tamanho do state em bytes e contagem de keys por fonte no `HEARTBEAT.md`
+
+## 8.2 `pending_retry` — campos mínimos no state
+
+Quando um evento falha após todos os retries, registrar no state:
+
+```yaml
+event_key: <source:event_type:event_id[:action_id]>
+status: pending_retry | exhausted
+retry_count: <int>
+next_retry_at: <ISO8601|null>
+last_error: <string>
+last_attempt_at: <ISO8601>
+```
+
+Regras:
+- `pending_retry`: ainda dentro da política de retry
+- `exhausted`: esgotou retries; exige revisão manual
+- Eventos `exhausted` devem aparecer no `memory/consolidation-log.md`
 
 ---
 
