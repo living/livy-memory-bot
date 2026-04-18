@@ -88,16 +88,19 @@ git commit -m "feat(research): add event_key builder with tests"
 
 - [ ] **Step 1: Write failing tests para leitura/escrita de state canônico**
 - [ ] **Step 2: Testar retenção de `processed_event_keys` (drop >180d)**
-- [ ] **Step 3: Implementar API mínima**
+- [ ] **Step 3: Testar compactação mensal (snapshot limpo no 1º dia do mês) e métricas de tamanho/contagem por fonte**
+- [ ] **Step 4: Implementar API mínima**
   - `load_state()`
   - `save_state()`
   - `upsert_processed_event_key(source, event_key, event_at)`
-  - `compact_processed_keys(retention_days=180)`
-- [ ] **Step 4: Run tests**
+  - `compact_processed_keys(retention_days=180)` — poda keys >180d
+  - `monthly_snapshot()` — compactação no 1º do mês
+  - `state_metrics()` → `{source: {key_count, size_bytes}}` para HEARTBEAT
+- [ ] **Step 5: Run tests**
 Run: `pytest tests/research/test_state_store.py -v`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 6: Commit**
 ```bash
 git add state/identity-graph/state.json vault/research/state_store.py tests/research/test_state_store.py
 git commit -m "feat(research): add canonical state store with 180d retention"
@@ -140,14 +143,15 @@ git commit -m "feat(research): add lock manager with stale lock cleanup"
   - timeout: retry imediato 1x + policy 5xx
 - [ ] **Step 3: Persistir campos mínimos de erro**
   - `retry_count`, `next_retry_at`, `last_error`, `last_attempt_at`, `status`
-- [ ] **Step 4: Run tests**
+- [ ] **Step 4: Garantir que eventos com `status: exhausted` sejam gravados em `memory/consolidation-log.md` via helper de log**
+- [ ] **Step 5: Run tests**
 Run: `pytest tests/research/test_retry_policy.py -v`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 6: Commit**
 ```bash
 git add vault/research/retry_policy.py tests/research/test_retry_policy.py
-git commit -m "feat(research): add retry policy and pending_retry schema"
+git commit -m "feat(research): add retry policy, pending_retry schema and exhausted logging"
 ```
 
 ### Task 5: Resolver de identidade (email-first + fallback contexto)
@@ -224,14 +228,15 @@ git commit -m "feat(research): add archive guardrails"
 - Create: `vault/research/pipeline.py`
 - Test: `tests/research/test_pipeline_tldv.py`, `tests/research/test_pipeline_github.py`
 
-- [ ] **Step 1: Write failing tests de fluxo TLDV/GitHub**
-- [ ] **Step 2: Implementar pipeline core com hooks para:
-  - ingest normalizado
-  - dedupe
-  - context build
-  - resolve
+- [ ] **Step 1: Write failing tests de fluxo TLDV/GitHub incluindo evento tardio (out-of-order)**
+- [ ] **Step 2: Implementar pipeline core com:**
+  - **tratamento de eventos out-of-order:** processar se `event_key` não existe no state, mesmo quando `event_at < last_seen_at` (janela `RESEARCH_LATE_WINDOW_MIN`)
+  - dedupe por `event_key` (não por `event_id`)
+  - ingest normalizado por tipo
+  - context build via claude-mem + wiki + FS
+  - entity resolution
   - validate/apply
-  - audit logging**
+  - audit logging com campos do spec
 - [ ] **Step 3: Garantir self-healing read-only no MVP**
 - [ ] **Step 4: Run tests**
 Run: `pytest tests/research/test_pipeline_tldv.py tests/research/test_pipeline_github.py -v`
@@ -253,9 +258,14 @@ git commit -m "feat(research): implement v1 pipeline core for tldv and github"
 - Test: `tests/research/test_consolidation_loop.py`
 
 - [ ] **Step 1: Write failing tests para cron entrypoints**
-- [ ] **Step 2: Implement cron scripts com env vars de intervalo**
-- [ ] **Step 3: Implement consolidator 07h BRT substituindo dream-memory-consolidation**
-- [ ] **Step 4: Run tests**
+- [ ] **Step 2: Implement cron scripts com:**
+  - env var `RESEARCH_TLDV_INTERVAL_MIN` (default 15min)
+  - env var `RESEARCH_GITHUB_INTERVAL_MIN` (default 10min)
+  - Lock path: `.research/<source>/lock` (flock + stale cleanup)
+  - Lock TTL: 10min com pid/start_ts em lockfile JSON
+- [ ] **Step 3: Implement cache rebuild: ao final de cada run, reconstruir `.research/<source>/state.json` a partir do SSOT `state/identity-graph/state.json`**
+- [ ] **Step 4: Implement consolidator 07h BRT substituindo dream-memory-consolidation**
+- [ ] **Step 5: Run tests**
 Run: `pytest tests/research/test_consolidation_loop.py -v`
 Expected: PASS
 
@@ -274,7 +284,7 @@ git commit -m "feat(crons): add research tldv/github and daily consolidation cro
 
 - [ ] **Step 1: Atualizar HEARTBEAT com novos jobs e playbook de falha**
 - [ ] **Step 2: Atualizar MEMORY com decisão de substituição do dream-memory-consolidation**
-- [ ] **Step 3: Verificar política de versionamento dos arquivos state/lock**
+- [ ] **Step 3: Verificar que `.research/<source>/state.json` é cache derivado (reconstruído do SSOT a cada run — não é persisted state)**
 - [ ] **Step 4: Commit**
 ```bash
 git add HEARTBEAT.md MEMORY.md .gitignore
