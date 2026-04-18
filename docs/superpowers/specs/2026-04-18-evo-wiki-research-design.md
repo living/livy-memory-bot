@@ -8,7 +8,9 @@
 
 ## 1. Objetivo
 
-Sistema de pesquisa e curadoria automática onde o **evo opera como motor de pesquisa** — consumindo eventos de TLDV, GitHub e Trello, enriquecendo a wiki v2 (`workspace-livy-memory`) com escrita em camadas curated/operational e bloqueio explícito de raw data sources.
+Sistema de pesquisa e curadoria automática onde o **evo opera como motor de pesquisa** — consumindo eventos de TLDV e GitHub (Trello em Fase 2), enriquecendo a wiki v2 (`workspace-livy-memory`) com escrita em camadas curated/operational e bloqueio explícito de raw data sources.
+
+**Este sistema substitui o `dream-memory-consolidation`.** O research acumula evidências; a cada ciclo, o próprio evo faz dedupe/merge/supersession periódico (Seção 9).
 
 **Escopo:** `workspace-livy-memory` (wiki v2 / livy-memory)
 
@@ -24,13 +26,14 @@ Sistema de pesquisa e curadoria automática onde o **evo opera como motor de pes
 >
 > **Chave idempotente:** `source:event_type:event_id[:action_id]`.
 >
-> **Política para eventos tardios/out-of-order:** processa qualquer evento cujo `event_key` ainda não exista, mesmo se `event_at < last_seen_at` (janela de tolerância configurável).
+> **Política para eventos tardios/out-of-order:** processa qualquer evento cujo `event_key` ainda não exista, mesmo se `event_at < last_seen_at` (janela de tolerância configurável via `RESEARCH_LATE_WINDOW_MIN`).
 
-| Cron | Schedule (configurável por env var) | Gatilho (polling) | SLA target |
+| Cron | Schedule (env var) | Gatilho (polling) | SLA realístico |
 |---|---|---|---|
-| `research-tldv` | `RESEARCH_TLDV_INTERVAL_MIN` (default: 15) | summary enriquecida / reunião marcada | latência <30min |
-| `research-github` | `RESEARCH_GITHUB_INTERVAL_MIN` (default: 10) | PR merged / issue fechada / review submitted | latência <20min |
-| `research-trello` | `RESEARCH_TRELLO_INTERVAL_MIN` (default: 15) | card criado / movido / concluído | latência <30min |
+| `research-tldv` | `RESEARCH_TLDV_INTERVAL_MIN` (default: 15) | summary enriquecida / reunião marcada | latência <1h |
+| `research-github` | `RESEARCH_GITHUB_INTERVAL_MIN` (default: 10) | PR merged / issue fechada / review submitted | latência <1h |
+
+> `research-trello` fica para **Fase 2** (Trello tem rate limiting instável e payloads variáveis — prioriza TLDV + GitHub primeiro).
 
 Cada cron executa o **pipeline interno** (idêntica estrutura, especializado por fonte):
 
@@ -53,11 +56,53 @@ Cada cron executa o **pipeline interno** (idêntica estrutura, especializado por
 | Pode alterar | Não pode alterar |
 |---|---|
 | `wiki v2` (curated/operational) | raw data sources |
-| Scripts de ingest/enrich/crosslink | `vault/data/**` |
-| Crons | `data/**` |
-| Documentação e testes | `exports/**` |
-| Playbooks e topic files | `*.jsonl` de ingestão bruta |
-| | Dumps (`*.sql`, `*.ndjson`, `*.csv` de origem) |
+| `state/identity-graph/` (identity canônico) | `vault/data/**` |
+| Scripts de ingest/enrich/crosslink | `data/**` |
+| Crons | `exports/**` |
+| Documentação e testes | `*.jsonl` de ingestão bruta |
+| Playbooks e topic files | Dumps (`*.sql`, `*.ndjson`, `*.csv` de origem) |
+| HEARTBEAT.md, consolidation log | |
+
+### 2.3 Identity Graph — Persistência
+
+**Local:** `state/identity-graph/`
+
+Arquivos:
+- `state/identity-graph/people.jsonl` — registry canônico de pessoas (um por linha, event_key como cursor)
+- `state/identity-graph/projects.jsonl` — registry de projetos
+- `state/identity-graph/state.json` — cursor + event_keys processados por fonte (espelha `.research/<source>/state.json` para consulta centralizada)
+
+### 2.4 Infraestrutura e Credenciais
+
+**Tokens/APIs:** via env vars em `~/.openclaw/.env` (mesmo padrão dos outros jobs):
+
+```bash
+# TLDV
+TLDV_API_TOKEN=          # API token do TLDV
+
+# GitHub
+GITHUB_PERSONAL_ACCESS_TOKEN=  # token com acesso aos repos Living
+
+# Trello (Fase 2)
+TRELLO_API_KEY=
+TRELLO_TOKEN=
+TRELLO_BOARD_IDS=        # vírgula-separated
+```
+
+**Rótulos de credenciais no spec:** `CREDENTIAL: TLDV_API_TOKEN`, `CREDENTIAL: GITHUB_PERSONAL_ACCESS_TOKEN`, etc.
+
+**Credential rotation:** o own de cada provider é responsável por rodar `gh auth refresh` (GitHub) ou atualizar o token no `.env` manualmente. Em Fase 3, avaliar integração com vault de secrets.
+
+### 2.5 Retry e Backoff (API fonte indisponível)
+
+| Situação | Política |
+|---|---|
+| API retorna 429 (rate limit) | backoff exponencial: 1min → 2min → 4min → 8min (max 3 retries) |
+| API retorna 5xx | backoff: 30s → 60s → 120s (max 3 retries) |
+| API retorna 403/401 | **não retry** — credencial inválida, escalona erro imediatamente |
+| Timeout de rede | retry imediato 1x, depois backoff padrão 5xx |
+
+> Evento que falha após todos os retries fica com `status: pending_retry` no state e é retestado no próximo ciclo do cron.
 
 ---
 
@@ -69,16 +114,29 @@ Cada cron executa o **pipeline interno** (idêntica estrutura, especializado por
 person_canonical_id: "person:lincoln-quinan-junior"
 aliases:
   github: ["lincolnqjunior", "lincoln-living"]
-  trello: [{ id: "abc123", username: "lincolnq" }]
-  tldv:   [{ name: "Lincoln Quinan Junior", email: "lincoln@..." }]
+  tldv:   [{ name: "Lincoln Quinan Junior", email: "lincoln@livingnet.com.br" }]
 confidence: 0.85
 last_confirmed_at: "2026-04-18T..."
-sources: ["tldv:meeting:123", "github:pr:456", "trello:card:789"]
+sources: ["tldv:meeting:123", "github:pr:456"]
 conflicts: []
 superseded_by: null
 ```
 
-### 3.2 Regras de linking (threshold progressivo por fase)
+### 3.2 Regras de resolução de identidade
+
+**Ordem de resolução (do mais forte ao mais fraco):**
+
+1. **Email exato** (mesmo domínio ou mesmo e-mail canônico) → auto-link imediato (`confidence ≥ 0.90`)
+2. **Username parcial** (mesmo username em fontes diferentes, ex: `lincolnq` no Trello + `lincolnq` no GitHub) → candidado forte (`+0.15` boost)
+3. **Contexto compartilhado** (mesmos projetos, mesmas reuniões, decisões em comum) → LLM decide com base em evidências cruzadas
+
+**Regras de desempate (review_band tiebreaker):**
+- Duas pessoas com score 0.45–0.59 no `review_band`:
+  1. Prioriza a que tiver **mais fontes confirmando** o vínculo
+  2. Em caso de empate, prioriza a que tiver **evento mais recente** como evidência
+  3. Se ainda empatar, marca `conflict:pending` e não linka (requer resolução manual)
+
+### 3.3 Regras de linking (threshold progressivo por fase)
 
 | Fase | Score | Comportamento |
 |---|---|---|
@@ -89,20 +147,19 @@ superseded_by: null
 | | `0.50–0.69` | review_band |
 | | `< 0.50` | não linka |
 
-**Rationale:** Fase 1 usa threshold baixo (0.60) para maximizar aprendizado. Fase 2 sobe para 0.70 conforme validação.
+**Rationale:** Fase 1 usa threshold baixo para maximizar aprendizado. Fase 2 sobe para 0.70 conforme validação.
 
-### 3.3 Self-healing / correção automática
+### 3.4 Self-healing — Modo read-only no MVP
 
-Quando o evo detectar inconsistência:
+> **MVP (Fase 1): self-healing roda em modo somente-leitura.** Acumula evidências e gera relatórios de candidatos a merge/supersession, mas **não aplica automaticamente.** Isso evita erro composto: se o merge erra, a próxima iteração usa o registro errado como evidência.
 
-1. **supersession explícita:** `old_claim → superseded_by → new_claim`
-2. **confidence decay:** reduz score do claim antigo
-3. **correção de atribuição:** em curated/operational
-4. **trilha de auditoria:** timestamp, evidências, root cause da correção
+Na **Fase 2**, self-healing ativa com circuit breaker (Seção 3.5).
 
 ---
 
 ## 4. Métricas de Sucesso (Modelo Mix)
+
+> **Fase 1:** métricas de cobertura e recência apenas. Métricas de qualidade de atribuição ficam para **Fase 2** (precisamos de dados reais antes de definir o que medir).
 
 ### 4.1 Coverage
 - `% de entidades com identity canônico resolvido`
@@ -114,7 +171,7 @@ Quando o evo detectar inconsistência:
 - tempo entre evento detectado → enriquecimento aplicado
 - backlog de hipóteses pendentes de validação
 
-### 4.3 Decisões e Correções
+### 4.3 Decisões e Correções (Fase 2+)
 - `stale:TODO/pendente → resolvido` (quantidade)
 - nº de correções auto-aplicadas (merge/supersession)
 - taxa de "correção revertida" (sinal de erro de linking)
@@ -138,7 +195,7 @@ resolucao:         <strategy>
 timestamp:         <ISO>
 ```
 
-> `confidence_antes/depois` deve ser `N/A` quando o evento não altera linking/atribuição.
+> `confidence_antes/depois` é `N/A` quando o evento não altera linking/atribuição.
 
 ### 5.2 Política de evolução de atribuições
 
@@ -147,42 +204,64 @@ timestamp:         <ISO>
 - correção quando evidência nova for superior (recência + suporte multi-fonte)
 - **nunca apagar contexto antigo** — sempre via supersession explícita
 
+### 5.3 Resolução de conflitos entre fontes
+
+Quando fontes contradictórias afetam o mesmo fato (ex: Trello diz card concluído, mas PR não foi merged):
+
+1. **Prioridade de fonte:** GitHub > TLDV > Trello (mais authoritative = mais peso)
+2. **Se衝突 for entre fontes de mesmo peso:** marca `conflict:pending` no registro
+3. **Evidência de supersession:** a fonte mais recente wins, com trilha de auditoria
+4. **Override manual:** qualquer conflito pode ser resolvido por edição direta no `state/identity-graph/people.jsonl`
+
 ---
 
 ## 6. Rollout em 3 Fases
 
 ### Fase 1 — MVP (1-2 semanas)
-- ativar 3 crons specialized (research-tldv, research-github, research-trello)
+- ativar 2 crons: `research-tldv` + `research-github`
+- `research-trello` **deferido para Fase 2**
 - identity graph mínimo de pessoas
-- **threshold auto-link: ≥ 0.60** (Seção 3.2)
-- checkpoint temporal + dedupe idempotente por **event_key** em cada fonte
+- **threshold auto-link: ≥ 0.60** (Seção 3.3)
+- checkpoint temporal + dedupe idempotente por **event_key**
+- **self-healing modo read-only** (não aplica merges — só acumula evidências)
 - logs detalhados de todas as ações
-- **sem agressividade em delete/merge**
+- métricas de coverage + recência (Seção 4)
+- **sem agressividade em delete/merge automático**
 
 ### Fase 2 — Refinamento
+- ativar `research-trello`
+- self-healing ativa com circuit breaker
 - ajuste de thresholds por fonte
 - regras de conflito mais fortes
-- score de qualidade por mudança
 - dashboard de cobertura
+- métricas de qualidade de atribuição (Seção 4.3)
 
 ### Fase 3 — Auto-tuning
 - threshold dinâmico por fonte (baseado em acertos/erros históricos)
 - relatórios semanais de confiança e qualidade da wiki
 - expansão para mais fontes/eventos
+- considerar vault de secrets para credential rotation
 
 ---
 
-## 7. Auto-Correction (Self-Healing)
+## 7. Auto-Correction — Circuit Breaker + Rollback
 
-O evo pode detectar e corrigir:
+### 7.1 Circuit Breaker (Fase 2+)
 
-| Situação | Ação |
-|---|---|
-| Pessoa duplicada no identity graph | merge + supersession do registro antigo |
-| Projeto mal atribuído | re-atribuição com evidência + redução confidence antigo |
-| Vínculo fraco contradito por evidência nova | upgrade/downgrade de confidence + nota desupersession |
-| Stale entry (>60d sem atualização) | marcar `stale:review` + propor re-validação |
-| Conflito de sources | marcar `conflict:pending` + escalar para revisão |
+Self-healing automático desliga se:
+- Taxa de "correção revertida" > 5% nos últimos 50 eventos processados
+- `confidence` médio do sistema cair abaixo de 0.50
+- 3+ merges aplicados resultaram em `conflict:pending` no mesmo ciclo
+
+**Comportamento quando aberto:** self-healing volta para modo read-only, registra alerta no HEARTBEAT, notifica canal operacional.
+
+### 7.2 Rollback Manual
+
+Se um merge/supersession for aplicado incorretamente:
+1. O arquivo `state/identity-graph/people.jsonl` mantém versão anterior em linha (imutabilidade por append)
+2. O campo `superseded_by` aponta para o registro que o substituiu
+3. **Reversão:** add novo registro com `superseded_by: null` e `supersedes: <event_key_do_merge_errado>`
+4. **Quem desfaz:** qualquer operador com acesso ao workspace pode editar o arquivo
 
 ---
 
@@ -256,30 +335,22 @@ Fluxo:
 6. detectar se novo owner/contributor deve ser adicionado
 ```
 
-### research-trello
-```
-1. receber payload: { board_id, card_id, action, members, list_name, due_date }
-2. resolver members → identity graph
-3. identificar projeto ↔ card mapping
-4. atualizar projeto com nova atribuição / milestone
-5. se card concluded → verificar se decision correspondente existe
-```
-
 ---
 
-## 9. self-correction — self-healing loop
+## 9. self-correction — Loop de Consolidação (Substitui dream-memory-consolidation)
 
-O evo mantém um loop de revisão contínua:
+Este sistema substitui o `dream-memory-consolidation`. A cada ciclo (diário, 07h BRT), o evo executa:
 
 ```
-A cada run:
-  1. detecta mudanças recentes no identity graph
-  2. identifica candidatos a merge (mesma pessoa, IDs diferentes)
-  3. identifica candidatos a split (pessoas diferentes, linkadas incorretamente)
-  4. para cada candidato → evalua confiança + evidências
-  5. se confiança alta o suficiente → apply com supersession
-  6. se confiança baixa → marca review_band
-  7. log completo de todas as ações de correção
+A cada consolidação (07h BRT):
+  1. ler state/identity-graph/people.jsonl
+  2. detectar candidatos a merge (mesma pessoa, IDs diferentes, score ≥ 0.60)
+  3. detectar candidatos a split (pessoas linkadas incorretamente)
+  4. para cada candidato → avaliar confiança + evidências + taxa de revertida
+  5. se self-healing em modo auto (Fase 2+) → apply com supersession
+  6. se self-healing em modo read-only (Fase 1) → gera relatório em memory/consolidation-log.md
+  7. atualizar HEARTBEAT.md com status do ciclo
+  8. archivar entries com mais de 90d sem acesso (mover para memory/.archive/)
 ```
 
 ---
@@ -287,9 +358,9 @@ A cada run:
 ## 10. Relação com Evo Napkins e Specs Existentes
 
 - **Evo Napkins** são artefatos de decisão — o evo pode consumi-los como contexto e propagar decisions para a wiki
+- **Este spec substitui `dream-memory-consolidation`** — não há mais consolidação separada; o research acumula e a consolidação (Seção 9) faz dedupe/merge/supersession
 - **Specs existentes** (memória, vault) não são alteradas — este spec adiciona capacidades ao evo sem quebrar workflows atuais
 - **HEARTBEAT.md** é atualizado automaticamente pelo evo-research com status dos jobs de pesquisa
-- **Consolidation log** registra todas as ações de correção/curadoria feitas pelo evo
 
 ---
 
@@ -298,11 +369,12 @@ A cada run:
 | Tipo | Gate |
 |---|---|
 | link de pessoa (≥ threshold) | automático |
-| merge de identidade | automático com log |
-| supersession de claim | automático com auditoria |
+| merge de identidade | automático com log (Fase 2+); modo read-only na Fase 1 |
+| supersession de claim | automático com auditoria (Fase 2+); modo read-only na Fase 1 |
 | correção de atribuição em projeto | automático com evidência multi-fonte |
 | criação de novo topic file | automático com notificação |
 | deletion de stale entry | manual (requer aprovação) |
+| rollback de merge | manual (qualquer operador com acesso) |
 
 ---
 
