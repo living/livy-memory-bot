@@ -217,3 +217,54 @@ def apply_decision(
         "reason": f"confidence {confidence:.2f} < {THRESHOLD_QUEUE}",
         "source": source,
     }
+
+
+# ---------------------------------------------------------------------------
+# Append-only rollback engine
+# ---------------------------------------------------------------------------
+
+def rollback_append(
+    log_path: Path | str,
+    event_key: str,
+    supersedes: str | None,
+    reason: str,
+    breaker_mode: bool,
+) -> None:
+    """
+    Append a rollback record to vault/logs/experiments.jsonl.
+
+    This function is append-only: it never reads, parses, or rewrites the
+    existing file content.  New records are always appended as a new JSONL
+    line so that the file forms an immutable audit trail.
+
+    Fields written:
+      - event_key   : identifier of the rollback event
+      - supersedes  : event_key being superseded, or None
+      - reason      : human-readable justification
+      - breaker_mode: whether the breaker was in effect at rollback time
+      - timestamp   : ISO-8601 UTC timestamp of the append
+
+    Parameters
+    ----------
+    log_path  : Path to the JSONL log file (created with parents if absent).
+    event_key : Unique identifier for this rollback event.
+    supersedes: event_key of the record being superseded, or None.
+    reason    : Why this rollback is being recorded.
+    breaker_mode: Whether the self-healing breaker was enabled.
+    """
+    path = Path(log_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    record = {
+        "event_key": event_key,
+        "supersedes": supersedes,
+        "reason": reason,
+        "breaker_mode": breaker_mode,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+    line = json.dumps(record, ensure_ascii=False)
+
+    # Append-only: open with 'a' so we never touch existing lines
+    with path.open("a", encoding="utf-8") as fh:
+        fh.write(line)
+        fh.write("\n")
