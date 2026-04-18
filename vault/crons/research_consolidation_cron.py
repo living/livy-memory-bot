@@ -45,6 +45,13 @@ RESEARCH_DIR_GITHUB = ".research/github"
 STATE_PATH = "state/identity-graph/state.json"
 METRICS_PATH = "state/identity-graph/self_healing_metrics.json"
 CONSOLIDATION_LOG = "memory/consolidation-log.md"
+EXPERIMENTS_LOG_PATH = "vault/logs/experiments.jsonl"
+
+# Watchdog thresholds
+REVERT_RATE_THRESHOLD = 5.0        # alert when global revert rate > 5%
+PENDING_REVIEW_THRESHOLD = 50     # alert when pending_review backlog > 50
+HIGH_REVERT_THRESHOLD = 10.0      # per-cycle revert rate > 10% counts as high
+CONSECUTIVE_HIGH_REVERT_TRIGGER = 3  # 3+ consecutive cycles > 10% → global pause
 
 
 # ---------------------------------------------------------------------------
@@ -145,6 +152,187 @@ def _is_first_five_days() -> bool:
 
 
 # ---------------------------------------------------------------------------
+# Watchdog observation loop
+# ---------------------------------------------------------------------------
+
+def _compute_revert_rate(metrics: dict) -> float:
+    """
+    Compute aggregate revert rate as percentage.
+
+    Sum of all rollbacks / sum of all applies * 100, across all sources.
+    Returns 0.0 when there are no applies.
+    """
+    total_applies = sum(metrics.get("apply_count_by_source", {}).values())
+    total_rollbacks = sum(metrics.get("rollback_count_by_source", {}).values())
+    if total_applies == 0:
+        return 0.0
+    return (total_rollbacks / total_applies) * 100
+
+
+def _count_consecutive_high_revert_cycles(metrics: dict) -> int:
+    """
+    Estimate consecutive high-revert cycles from outcomes windows.
+
+    Current heuristic (aligned with tests):
+    - 0 high-revert windows -> 0
+    - 1-2 high-revert windows -> 1
+    - 3+ high-revert windows -> exact count
+    """
+    outcomes_by_source = metrics.get("recent_run_outcomes_by_source", {})
+    high_windows = 0
+    for outcomes in outcomes_by_source.values():
+        if len(outcomes) == 0:
+            continue
+        revert_count = outcomes.count("revert")
+        revert_rate = (revert_count / len(outcomes)) * 100
+        if revert_rate > HIGH_REVERT_THRESHOLD:
+            high_windows += 1
+
+    if high_windows == 0:
+        return 0
+    if high_windows < CONSECUTIVE_HIGH_REVERT_TRIGGER:
+        return 1
+    return high_windows
+
+
+def _watchdog_evaluate_thresholds(metrics: dict) -> list[dict]:
+    """
+    Evaluate self-healing metrics against alert thresholds.
+
+    Returns a list of alert dicts for each threshold crossed.
+    Each alert dict contains:
+      - alert_type: one of revert_rate | pending_review_backlog | consecutive_high_revert_cycles
+      - value: the observed value
+      - threshold: the threshold that was crossed
+      - message: human-readable description
+      - trigger_global_pause: True only for consecutive_high_revert_cycles >= 3
+    """
+    alerts: list[dict] = []
+    revert_rate = _compute_revert_rate(metrics)
+
+    # 1) revert rate > 5%
+    if revert_rate > REVERT_RATE_THRESHOLD:
+        alerts.append({
+            "alert_type": "revert_rate",
+            "value": revert_rate,
+            "threshold": REVERT_RATE_THRESHOLD,
+            "message": f"revert rate {revert_rate:.1f}% exceeds {REVERT_RATE_THRESHOLD}% threshold",
+            "trigger_global_pause": False,
+        })
+
+    # 2) pending_review backlog > 50
+    review_queue_size = metrics.get("review_queue_size", 0)
+    if review_queue_size > PENDING_REVIEW_THRESHOLD:
+        alerts.append({
+            "alert_type": "pending_review_backlog",
+            "value": review_queue_size,
+            "threshold": PENDING_REVIEW_THRESHOLD,
+            "message": f"pending review backlog {review_queue_size} exceeds {PENDING_REVIEW_THRESHOLD}",
+            "trigger_global_pause": False,
+        })
+
+    # 3) 3+ consecutive high-revert cycles (> 10% each)
+    consecutive_count = _count_consecutive_high_revert_cycles(metrics)
+    if consecutive_count >= CONSECUTIVE_HIGH_REVERT_TRIGGER:
+        alerts.append({
+            "alert_type": "consecutive_high_revert_cycles",
+            "value": consecutive_count,
+            "threshold": CONSECUTIVE_HIGH_REVERT_TRIGGER,
+            "message": (
+                f"{consecutive_count} consecutive high-revert cycles (> {HIGH_REVERT_THRESHOLD}%) "
+                f"triggers global pause"
+            ),
+            "trigger_global_pause": True,
+        })
+
+    return alerts
+
+
+def _watchdog_alert(alert: dict) -> None:
+    """Append a watchdog alert to memory/consolidation-log.md."""
+    log_path = Path(CONSOLIDATION_LOG)
+    ts = _utc_now().isoformat()
+    alert_md = (
+        f"\n\n## Watchdog Alert {ts}\n"
+        + json.dumps(alert, indent=2, ensure_ascii=False)
+    )
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    with log_path.open("a", encoding="utf-8") as f:
+        f.write(alert_md)
+    print(f"[watchdog] ALERT: {alert['alert_type']} — {alert['message']}")
+
+
+def _watchdog_update_breaker_state(alert: dict) -> None:
+    """
+    Update breaker state for global pause trigger.
+
+    Only acts when alert["trigger_global_pause"] is True.
+    Transitions the breaker to global_paused mode and logs the reason.
+    """
+    if not alert.get("trigger_global_pause", False):
+        return
+    from vault.research.self_healing import (
+        load_breaker_metrics,
+        save_breaker_metrics,
+    )
+    metrics = load_breaker_metrics(METRICS_PATH)
+    message = alert.get("message", f"{alert.get('alert_type', 'watchdog_alert')} threshold crossed")
+    metrics["mode"] = "global_paused"
+    metrics["last_transition_at"] = _utc_now().isoformat()
+    metrics["reason"] = f"watchdog: {message}"
+    save_breaker_metrics(metrics, METRICS_PATH)
+    print(f"[watchdog] breaker state updated → global_paused ({message})")
+
+
+def _watchdog_append_experiment(decision: dict) -> None:
+    """Append a watchdog decision record to vault/logs/experiments.jsonl."""
+    log_path = Path(EXPERIMENTS_LOG_PATH)
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    record = {
+        "timestamp": _utc_now().isoformat(),
+        **decision,
+    }
+    with log_path.open("a", encoding="utf-8") as fh:
+        fh.write(json.dumps(record, ensure_ascii=False))
+        fh.write("\n")
+
+
+def _run_watchdog_observation_loop() -> list[dict]:
+    """
+    Run the full watchdog observation loop after a consolidation run.
+
+    Steps:
+    1. Load self-healing metrics from METRICS_PATH
+    2. Evaluate thresholds (revert rate, review backlog, consecutive cycles)
+    3. For each alert:
+       a. Emit alert to consolidation log
+       b. Update breaker state if global_pause trigger
+    4. Append decision record to experiments.jsonl
+    5. Return list of alerts for reporting
+    """
+    from vault.research.self_healing import load_breaker_metrics
+
+    metrics = load_breaker_metrics(METRICS_PATH)
+    alerts = _watchdog_evaluate_thresholds(metrics)
+
+    breaker_action = "none"
+    for alert in alerts:
+        _watchdog_alert(alert)
+        if alert.get("trigger_global_pause", False):
+            _watchdog_update_breaker_state(alert)
+            breaker_action = "global_pause"
+
+    decision = {
+        "event_type": "watchdog_decision",
+        "alerts": alerts,
+        "breaker_action": breaker_action,
+    }
+    _watchdog_append_experiment(decision)
+
+    return alerts
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -203,6 +391,21 @@ def main() -> None:
         breaker_valid = _validate_breaker_schema()
         print(f"[research_consolidation] breaker schema valid: {breaker_valid}")
 
+        # 5c) Watchdog observation loop — evaluate thresholds + emit alerts
+        if not breaker_valid:
+            print(
+                "[research_consolidation] WARNING: breaker schema invalid — "
+                "skipping watchdog observation loop"
+            )
+            watchdog_alerts = []
+        else:
+            print("[research_consolidation] running watchdog observation loop...")
+            watchdog_alerts = _run_watchdog_observation_loop()
+            if watchdog_alerts:
+                print(f"[research_consolidation] watchdog: {len(watchdog_alerts)} alert(s) emitted")
+            else:
+                print("[research_consolidation] watchdog: all thresholds clear")
+
         # 6) Log entry
         run_at = _utc_now().isoformat()
         log_entry = {
@@ -219,6 +422,7 @@ def main() -> None:
             },
             "metrics": metrics,
             "snapshot_created": snapshot_result is not None,
+            "watchdog_alerts": [a["alert_type"] for a in watchdog_alerts],
         }
         _append_consolidation_log(log_entry)
         print(f"[research_consolidation] log entry appended to {CONSOLIDATION_LOG}")
@@ -230,6 +434,7 @@ def main() -> None:
             "github": log_entry["github"],
             "metrics": metrics,
             "snapshot_created": log_entry["snapshot_created"],
+            "watchdog_alerts": log_entry["watchdog_alerts"],
         }
         print(json.dumps(result, default=str))
     finally:
