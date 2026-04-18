@@ -1,0 +1,175 @@
+"""Trello polling client for board events (Stream T).
+
+Fetches actions and cards from configured Trello boards via the REST API.
+Normalizes Trello events into the internal event format.
+"""
+from __future__ import annotations
+
+import logging
+import os
+from datetime import datetime, timezone
+from typing import Any
+
+import requests
+
+logger = logging.getLogger(__name__)
+
+
+# Trello API base URL
+TRELLO_API_BASE = "https://api.trello.com/1"
+
+# Mapping from Trello action types to internal event types
+ACTION_TYPE_MAP = {
+    "createCard": "trello:card_created",
+    "updateCard": "trello:card_updated",
+    "moveListFromBoard": "trello:list_moved",
+    "addMemberToCard": "trello:member_added",
+    "removeMemberFromCard": "trello:member_removed",
+}
+
+
+class TrelloAPIError(Exception):
+    """Raised when the Trello API returns a non-200 response."""
+
+    def __init__(self, board_id: str, status_code: int, response_text: str = "") -> None:
+        self.board_id = board_id
+        self.status_code = status_code
+        super().__init__(
+            f"Trello API error for board {board_id}: HTTP {status_code}{f' - {response_text[:100]}' if response_text else ''}"
+        )
+
+
+class TrelloClient:
+    """Client for polling Trello boards for activity.
+
+    Args:
+        api_key: Trello API key (or set TRELLO_API_KEY env var)
+        token: Trello token (or set TRELLO_TOKEN env var)
+        board_ids: List of Trello board IDs to poll
+
+    Raises:
+        EnvironmentError: if TRELLO_API_KEY or TRELLO_TOKEN is not set
+        TrelloAPIError: if a board API call returns a non-200 response
+    """
+
+    def __init__(
+        self,
+        api_key: str | None = None,
+        token: str | None = None,
+        board_ids: list[str] | None = None,
+    ) -> None:
+        # Allow constructor overrides, but env vars are the primary source
+        self.api_key = api_key or os.environ.get("TRELLO_API_KEY", "")
+        self.token = token or os.environ.get("TRELLO_TOKEN", "")
+        self.board_ids = board_ids or os.environ.get("TRELLO_BOARD_IDS", "").split(",")
+
+        # Validate required credentials
+        if not self.api_key or not self.token:
+            raise EnvironmentError("TRELLO_API_KEY and TRELLO_TOKEN must be set")
+
+        # Filter out empty strings from board_ids
+        self.board_ids = [b.strip() for b in self.board_ids if b.strip()]
+
+    def fetch_events_since(self, last_seen_at: str | None) -> list[dict[str, Any]]:
+        """Fetch events from all configured boards since last_seen_at.
+
+        Args:
+            last_seen_at: ISO timestamp string; if None, fetches all recent actions
+
+        Returns:
+            List of normalized event dicts with source='trello' and event_type in
+            trello:card_created | card_updated | list_moved | member_added | member_removed
+        """
+        all_events: list[dict[str, Any]] = []
+
+        for board_id in self.board_ids:
+            events = self._fetch_board_actions(board_id, last_seen_at)
+            all_events.extend(events)
+
+        return all_events
+
+    def _fetch_board_actions(
+        self, board_id: str, last_seen_at: str | None
+    ) -> list[dict[str, Any]]:
+        """Fetch actions for a single board, optionally filtered by since date."""
+        params: dict[str, Any] = {
+            "key": self.api_key,
+            "token": self.token,
+            "filter": "createCard,updateCard,moveListFromBoard,addMemberToCard,removeMemberFromCard",
+        }
+
+        if last_seen_at:
+            params["since"] = last_seen_at
+
+        url = f"{TRELLO_API_BASE}/boards/{board_id}/actions"
+        response = requests.get(url, params=params, timeout=30)
+
+        if response.status_code != 200:
+            raise TrelloAPIError(board_id, response.status_code, response.text)
+
+        actions = response.json()
+        return [self.normalize_action(action) for action in actions]
+
+    def normalize_action(self, action: dict[str, Any]) -> dict[str, Any]:
+        """Convert a Trello action dict into the internal event format.
+
+        Args:
+            action: Raw Trello action object from the API
+
+        Returns:
+            Normalized event dict with fields:
+                - source: always "trello"
+                - event_type: mapped from action type
+                - action_id: original Trello action ID
+                - card_id: card ID if present
+                - list_id: list ID if present
+                - board_id: board ID if present
+                - member_id: member ID if present
+                - timestamp: ISO timestamp of the action
+                - raw: original action data
+        """
+        action_type = action.get("type", "")
+        # Known types are in ACTION_TYPE_MAP; unknown types fall back to
+        # "trello:<raw_type>" so the pipeline can still track them.
+        event_type = ACTION_TYPE_MAP.get(action_type, f"trello:{action_type}")
+        data = action.get("data", {})
+
+        event: dict[str, Any] = {
+            "source": "trello",
+            "event_type": event_type,
+            "action_id": action.get("id"),
+            "timestamp": action.get("date"),
+            "raw": action,
+        }
+
+        # Extract card info if present
+        card = data.get("card")
+        if card:
+            event["card_id"] = card.get("id")
+            event["card_name"] = card.get("name")
+
+        # Extract list info if present
+        lst = data.get("list")
+        if lst:
+            event["list_id"] = lst.get("id")
+            event["list_name"] = lst.get("name")
+
+        # Extract board info if present
+        board = data.get("board")
+        if board:
+            event["board_id"] = board.get("id")
+            event["board_name"] = board.get("name")
+
+        # Extract member info if present
+        member = data.get("member") or data.get("memberAdded") or data.get("memberRemoved")
+        if member:
+            event["member_id"] = member.get("id")
+            event["member_name"] = member.get("fullName")
+
+        # Member creator (actor)
+        member_creator = action.get("memberCreator")
+        if member_creator:
+            event["actor_id"] = member_creator.get("id")
+            event["actor_name"] = member_creator.get("fullName")
+
+        return event
