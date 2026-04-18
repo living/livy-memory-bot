@@ -9,8 +9,8 @@ from pathlib import Path
 from typing import Any
 
 DEFAULT_STATE = {
-    "processed_event_keys": {"github": [], "tldv": []},
-    "last_seen_at": {"github": None, "tldv": None},
+    "processed_event_keys": {"github": [], "tldv": [], "trello": []},
+    "last_seen_at": {"github": None, "tldv": None, "trello": None},
     "version": 1,
 }
 
