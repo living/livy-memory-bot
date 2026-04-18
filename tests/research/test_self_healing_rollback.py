@@ -19,8 +19,8 @@ def tmp_log_file(tmp_log_dir):
     p.parent.mkdir(parents=True, exist_ok=True)
     # Pre-populate with existing lines to verify append-only invariant
     existing = [
-        json.dumps({"event_key": "ev/001", "supersedes": None, "reason": "initial", "breaker_mode": True, "timestamp": "2026-04-01T10:00:00Z"}),
-        json.dumps({"event_key": "ev/002", "supersedes": "ev/001", "reason": "correction", "breaker_mode": False, "timestamp": "2026-04-01T11:00:00Z"}),
+        json.dumps({"event_type": "rollback_append", "event_key": "ev/001", "supersedes": None, "reason": "initial", "breaker_mode": True, "timestamp": "2026-04-01T10:00:00Z"}),
+        json.dumps({"event_type": "rollback_append", "event_key": "ev/002", "supersedes": "ev/001", "reason": "correction", "breaker_mode": False, "timestamp": "2026-04-01T11:00:00Z"}),
     ]
     p.write_text("\n".join(existing) + "\n")
     return p
@@ -47,6 +47,7 @@ def test_rollback_append_writes_jsonl_line(tmp_log_dir):
     assert record["reason"] == "reverted bad change"
     assert record["breaker_mode"] is True
     assert "timestamp" in record
+    assert record["event_type"] == "rollback_append"
 
 
 def test_rollback_append_preserves_existing_lines(tmp_log_file):

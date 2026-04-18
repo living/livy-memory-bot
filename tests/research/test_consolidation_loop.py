@@ -293,3 +293,72 @@ class TestResearchConsolidationCron:
         assert any("skipping" in line for line in lines)
         parsed = json.loads(lines[-1])
         assert parsed.get("skipped_reason") == "locked"
+
+
+# ---------------------------------------------------------------------------
+# _expected_type_name helper
+# ---------------------------------------------------------------------------
+
+    def test_expected_type_name_single(self):
+        from vault.crons.research_consolidation_cron import _expected_type_name
+        assert _expected_type_name(str) == "str"
+        assert _expected_type_name(int) == "int"
+        assert _expected_type_name(list) == "list"
+
+    def test_expected_type_name_tuple_union(self):
+        from vault.crons.research_consolidation_cron import _expected_type_name
+        result = _expected_type_name((type(None), str))
+        assert "None" in result and "str" in result
+
+
+# ---------------------------------------------------------------------------
+# _validate_breaker_schema
+# ---------------------------------------------------------------------------
+
+    def test_validate_breaker_schema_accepts_string_last_transition_at(self, monkeypatch, tmp_path, capsys):
+        from vault.crons import research_consolidation_cron as mod
+        from vault.research.self_healing import DEFAULT_BREAKER_METRICS
+
+        metrics_file = tmp_path / "metrics.json"
+        monkeypatch.setattr(mod, "METRICS_PATH", str(metrics_file))
+
+        # Write metrics with ISO string last_transition_at
+        data = {**DEFAULT_BREAKER_METRICS, "last_transition_at": "2026-04-18T10:00:00+00:00"}
+        metrics_file.write_text(json.dumps(data))
+
+        result = mod._validate_breaker_schema()
+        assert result is True
+        out = capsys.readouterr().out
+        assert "WARNING" not in out
+
+    def test_validate_breaker_schema_accepts_none_last_transition_at(self, monkeypatch, tmp_path, capsys):
+        from vault.crons import research_consolidation_cron as mod
+        from vault.research.self_healing import DEFAULT_BREAKER_METRICS
+
+        metrics_file = tmp_path / "metrics.json"
+        monkeypatch.setattr(mod, "METRICS_PATH", str(metrics_file))
+
+        # Write metrics with None last_transition_at (default)
+        data = {**DEFAULT_BREAKER_METRICS}
+        metrics_file.write_text(json.dumps(data))
+
+        result = mod._validate_breaker_schema()
+        assert result is True
+        out = capsys.readouterr().out
+        assert "WARNING" not in out
+
+    def test_validate_breaker_schema_rejects_invalid_last_transition_at(self, monkeypatch, tmp_path, capsys):
+        from vault.crons import research_consolidation_cron as mod
+        from vault.research.self_healing import DEFAULT_BREAKER_METRICS
+
+        metrics_file = tmp_path / "metrics.json"
+        monkeypatch.setattr(mod, "METRICS_PATH", str(metrics_file))
+
+        # Write metrics with invalid type (int instead of None|str)
+        data = {**DEFAULT_BREAKER_METRICS, "last_transition_at": 12345}
+        metrics_file.write_text(json.dumps(data))
+
+        result = mod._validate_breaker_schema()
+        assert result is False
+        out = capsys.readouterr().out
+        assert "WARNING" in out and "last_transition_at" in out

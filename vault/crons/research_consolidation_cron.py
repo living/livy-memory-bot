@@ -24,6 +24,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from vault.research.lock_manager import acquire_lock, release_lock, LOCK_TTL
 from vault.research.pipeline import ResearchPipeline
+from vault.research.self_healing import (
+    DEFAULT_BREAKER_METRICS,
+    load_breaker_metrics,
+)
 from vault.research.state_store import (
     compact_processed_keys,
     load_state,
@@ -39,7 +43,65 @@ LOCK_PATH = ".research/consolidation/lock"
 RESEARCH_DIR_TLDV = ".research/tldv"
 RESEARCH_DIR_GITHUB = ".research/github"
 STATE_PATH = "state/identity-graph/state.json"
+METRICS_PATH = "state/identity-graph/self_healing_metrics.json"
 CONSOLIDATION_LOG = "memory/consolidation-log.md"
+
+
+# ---------------------------------------------------------------------------
+# Schema validation
+# ---------------------------------------------------------------------------
+
+def _expected_type_name(expected_type: type | tuple[type, ...]) -> str:
+    """Format expected type names for logs, including tuple unions."""
+    if isinstance(expected_type, tuple):
+        return " | ".join(t.__name__ for t in expected_type)
+    return expected_type.__name__
+
+
+def _validate_breaker_schema() -> bool:
+    """
+    Validate the self-healing metrics schema.
+
+    Checks that all required fields are present and have the correct types.
+    Logs warnings for any schema violations and returns False if invalid.
+    """
+    required_fields = {
+        "mode": (str, {"monitoring", "write_paused", "global_paused"}),
+        "paused_sources": (list, None),
+        "apply_count_by_source": (dict, None),
+        "rollback_count_by_source": (dict, None),
+        "revert_streak_by_source": (dict, None),
+        "error_streak_by_source": (dict, None),
+        "availability_error_by_source": (dict, None),
+        "review_queue_size": (int, None),
+        "last_transition_at": ((type(None), str), None),   # None or ISO string
+        "reason": (str, None),
+        "recent_run_outcomes_by_source": (dict, None),     # {source: [outcome, ...]}
+    }
+
+    try:
+        metrics = load_breaker_metrics(METRICS_PATH)
+    except Exception as exc:
+        print(f"[research_consolidation] WARNING: could not load breaker metrics: {exc}")
+        return False
+
+    for field, (expected_type, allowed_values) in required_fields.items():
+        if field not in metrics:
+            print(f"[research_consolidation] WARNING: missing breaker field '{field}' — will use default")
+            continue
+        value = metrics[field]
+        if not isinstance(value, expected_type):
+            expected_name = _expected_type_name(expected_type)
+            print(
+                f"[research_consolidation] WARNING: breaker field '{field}' "
+                f"has type {type(value).__name__}, expected {expected_name}"
+            )
+            return False
+        if allowed_values and value not in allowed_values:
+            print(f"[research_consolidation] WARNING: breaker field '{field}' has invalid value {value!r}; allowed: {allowed_values}")
+            return False
+
+    return True
 
 
 # ---------------------------------------------------------------------------
@@ -136,6 +198,10 @@ def main() -> None:
         # 5) Metrics
         metrics = state_metrics(state_path=STATE_PATH)
         print(f"[research_consolidation] state metrics: {metrics}")
+
+        # 5b) Validate self-healing breaker schema
+        breaker_valid = _validate_breaker_schema()
+        print(f"[research_consolidation] breaker schema valid: {breaker_valid}")
 
         # 6) Log entry
         run_at = _utc_now().isoformat()
