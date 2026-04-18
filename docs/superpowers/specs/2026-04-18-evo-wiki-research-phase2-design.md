@@ -68,6 +68,12 @@ Gate T1 (Trello verde) -> Gate S1 (Self-healing verde) -> Gate Final (regressão
 ### 3.1.3 Chave idempotente
 `trello:{event_type}:{card_id}[:{action_id}]`
 
+**Collision avoidance:**
+- `card_created`/`card_updated`: `action_id` é obrigatório. Se a API não retornar action_id, fallback determinístico: `list_id_at_event + _ + updated_at_ts`
+- `list_moved`: suffix = `target_list_id + _ + card_id + _ + timestamp`
+- `member_added`/`member_removed`: suffix = `member_id + _ + timestamp`
+- Fallback final para garantir unicidade: `hash16(field1 + field2 + timestamp)`
+
 ### 3.1.4 Entidades afetadas
 - card → `memory/vault/entities/cards/`
 - project (derivado do board mapping)
@@ -106,15 +112,34 @@ Formato mínimo de evidência no consolidation log:
 ```
 
 ### 3.2.3 Circuit breaker (por fonte)
-- 3 erros consecutivos → pausa auto-apply da fonte (**polling continua, escrita automática pausa**)
-- 5 reverts em 10 ciclos → pausa global de self-healing (**polling continua, somente write-mode pausa**)
-- fonte offline >30min → erro operacional (não conta como revert)
+- 3 erros consecutivos (**runs consecutivos** da fonte) → pausa auto-apply da fonte (polling continua, escrita pausa)
+- 5 reverts em **10 runs consecutivos** da fonte → pausa global de self-healing (polling continua, somente write-mode pausa)
+- fonte offline >30min → incrementa `availability_error_by_source` (não conta como revert)
 
-Estado do breaker é persistido por fonte em `state/identity-graph/self_healing_metrics.json`:
-- `mode: monitoring|write_paused|global_paused`
-- `paused_sources: ["trello", "github", "tldv"]`
-- `last_transition_at`
-- `reason`
+Regras de janela:
+- "run" = uma execução do cron da fonte com status `ok` ou `error`
+- janela de 10 runs é resetada após 3 runs sem revert
+
+Separação de erros:
+- `error_streak_by_source` = erros de qualidade (parse/validation/write)
+- `availability_error_by_source` = erros de disponibilidade (timeout/5xx/offline)
+
+Estado do breaker é persistido em `state/identity-graph/self_healing_metrics.json` com schema único:
+
+```json
+{
+  "mode": "monitoring|write_paused|global_paused",
+  "paused_sources": ["trello", "github", "tldv"],
+  "apply_count_by_source": {"github": 0, "tldv": 0, "trello": 0},
+  "rollback_count_by_source": {"github": 0, "tldv": 0, "trello": 0},
+  "revert_streak_by_source": {"github": 0, "tldv": 0, "trello": 0},
+  "error_streak_by_source": {"github": 0, "tldv": 0, "trello": 0},
+  "availability_error_by_source": {"github": 0, "tldv": 0, "trello": 0},
+  "review_queue_size": 0,
+  "last_transition_at": "<ISO>",
+  "reason": "<string>"
+}
+```
 
 ---
 
@@ -126,6 +151,11 @@ Estado do breaker é persistido por fonte em `state/identity-graph/self_healing_
   - `processed_event_keys.trello`
   - `last_seen_at.trello`
   - métricas por fonte em `state_metrics()`
+
+**Retenção e compactação:**
+- `processed_event_keys` por fonte: retenção de 180 dias + compactação mensal (dia 1–5)
+- `pending_conflicts`: sem delete automático; alerta se >200 entradas
+- `self_healing_metrics.json`: estado operacional corrente (sem retenção histórica)
 
 `state_metrics()` é função do módulo `vault/research/state_store.py` e retorna:
 
@@ -205,7 +235,10 @@ Suites novas esperadas:
 - `tests/research/test_pipeline_trello.py`
 - `tests/research/test_trello_board_project_map.py`
 
-Critério: 100% verde + idempotência validada.
+Critério auditável:
+- 3 suites acima com 0 failures
+- idempotência por event_key validada
+- smoke `python3 vault/crons/research_trello_cron.py` com status=success
 
 ## 7.2 Gate S1 (Self-healing)
 Suites novas esperadas:
@@ -213,14 +246,18 @@ Suites novas esperadas:
 - `tests/research/test_self_healing_rollback.py`
 - `tests/research/test_circuit_breaker.py`
 
-Critério: 100% verde + rollback append-only garantido.
+Critério auditável:
+- 3 suites acima com 0 failures
+- rollback append-only validado por teste de não-edição de linha existente
+- breaker validado com cenário de 5 reverts em 10 runs
 
 ## 7.3 Gate Final
-- `pytest -q tests/research/`
-- `pytest -q vault/tests/test_identity_resolution.py vault/tests/test_resilience.py --ignore=vault/tests/test_reverify_module.py`
+- `PYTHONPATH=. pytest -q tests/research/`
+- `PYTHONPATH=. pytest -q vault/tests/test_identity_resolution.py vault/tests/test_resilience.py --ignore=vault/tests/test_reverify_module.py`
 - smoke dos crons `research_tldv`, `research_github`, `research_trello`, `research_consolidation`
+- validação de schema de `state/identity-graph/self_healing_metrics.json`
 
-Critério: sem regressões.
+Critério auditável: zero regressões críticas + todas as suites obrigatórias acima com 0 failures.
 
 ---
 
@@ -232,6 +269,8 @@ T2. normalização e event_key trello
 T3. card upsert + list move status tracking  
 T4. member reinforcement  
 T5. cron `research_trello` + testes + gate T1
+
+**Nomenclatura:** usar `research_trello` (underscore) em código e testes; usar `research-trello` apenas em exibição operacional (HEARTBEAT).
 
 ### Stream S (Self-healing)
 S1. write-mode agressivo (`>=0.70`)  
