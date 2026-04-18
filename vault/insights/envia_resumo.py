@@ -11,7 +11,7 @@ from pathlib import Path
 import requests
 
 
-BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
+BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN") or os.environ.get("TELEGRAM_TOKEN", "")
 CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "7426291192")
 DRY_RUN = False  # Ativado — enviar para Telegram de verdade
 DRY_RUN_FALLBACK = os.environ.get("DRY_RUN_RESUMO", "false").lower() in ("1", "true")
