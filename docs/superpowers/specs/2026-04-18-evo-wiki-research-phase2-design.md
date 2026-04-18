@@ -94,10 +94,27 @@ Quando regressão é detectada (ex.: conflito reaberto, atribuição revertida p
 - nunca editar linha antiga
 - registrar evidência no `memory/consolidation-log.md`
 
+Formato mínimo de evidência no consolidation log:
+
+```markdown
+## Self-Healing Rollback <ISO_TS>
+- source: trello|github|tldv
+- event_key: <rollback_event_key>
+- supersedes: <event_key_original>
+- reason: <reason_code>
+- breaker_mode: monitoring|write_paused|global_paused
+```
+
 ### 3.2.3 Circuit breaker (por fonte)
-- 3 erros consecutivos → pausa auto-apply da fonte
-- 5 reverts em 10 ciclos → pausa global de self-healing
+- 3 erros consecutivos → pausa auto-apply da fonte (**polling continua, escrita automática pausa**)
+- 5 reverts em 10 ciclos → pausa global de self-healing (**polling continua, somente write-mode pausa**)
 - fonte offline >30min → erro operacional (não conta como revert)
+
+Estado do breaker é persistido por fonte em `state/identity-graph/self_healing_metrics.json`:
+- `mode: monitoring|write_paused|global_paused`
+- `paused_sources: ["trello", "github", "tldv"]`
+- `last_transition_at`
+- `reason`
 
 ---
 
@@ -109,6 +126,16 @@ Quando regressão é detectada (ex.: conflito reaberto, atribuição revertida p
   - `processed_event_keys.trello`
   - `last_seen_at.trello`
   - métricas por fonte em `state_metrics()`
+
+`state_metrics()` é função do módulo `vault/research/state_store.py` e retorna:
+
+```python
+{
+  "github": {"key_count": int, "size_bytes": int},
+  "tldv": {"key_count": int, "size_bytes": int},
+  "trello": {"key_count": int, "size_bytes": int},
+}
+```
 
 Compatibilidade:
 - não quebrar fluxos existentes de `tldv` e `github`
@@ -131,7 +158,13 @@ Campos mínimos:
 O evo (`evo-analyze` / watchdog) usa esses sinais para:
 - alertar regressão de qualidade
 - pausar/reabilitar self-healing
-- registrar decisões em `experiments.jsonl`
+- registrar decisões em `vault/logs/experiments.jsonl`
+
+Formato mínimo de entrada em `vault/logs/experiments.jsonl`:
+
+```json
+{"ts":"...","source":"trello","breaker_mode":"write_paused","decision":"pause_auto_apply","reason":"5_reverts_in_10_cycles"}
+```
 
 ---
 
@@ -142,6 +175,25 @@ O evo (`evo-analyze` / watchdog) usa esses sinais para:
 - lock por fonte com `flock` + stale cleanup (TTL 600s)
 - retries e backoff seguem política da Fase 1
 - conflitos insolúveis continuam como `conflict:pending`
+
+`conflict:pending` é persistido em `state/identity-graph/state.json` em `pending_conflicts[]` com schema mínimo:
+
+```json
+{
+  "conflict_id": "<stable-id>",
+  "entity_type": "person|project|card",
+  "entity_key": "<entity-source-key>",
+  "candidates": [{"source":"...","event_key":"...","confidence":0.0}],
+  "created_at": "<ISO>",
+  "status": "pending",
+  "resolution": null
+}
+```
+
+Resolução de `conflict:pending` ocorre no `research_consolidation_cron.py`:
+1. reaplica source priority + recency com evidências acumuladas
+2. se ainda empate, mantém `pending`
+3. se resolver, append de registro com `status: resolved` + `resolved_by_event_key`
 
 ---
 
