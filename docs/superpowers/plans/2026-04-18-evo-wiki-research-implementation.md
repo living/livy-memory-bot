@@ -269,7 +269,7 @@ git commit -m "feat(research): implement v1 pipeline core for tldv and github"
 Run: `pytest tests/research/test_consolidation_loop.py -v`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 6: Commit**
 ```bash
 git add vault/crons/research_tldv_cron.py vault/crons/research_github_cron.py vault/crons/research_consolidation_cron.py vault/crons/__init__.py tests/research/test_consolidation_loop.py
 git commit -m "feat(crons): add research tldv/github and daily consolidation cron"
@@ -284,7 +284,7 @@ git commit -m "feat(crons): add research tldv/github and daily consolidation cro
 
 - [ ] **Step 1: Atualizar HEARTBEAT com novos jobs e playbook de falha**
 - [ ] **Step 2: Atualizar MEMORY com decisão de substituição do dream-memory-consolidation**
-- [ ] **Step 3: Verificar que `.research/<source>/state.json` é cache derivado (reconstruído do SSOT a cada run — não é persisted state)**
+- [ ] **Step 3: Verificar que `.research/<source>/state.json` é cache derivado (reconstruído do SSOT a cada run — não é persisted state). Se existier no repo, adicionar `.research/*/state.json` ao `.gitignore`.**
 - [ ] **Step 4: Commit**
 ```bash
 git add HEARTBEAT.md MEMORY.md .gitignore
