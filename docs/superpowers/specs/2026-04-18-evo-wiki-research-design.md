@@ -128,15 +128,17 @@ Quando o evo detectar inconsistência:
 Cada execução do cron registra:
 
 ```
-evento_processado: <event_id>
+evento_processado: <event_key>
 mudanças_feitas:   [<list>]
 evidencias:        [<sources>]
-confidence_antes: <float>
-confidence_depois: <float>
+confidence_antes: <float|N/A>
+confidence_depois: <float|N/A>
 conflitos:         [<list>]
 resolucao:         <strategy>
 timestamp:         <ISO>
 ```
+
+> `confidence_antes/depois` deve ser `N/A` quando o evento não altera linking/atribuição.
 
 ### 5.2 Política de evolução de atribuições
 
@@ -153,7 +155,7 @@ timestamp:         <ISO>
 - ativar 3 crons specialized (research-tldv, research-github, research-trello)
 - identity graph mínimo de pessoas
 - **threshold auto-link: ≥ 0.60** (Seção 3.2)
-- checkpoint + dedupe por event_id em cada fonte
+- checkpoint temporal + dedupe idempotente por **event_key** em cada fonte
 - logs detalhados de todas as ações
 - **sem agressividade em delete/merge**
 
@@ -196,6 +198,15 @@ O evo pode detectar e corrigir:
 6. apply se confidence ≥ threshold
 7. log + notificar se gap crítico
 ```
+
+**Critério de gap crítico (v1):**
+- decisão sem owner em projeto ativo
+- tema recorrente em 3+ reuniões sem decisão
+- conflito de identidade de pessoa com impacto em owner/atribuição
+
+**Destino da notificação (v1):**
+1. registra no `HEARTBEAT.md` (alerta)
+2. envia alerta direto no canal operacional configurado
 
 ### research-github
 
