@@ -19,26 +19,47 @@ def run() -> Path:
         "?select=id,name,created_at,enriched_at"
         "&enriched_at=not.is.null"
         "&order=created_at.desc"
-        "&limit=100",
+        "&limit=200",
         headers=H,
         timeout=30,
     )
     r.raise_for_status()
     meetings = r.json()
 
+    if not meetings:
+        out = Path("memory/vault/insights/no-decisions.md")
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(
+            "# Reuniões Sem Decisão Explícita\n\nNenhuma reunião enriquecida encontrada.",
+            encoding="utf-8",
+        )
+        return out
+
+    # Batch fetch summaries in chunks to avoid N+1 requests
+    meeting_ids = [m["id"] for m in meetings if m.get("id")]
+    summaries_by_meeting = {}
+
+    chunk_size = 100
+    for i in range(0, len(meeting_ids), chunk_size):
+        chunk = meeting_ids[i:i + chunk_size]
+        ids = ",".join(chunk)
+        sr = requests.get(
+            f"{SUPABASE_URL}/rest/v1/summaries"
+            f"?select=meeting_id,decisions&meeting_id=in.({ids})",
+            headers=H,
+            timeout=30,
+        )
+        sr.raise_for_status()
+        for row in sr.json():
+            summaries_by_meeting.setdefault(row.get("meeting_id"), []).append(row)
+
     no_decisions = []
     for m in meetings:
         sid = m["id"]
-        sr = requests.get(
-            f"{SUPABASE_URL}/rest/v1/summaries"
-            f"?select=decisions&meeting_id=eq.{sid}&limit=1",
-            headers=H,
-            timeout=15,
-        )
-        if sr.ok:
-            summaries = sr.json()
-            if not summaries or not summaries[0].get("decisions"):
-                no_decisions.append(m)
+        rows = summaries_by_meeting.get(sid, [])
+        has_decision = any((row.get("decisions") or []) for row in rows)
+        if not has_decision:
+            no_decisions.append(m)
 
     out = Path("memory/vault/insights/no-decisions.md")
     out.parent.mkdir(parents=True, exist_ok=True)

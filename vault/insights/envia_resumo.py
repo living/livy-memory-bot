@@ -3,6 +3,7 @@ Envia resumo-semanal.md para Telegram (chat 7426291192).
 Dry-run: apenas valida, mostra preview e log. Não envia de verdade.
 Para ativar, trocar DRY_RUN = False.
 """
+import os
 import json
 from datetime import datetime, timezone
 from pathlib import Path
@@ -14,7 +15,13 @@ STATE_FILE = Path("memory/vault/insights/.last_sent.json")
 
 
 def run():
-    V = Path("memory/vault")
+    # Resolve vault path relative to script location, not hardcoded machine path.
+    env_vault = os.environ.get("SOURCE_VAULT")
+    if env_vault:
+        V = Path(env_vault)
+    else:
+        V = Path(__file__).parent.parent.parent / "memory" / "vault"
+
     resumo = V / "insights" / "resumo-semanal.md"
 
     if not resumo.exists():

@@ -12,6 +12,9 @@ H = {"apikey": KEY, "Authorization": f"Bearer {KEY}"}
 
 
 def run() -> Path:
+    if not SUPABASE_URL or not KEY:
+        raise RuntimeError("SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY missing")
+
     V = Path("memory/vault")
 
     # Metrics from local outputs
