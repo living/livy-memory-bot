@@ -1,8 +1,8 @@
 # HEARTBEAT — Livy Memory Agent
 
-_Atualizado: 2026-04-18 15:18 UTC (12:18 BRT)_
+_Atualizado: 2026-04-18 17:55 UTC (14:55 BRT)_
 
-## Jobs Ativos — 17 crons
+## Jobs Ativos — 20 crons
 
 | Job | Schedule (BRT) | Status | Erros Consec. | Nota |
 |---|---|---|---|---|
@@ -15,6 +15,9 @@ _Atualizado: 2026-04-18 15:18 UTC (12:18 BRT)_
 | **evo-analyze** | 02h | ✅ ok | 0 | |
 | **evo-watchdog** | 08h | ✅ ok | 0 | |
 | **tldv-archive-videos** | 03h | ✅ ok | 0 | |
+| **research-tldv** | intervalo configurável (`RESEARCH_TLDV_INTERVAL_MIN`) | ✅ ok | 0 | lock + rebuild de estado derivado |
+| **research-github** | intervalo configurável (`RESEARCH_GITHUB_INTERVAL_MIN`) | ✅ ok | 0 | lock + rebuild de estado derivado |
+| **research-consolidation** | 07h | ✅ ok | 0 | substitui loop dream-memory-consolidation |
 | **vault-crosslink** | 01h | ✅ ok | 0 | 729 edges, 31 PR authors |
 | **vault-ingest** | 10h,14h,20h | ✅ ok | 0 | delivery telegram ativo |
 | **vault-lint** | 21h | ✅ ok | 0 | delivery telegram ativo |
@@ -24,7 +27,7 @@ _Atualizado: 2026-04-18 15:18 UTC (12:18 BRT)_
 | **agenda-trello-1230** | 12:30 | 🔴 error | 2 | billing provider/model |
 | **agenda-trello-1700** | 17h | 🔴 error | 3 | billing provider/model |
 
-**Resumo:** 14/17 ok, 3/17 em error
+**Resumo:** 17/20 ok, 3/20 em error
 
 ## Alertas
 
@@ -33,6 +36,7 @@ _Atualizado: 2026-04-18 15:18 UTC (12:18 BRT)_
 | 🔴 CRÍTICO | `agenda-trello-*` com falha recorrente por billing (neo/anthropic) | Trocar model para provider ativo (ex: fastest/copoly) ou reativar billing |
 | 🟡 | Jobs legados desabilitados (openclaw-health, sonhar, signal-curation, daily-memory-save) | Manter desabilitados ou replanejar com configuração nova |
 | 🟢 | Vault insights semanal operacional | Manter monitoramento das segundas 06:30/07:00 |
+| 🟢 | Loop de research v1 (TLDV/GitHub/Consolidation) ativo | Manter observabilidade de lock, rebuild de estado e retry policy |
 
 ## Mudanças desde Último HEARTBEAT
 
@@ -43,7 +47,9 @@ _Atualizado: 2026-04-18 15:18 UTC (12:18 BRT)_
 | ✅ PR #15 mergeada (`6ea8005`) — fallback `TELEGRAM_TOKEN` | Compatibilidade com ambiente de produção atual |
 | 🆕 Cron `vault-insights-weekly-validate` | Validação preventiva semanal antes da geração |
 | 🆕 Cron `vault-insights-weekly-generate` | Geração + envio semanal para `7426291192` |
-| ✅ Smoke test manual dos 2 crons novos | Ambos com `lastRunStatus=ok`, `lastDeliveryStatus=delivered` |
+| 🆕 Crons `research-tldv` e `research-github` | Polling por fonte com lock distribuído e rebuild de estado derivado |
+| 🆕 Cron `research-consolidation` | Consolidação diária 07h BRT substituindo `dream-memory-consolidation` |
+| ✅ Smoke test manual dos crons de research | Execução inicial com lock/release e sem conflito de concorrência |
 
 ## Memória
 
@@ -54,6 +60,35 @@ _Atualizado: 2026-04-18 15:18 UTC (12:18 BRT)_
 | Operational (crons) | ✅ 2 novos jobs operacionais adicionados |
 
 ## Incident Playbook
+
+### `research-*` — falha em lock/state/rebuild (novo)
+
+**Sintomas típicos:**
+- lock não libera (`Timeout acquiring lock` / lock stale)
+- erro ao reconstruir cache derivado em `.research/<source>/state.json`
+- divergência entre SSOT `state/identity-graph/state.json` e estado derivado por fonte
+
+**Verificar primeiro:**
+```bash
+openclaw cron list | grep research-
+```
+
+```bash
+# Conferir SSOT e caches derivados
+ls -la state/identity-graph/state.json .research/tldv/state.json .research/github/state.json
+```
+
+**Mitigação imediata:**
+1. Garantir que apenas um job por fonte esteja ativo (evitar concorrência manual).
+2. Se lock estiver stale, aguardar TTL (600s) ou remover lock stale conforme política do `lock_manager`.
+3. Regenerar estado derivado rodando o cron da fonte uma vez em modo controlado.
+4. Validar que SSOT permaneceu íntegro em `state/identity-graph/state.json`.
+
+**Root cause provável:** execução concorrente fora da janela esperada, interrupção durante rebuild do cache derivado, ou erro transitório de fonte externa (TLDV/GitHub).
+
+**Critério de recuperação:** próximo run conclui com lock acquire/release, rebuild sem erro e `lastRunStatus=ok`.
+
+---
 
 ### `agenda-trello-*` — billing error em neo/anthropic (recorrente)
 
@@ -87,5 +122,5 @@ gh api graphql -f query='{ marketplacePurchases(first:5) { nodes { plan { name }
 ## Última Consolidação
 
 - Sessão de implementação/documentação: 2026-04-18
-- Alterações aplicadas: merge PRs #13, #14, #15 + criação de 2 crons
+- Alterações aplicadas: merge PRs #13, #14, #15 + criação de 3 crons de research (tldv/github/consolidation)
 - Próxima consolidação: 2026-04-19 07:00 BRT
