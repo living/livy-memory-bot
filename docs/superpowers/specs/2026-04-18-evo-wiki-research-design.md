@@ -22,11 +22,13 @@ Sistema de pesquisa e curadoria automática onde o **evo opera como motor de pes
 
 > **Modelo de trigger v1: polling via cron.** Cada job faz polling na fonte correspondente, detecta eventos novos desde o último checkpoint temporal, e os processa idempotentemente.
 >
-> **Deduplicação:** cada fonte mantém cursor temporal (`last_seen_at`) + tabela local de chaves idempotentes (`event_key`) em `.research/<source>/state.json`.
+> **Lock de concorrência:** antes de iniciar, cada job adquire lock exclusivo via `flock(2)` em `.research/<source>/lock`. TTL de 10min (protege contra crash). Se lock não disponível, run é skipado.
+>
+> **Deduplicação:** o `state/identity-graph/state.json` mantém `processed_event_keys[]` por fonte. Só eventos com `event_key` não existente no state são processados.
 >
 > **Chave idempotente:** `source:event_type:event_id[:action_id]`.
 >
-> **Política para eventos tardios/out-of-order:** processa qualquer evento cujo `event_key` ainda não exista, mesmo se `event_at < last_seen_at` (janela de tolerância configurável via `RESEARCH_LATE_WINDOW_MIN`).
+> **Política para eventos tardios/out-of-order:** processa qualquer evento cujo `event_key` ainda não exista no state, mesmo se `event_at < last_seen_at` (janela de tolerância configurável via `RESEARCH_LATE_WINDOW_MIN`).
 
 | Cron | Schedule (env var) | Gatilho (polling) | SLA realístico |
 |---|---|---|---|
@@ -68,9 +70,11 @@ Cada cron executa o **pipeline interno** (idêntica estrutura, especializado por
 **Local:** `state/identity-graph/`
 
 Arquivos:
-- `state/identity-graph/people.jsonl` — registry canônico de pessoas (um por linha, event_key como cursor)
-- `state/identity-graph/projects.jsonl` — registry de projetos
-- `state/identity-graph/state.json` — cursor + event_keys processados por fonte (espelha `.research/<source>/state.json` para consulta centralizada)
+- `state/identity-graph/people.jsonl` — registry canônico de pessoas (append-only, um registro por linha)
+- `state/identity-graph/projects.jsonl` — registry de projetos (append-only)
+- `state/identity-graph/state.json` — **única fonte de verdade** para cursores e event_keys processados por fonte
+
+> **Estado único (SSOT):** `.research/<source>/state.json` é cache derivado do `state/identity-graph/state.json`. O `state/identity-graph/state.json` é a fonte canônica. Após cada run, o processo persiste apenas no `state/identity-graph/state.json`. O conteúdo de `.research/<source>/state.json` é reconstruído a partir do state canônico a cada run.
 
 ### 2.4 Infraestrutura e Credenciais
 
@@ -206,12 +210,13 @@ timestamp:         <ISO>
 
 ### 5.3 Resolução de conflitos entre fontes
 
-Quando fontes contradictórias afetam o mesmo fato (ex: Trello diz card concluído, mas PR não foi merged):
+Quando fontes contradictórias afetam o mesmo fato (ex: Trello diz card concluído, mas PR não foi merged), a ordem de resolução é:
 
-1. **Prioridade de fonte:** GitHub > TLDV > Trello (mais authoritative = mais peso)
-2. **Se衝突 for entre fontes de mesmo peso:** marca `conflict:pending` no registro
-3. **Evidência de supersession:** a fonte mais recente wins, com trilha de auditoria
-4. **Override manual:** qualquer conflito pode ser resolvido por edição direta no `state/identity-graph/people.jsonl`
+1. **Prioridade de fonte:** GitHub > TLDV > Trello (mais authoritative = mais peso na decisão)
+2. **Se empate de prioridade:** fonte mais recente wins (`event_at` mais recente)
+3. **Se empate total (mesma fonte, mesmo timestamp):** marca `conflict:pending` — não resolve sozinho
+
+**Nunca editar linha antiga para resolver conflito** — sempre append de novo registro superseding com evidência e razão da resolução.
 
 ---
 
@@ -258,10 +263,10 @@ Self-healing automático desliga se:
 ### 7.2 Rollback Manual
 
 Se um merge/supersession for aplicado incorretamente:
-1. O arquivo `state/identity-graph/people.jsonl` mantém versão anterior em linha (imutabilidade por append)
-2. O campo `superseded_by` aponta para o registro que o substituiu
-3. **Reversão:** add novo registro com `superseded_by: null` e `supersedes: <event_key_do_merge_errado>`
-4. **Quem desfaz:** qualquer operador com acesso ao workspace pode editar o arquivo
+1. O arquivo `state/identity-graph/people.jsonl` é **append-only** — nunca editar linha existente
+2. **Reversão:** append de novo registro com `action: rollback`, `supersedes: <event_key_do_merge_errado>`, `superseded_by: null`
+3. O registro errado fica no arquivo mas com `superseded_by` apontando para o rollback
+4. **Quem desfaz:** qualquer operador com acesso ao workspace pode criar um registro de rollback (append only)
 
 ---
 
@@ -350,7 +355,10 @@ A cada consolidação (07h BRT):
   5. se self-healing em modo auto (Fase 2+) → apply com supersession
   6. se self-healing em modo read-only (Fase 1) → gera relatório em memory/consolidation-log.md
   7. atualizar HEARTBEAT.md com status do ciclo
-  8. archivar entries com mais de 90d sem acesso (mover para memory/.archive/)
+  8. archivar entries candidatas: **só arquiva se** todas as condições:
+     - sem acesso nos últimos 90d
+     - sem referência ativa em decisions/projetos (`sources` sem event_at recente)
+     - sem conflito pendente (`conflict:pending == false`)
 ```
 
 ---
