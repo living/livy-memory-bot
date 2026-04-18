@@ -78,12 +78,22 @@ Análise: infra base (TLDV pipeline + Signal Cross-Curation + ChromaDB) já reso
 Gaps: Google Auth (Domain-wide Delegation), RAG multimodal (RAG-Anything para DOCX/XLSX/PDF), Identity Resolution (cruzar e-mail↔telegram↔tldv).
 Topic file: `memory/curated/projeto-super-memoria-robert.md`
 
+### 2026-04-18 — Loop de consolidação de research substitui `dream-memory-consolidation`
+
+Decisão: substituir a consolidação legada por um loop de research v1 composto por:
+- `research-tldv` (polling de fonte + rebuild de estado derivado)
+- `research-github` (polling de fonte + rebuild de estado derivado)
+- `research-consolidation` (consolidação diária às 07h BRT)
+
+SSOT permanece em `state/identity-graph/state.json`; arquivos `.research/<source>/state.json` são cache derivado e descartável.
+Impacto: consolidação diária passa a refletir pipeline research v1 com lock distribuído, retry policy e rebuild determinístico do estado por fonte.
+
 ### 2026-03-31 — Sistema de Memória como Infraestrutura de Decisão
 
 Decisão: criar agente `@livy_agentic_memory_bot` com memória agêntica de 3 camadas.
 Repo: `living/livy-memory-bot`
 Arquitetura: claude-mem SQLite (observations) → MEMORY.md + topic files (curated) → HEARTBEAT.md (operational)
-Cron: `dream-memory-consolidation` (07h BRT), `memory-watchdog` (a cada 4h)
+Cron original: `dream-memory-consolidation` (07h BRT), `memory-watchdog` (a cada 4h)
 
 ### 2026-03-30 — TLDV Pipeline — gw.tldv.io 502 (não é token)
 

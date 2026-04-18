@@ -45,3 +45,6 @@ memory/2026-*-report.md
 # Vault insights runtime artifacts (generated on each run)
 memory/vault/insights/*.md
 memory/vault/insights/.last_sent.json
+
+# Research derived state cache (SSOT is state/identity-graph/state.json)
+.research/*/state.json
