@@ -1,0 +1,28 @@
+name: Vault Insights CI
+
+on:
+  push:
+    branches: [feat/quick-wins-vault-insights, fix/pr13-review-fixes]
+  pull_request:
+    branches: [master]
+
+jobs:
+  validate:
+    name: Validate vault/insights scripts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Check syntax
+        run: python3 -m py_compile vault/insights/no_decisions.py vault/insights/owner_por_tema.py vault/insights/temas_recorrentes.py vault/insights/resumo_semanal.py vault/insights/risco_projetos.py vault/insights/envia_resumo.py
+
+      - name: Check imports
+        run: python3 -c "import vault.insights.no_decisions; import vault.insights.owner_por_tema; import vault.insights.temas_recorrentes; import vault.insights.resumo_semanal; import vault.insights.risco_projetos; import vault.insights.envia_resumo; print('All imports OK')"

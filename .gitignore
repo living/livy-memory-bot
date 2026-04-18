@@ -41,3 +41,7 @@ memory/vault/concepts/*.md
 .claude/napkin.md
 .claude/plans/
 memory/2026-*-report.md
+
+# Vault insights runtime artifacts (generated on each run)
+memory/vault/insights/*.md
+memory/vault/insights/.last_sent.json
