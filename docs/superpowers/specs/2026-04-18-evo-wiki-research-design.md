@@ -18,29 +18,34 @@ Sistema de pesquisa e curadoria automática onde o **evo opera como motor de pes
 
 ### 2.1 Jobs de pesquisa (trigger: polling via cron)
 
-> **Modelo de trigger v1: polling via cron.** Cada job faz polling na fonte correspondente, detecta eventos novos desde o último checkpoint, e os processa idempotentemente.
+> **Modelo de trigger v1: polling via cron.** Cada job faz polling na fonte correspondente, detecta eventos novos desde o último checkpoint temporal, e os processa idempotentemente.
 >
-> **Deduplicação:** cada fonte mantém `last_processed_<source>_id` em arquivo de checkpoint (`.research/<source>/checkpoint.json`). Só eventos com ID > checkpoint são processados.
+> **Deduplicação:** cada fonte mantém cursor temporal (`last_seen_at`) + tabela local de chaves idempotentes (`event_key`) em `.research/<source>/state.json`.
+>
+> **Chave idempotente:** `source:event_type:event_id[:action_id]`.
+>
+> **Política para eventos tardios/out-of-order:** processa qualquer evento cujo `event_key` ainda não exista, mesmo se `event_at < last_seen_at` (janela de tolerância configurável).
 
-| Cron | Schedule | Gatilho (polling) | SLA target |
+| Cron | Schedule (configurável por env var) | Gatilho (polling) | SLA target |
 |---|---|---|---|
-| `research-tldv` | a definir (provisório: 15min) | summary enriquecida / reunião marcada | latência <30min |
-| `research-github` | a definir (provisório: 10min) | PR merged / issue fechada / review | latência <20min |
-| `research-trello` | a definir (provisório: 15min) | card criado / movido / concluído | latência <30min |
+| `research-tldv` | `RESEARCH_TLDV_INTERVAL_MIN` (default: 15) | summary enriquecida / reunião marcada | latência <30min |
+| `research-github` | `RESEARCH_GITHUB_INTERVAL_MIN` (default: 10) | PR merged / issue fechada / review submitted | latência <20min |
+| `research-trello` | `RESEARCH_TRELLO_INTERVAL_MIN` (default: 15) | card criado / movido / concluído | latência <30min |
 
 Cada cron executa o **pipeline interno** (idêntica estrutura, especializado por fonte):
 
 ```
-1. Checkpoint → lê last_processed_<source>_id
-2. Poll       → busca eventos novos desde checkpoint
-3. Ingest     → normaliza payload do evento
-4. Context    → monta contexto via claude-mem + wiki + FS
-5. Resolve    → entity resolution (pessoas/projetos)
-6. Hypothesize → gera hipóteses de atualização
-7. Validate   → gate de coerência, conflitos, qualidade
-8. Apply      → escreve mudanças (apenas paths permitidos)
-9. Verify     → tests/lints + log de evidência
-10. Checkpoint → atualiza last_processed_<source>_id
+1. State      → lê last_seen_at + processed_event_keys
+2. Poll       → busca eventos novos/alterados desde last_seen_at
+3. Ingest     → normaliza payload do evento e calcula event_key
+4. Dedupe     → se event_key já processado, skip; senão continua
+5. Context    → monta contexto via claude-mem + wiki + FS
+6. Resolve    → entity resolution (pessoas/projetos)
+7. Hypothesize → gera hipóteses de atualização
+8. Validate   → gate de coerência, conflitos, qualidade
+9. Apply      → escreve mudanças (apenas paths permitidos)
+10. Verify    → tests/lints + log de evidência
+11. State     → persiste event_key e avança last_seen_at
 ```
 
 ### 2.2 Boundary de escrita
@@ -193,12 +198,50 @@ O evo pode detectar e corrigir:
 ```
 
 ### research-github
+
+**Escopo v1 (MVP):**
+- `pr_merged` ✅ in-scope
+- `review_submitted` ✅ in-scope
+- `issue_closed` ✅ in-scope
+
+Payload mínimo por tipo:
+
+```yaml
+pr_merged:
+  event_type: pr_merged
+  event_id: <id>
+  event_at: <timestamp>
+  repo: <repo>
+  pr_id: <number>
+  author: <login>
+  files_changed: []
+
+review_submitted:
+  event_type: review_submitted
+  event_id: <id>
+  event_at: <timestamp>
+  repo: <repo>
+  pr_id: <number>
+  reviewer: <login>
+  state: approved|changes_requested|commented
+
+issue_closed:
+  event_type: issue_closed
+  event_id: <id>
+  event_at: <timestamp>
+  repo: <repo>
+  issue_id: <number>
+  closer: <login>
+  labels: []
 ```
-1. receber payload: { repo, pr_id, author, merged_at, files_changed, review_comments }
-2. resolver author → identity graph
-3. identificar projetos afetados (por path/arquivo)
-4. cruzar decisões relevantes (owners, projetos)
-5. aplicar updates (pr merged → atualizar status projeto, decision log)
+
+Fluxo:
+```
+1. receber payload normalizado (pr_merged | review_submitted | issue_closed)
+2. resolver atores (author/reviewer/closer) → identity graph
+3. identificar projetos afetados (por repo/path/labels)
+4. cruzar decisões relevantes (owners, projetos, status de execução)
+5. aplicar updates de acordo com tipo de evento
 6. detectar se novo owner/contributor deve ser adicionado
 ```
 
