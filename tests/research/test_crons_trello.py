@@ -2,9 +2,6 @@
 
 RED phase: write failing tests first.
 """
-import json
-import os
-import subprocess
 import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -48,28 +45,23 @@ class TestResearchTrelloCron:
         from vault.crons.research_trello_cron import RESEARCH_DIR
         assert RESEARCH_DIR == ".research/trello"
 
-    def test_trello_cron_interval_env_var_default_20(self, monkeypatch):
+    def test_trello_cron_interval_env_var_default_20(self, monkeypatch, capsys):
         """Default interval should be 20 minutes when env var is not set."""
         monkeypatch.delenv("RESEARCH_TRELLO_INTERVAL_MIN", raising=False)
         from vault.crons import research_trello_cron
-        # Re-import to pick up env var (fresh import)
-        import importlib
-        importlib.reload(research_trello_cron)
-        # The interval_min calculation in main() uses the env var with default 20
-        # We test this by checking the function body or running main
-        # Since default is 20, we verify with a patched environment
-        with patch.dict(os.environ, {}, clear=False):
-            with patch("vault.crons.research_trello_cron.ResearchPipeline") as mock_pipeline:
-                mock_pipeline.return_value.run.return_value = {
-                    "events_processed": 0,
-                    "events_skipped": 0,
-                    "status": "success",
-                }
-                with patch("vault.crons.research_trello_cron.acquire_lock", return_value=True):
-                    with patch("vault.crons.research_trello_cron.release_lock"):
-                        research_trello_cron.main()
-                        # Verify default interval of 20 was used in the print output
-                        # (captured via mock)
+
+        with patch("vault.crons.research_trello_cron.ResearchPipeline") as mock_pipeline:
+            mock_pipeline.return_value.run.return_value = {
+                "events_processed": 0,
+                "events_skipped": 0,
+                "status": "success",
+            }
+            with patch("vault.crons.research_trello_cron.acquire_lock", return_value=True):
+                with patch("vault.crons.research_trello_cron.release_lock"):
+                    research_trello_cron.main()
+
+        captured = capsys.readouterr()
+        assert "interval=20min" in captured.out
 
     def test_trello_cron_calls_pipeline_with_source_trello(self, tmp_path, monkeypatch):
         """When run, cron must instantiate ResearchPipeline with source='trello'."""
@@ -77,7 +69,7 @@ class TestResearchTrelloCron:
 
         from vault.crons import research_trello_cron
 
-        with patch("vault.crons.research_trello_cron.acquire_lock", return_value=True) as mock_acquire:
+        with patch("vault.crons.research_trello_cron.acquire_lock", return_value=True):
             with patch("vault.crons.research_trello_cron.release_lock"):
                 with patch("vault.crons.research_trello_cron.ResearchPipeline") as mock_pipeline_cls:
                     mock_pipeline = MagicMock()
@@ -100,7 +92,7 @@ class TestResearchTrelloCron:
         """When lock cannot be acquired, main() must return early without calling pipeline."""
         from vault.crons import research_trello_cron
 
-        with patch("vault.crons.research_trello_cron.acquire_lock", return_value=False) as mock_acquire:
+        with patch("vault.crons.research_trello_cron.acquire_lock", return_value=False):
             with patch("vault.crons.research_trello_cron.ResearchPipeline") as mock_pipeline_cls:
                 research_trello_cron.main()
                 mock_pipeline_cls.assert_not_called()

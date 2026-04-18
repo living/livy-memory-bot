@@ -9,9 +9,12 @@ After each successful run rebuilds .research/trello/state.json from the SSOT
 
 from __future__ import annotations
 
+import logging
 import os
 import sys
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 # Ensure vault package is on path when run as script
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
@@ -25,7 +28,15 @@ STATE_PATH = "state/identity-graph/state.json"
 
 
 def main() -> None:
-    interval_min = int(os.environ.get("RESEARCH_TRELLO_INTERVAL_MIN", "20"))
+    try:
+        interval_min = int(os.environ.get("RESEARCH_TRELLO_INTERVAL_MIN", "20"))
+    except ValueError:
+        interval_min = 20
+        logger.warning(
+            "RESEARCH_TRELLO_INTERVAL_MIN=%r is not a valid integer; falling back to %d",
+            os.environ.get("RESEARCH_TRELLO_INTERVAL_MIN"),
+            interval_min,
+        )
     print(f"[research_trello] acquiring lock {LOCK_PATH} (ttl={LOCK_TTL}s, interval={interval_min}min)")
 
     if not acquire_lock(LOCK_PATH):
