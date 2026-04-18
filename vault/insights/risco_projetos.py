@@ -27,8 +27,23 @@ def run() -> Path:
 
     projects_dir = source_vault / "entities" / "projects"
     projects = [p.stem for p in projects_dir.glob("*.md")]
+
     if not projects:
-        raise RuntimeError(f"No projects found in source vault: {projects_dir}")
+        out = out_vault / "insights" / "risco-projetos.md"
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(
+            "\n".join(
+                [
+                    "# Painel de Risco por Projeto",
+                    f"_Gerado: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}_",
+                    "",
+                    "Nenhum projeto encontrado no vault de origem.",
+                    f"Origem verificada: `{projects_dir}`",
+                ]
+            ),
+            encoding="utf-8",
+        )
+        return out
 
     card_project = json.loads((source_vault / "relationships" / "card-project.json").read_text())
     card_person = json.loads((source_vault / "relationships" / "card-person.json").read_text())

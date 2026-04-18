@@ -11,7 +11,6 @@ from pathlib import Path
 
 DRY_RUN = True
 CHAT_ID = "7426291192"
-STATE_FILE = Path("memory/vault/insights/.last_sent.json")
 
 
 def run():
@@ -23,6 +22,7 @@ def run():
         V = Path(__file__).parent.parent.parent / "memory" / "vault"
 
     resumo = V / "insights" / "resumo-semanal.md"
+    state_file = V / "insights" / ".last_sent.json"
 
     if not resumo.exists():
         print("[WARN] resumo-semanal.md não existe — pulando")
@@ -32,8 +32,8 @@ def run():
     current_week = datetime.now(timezone.utc).isocalendar()[1]
 
     # Check if already sent this week
-    if STATE_FILE.exists():
-        last = json.loads(STATE_FILE.read_text())
+    if state_file.exists():
+        last = json.loads(state_file.read_text())
         if last.get("week") == current_week and not DRY_RUN:
             print(f"[SKIP] Já enviado na semana {current_week}")
             return
@@ -49,13 +49,13 @@ def run():
               "Defina DRY_RUN=False para ativar o envio real via message tool.")
         print(f"[INFO] Resumo: {len(text)} chars, week={current_week}")
         # Write state anyway to simulate
-        STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
-        STATE_FILE.write_text(json.dumps({
+        state_file.parent.mkdir(parents=True, exist_ok=True)
+        state_file.write_text(json.dumps({
             "week": current_week,
             "sent_at": datetime.now(timezone.utc).isoformat(),
             "dry_run": True,
         }))
-        print(f"[STATE] Logged dry-run to {STATE_FILE}")
+        print(f"[STATE] Logged dry-run to {state_file}")
     else:
         print("[TODO] Wire message tool here to send to Telegram")
 

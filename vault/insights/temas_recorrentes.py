@@ -11,6 +11,21 @@ KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
 H = {"apikey": KEY, "Authorization": f"Bearer {KEY}"}
 
 
+def _resolve_source_vault() -> Path:
+    env_vault = os.environ.get("SOURCE_VAULT")
+    if env_vault:
+        p = Path(env_vault)
+    else:
+        p = Path(__file__).resolve().parents[2] / "memory" / "vault"
+
+    if not p.exists():
+        raise RuntimeError(
+            f"SOURCE_VAULT not set and default path does not exist: {p}. "
+            "Set SOURCE_VAULT to a valid memory/vault directory."
+        )
+    return p
+
+
 def normalize_topic(topic: str) -> str:
     return " ".join(topic.lower().split())[:70]
 
@@ -45,7 +60,8 @@ def run() -> Path:
 
     recurring = {k: v for k, v in topic_meetings.items() if len(v) >= 3}
 
-    out = Path("memory/vault/insights/temas-recorrentes.md")
+    vault_path = _resolve_source_vault()
+    out = vault_path / "insights" / "temas-recorrentes.md"
     out.parent.mkdir(parents=True, exist_ok=True)
 
     lines = [
