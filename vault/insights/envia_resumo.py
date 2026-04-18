@@ -64,7 +64,8 @@ def run() -> Path | None:
     # Deduplicação semanal
     if state_file.exists():
         last = json.loads(state_file.read_text())
-        if last.get("week") == current_week and not dry_run:
+        already_sent_real = last.get("week") == current_week and not bool(last.get("dry_run", False))
+        if already_sent_real and not dry_run:
             _log(f"[SKIP] Já enviado na semana {current_week} — pulando")
             return None
 
