@@ -18,6 +18,7 @@ MVP self-healing mode is read-only: it only accumulates evidence.
 
 from __future__ import annotations
 
+import hashlib
 import json
 from datetime import datetime, timezone
 from pathlib import Path
@@ -26,6 +27,81 @@ from typing import Any
 from vault.research.event_key import build_event_key
 from vault.research.identity_resolver import resolve_identity
 from vault.research.state_store import load_state, save_state, upsert_processed_event_key
+
+
+def _hash16(s: str) -> str:
+    """Compute first 16 hex chars of SHA256 of a string."""
+    return hashlib.sha256(s.encode()).hexdigest()[:16]
+
+
+def _parse_ts_to_epoch(timestamp: str | None) -> int | None:
+    """Parse ISO timestamp to Unix epoch seconds."""
+    if not timestamp:
+        return None
+    try:
+        # Handle both with and without 'Z' suffix
+        ts = timestamp
+        if ts.endswith("Z"):
+            ts = ts[:-1] + "+00:00"
+        dt = datetime.fromisoformat(ts)
+        return int(dt.timestamp())
+    except (ValueError, TypeError):
+        return None
+
+
+def build_trello_event_key(event: dict[str, Any]) -> str:
+    """Build a collision-safe event_key for Trello events.
+
+    Fallback hierarchy (first applicable):
+    1. action_id (if present and non-empty)
+    2. list_id + updated_at_ts (for card_created/card_updated)
+    3. target_list_id + card_id + timestamp (for list_moved)
+    4. member_id + timestamp (for member_added/member_removed)
+    5. hash16(field1 + '_' + field2 + '_' + timestamp) — last resort
+
+    Args:
+        event: Normalized Trello event dict from TrelloClient
+
+    Returns:
+        A string event_key with no '::' separators (to avoid collision
+        with the generic build_event_key format)
+    """
+    event_type = event.get("event_type", "")
+    action_id = event.get("action_id")
+    timestamp = event.get("timestamp") or event.get("date")
+    ts_epoch = _parse_ts_to_epoch(timestamp)
+
+    # 1. action_id if present and non-empty/non-whitespace
+    if action_id and action_id.strip():
+        return action_id
+
+    # 2. list_id + updated_at_ts for card_created/card_updated
+    if event_type in ("trello:card_created", "trello:card_updated"):
+        list_id = event.get("list_id")
+        if list_id and ts_epoch is not None:
+            return f"{list_id}_{ts_epoch}"
+        # Fall through to hash if list_id missing
+
+    # 3. target_list_id + card_id + timestamp for list_moved
+    if event_type == "trello:list_moved":
+        target_list_id = event.get("target_list_id") or event.get("list_id")
+        card_id = event.get("card_id")
+        if target_list_id and card_id and ts_epoch is not None:
+            return f"{target_list_id}_{card_id}_{ts_epoch}"
+        # Fall through to hash if target_list_id or card_id missing
+
+    # 4. member_id + timestamp for member_added/member_removed
+    if event_type in ("trello:member_added", "trello:member_removed"):
+        member_id = event.get("member_id")
+        if member_id and ts_epoch is not None:
+            return f"{member_id}_{ts_epoch}"
+        # Fall through to hash if member_id missing
+
+    # 5. Hash fallback: field1 + '_' + field2 + '_' + timestamp
+    field1 = event.get("field1", event.get("list_id", ""))
+    field2 = event.get("field2", event.get("card_id", ""))
+    ts_str = timestamp or ""
+    return _hash16(f"{field1}_{field2}_{ts_str}")
 
 
 def get_claude_mem_context(payload: dict[str, Any]) -> dict[str, Any]:
