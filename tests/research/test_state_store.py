@@ -15,25 +15,61 @@ from vault.research.state_store import (
     compact_processed_keys,
     monthly_snapshot,
     state_metrics,
+    DEFAULT_STATE,
+    PENDING_CONFLICTS_ALERT_THRESHOLD,
+    get_pending_conflicts,
+    add_pending_conflict,
+    resolve_pending_conflicts,
+    count_pending_conflicts,
 )
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
-EMPTY_STATE = {
-    "processed_event_keys": {"github": [], "tldv": []},
-    "last_seen_at": {"github": None, "tldv": None},
+FULL_STATE = {
+    "processed_event_keys": {"github": [], "tldv": [], "trello": []},
+    "last_seen_at": {"github": None, "tldv": None, "trello": None},
+    "pending_conflicts": [],
     "version": 1,
 }
 
 
 @pytest.fixture()
 def tmp_state_file(tmp_path):
-    """Return a path to a temporary state.json pre-seeded with EMPTY_STATE."""
+    """Return a path to a temporary state.json pre-seeded with FULL_STATE."""
     p = tmp_path / "state.json"
-    p.write_text(json.dumps(EMPTY_STATE))
+    p.write_text(json.dumps(FULL_STATE))
     return p
+
+
+# ---------------------------------------------------------------------------
+# DEFAULT_STATE
+# ---------------------------------------------------------------------------
+
+
+def test_default_state_has_trello_sources():
+    """Trello must be present in processed_event_keys and last_seen_at."""
+    assert "trello" in DEFAULT_STATE["processed_event_keys"]
+    assert "trello" in DEFAULT_STATE["last_seen_at"]
+    assert DEFAULT_STATE["processed_event_keys"]["trello"] == []
+    assert DEFAULT_STATE["last_seen_at"]["trello"] is None
+
+
+def test_default_state_has_pending_conflicts():
+    """pending_conflicts must be initialised as empty list."""
+    assert "pending_conflicts" in DEFAULT_STATE
+    assert DEFAULT_STATE["pending_conflicts"] == []
+
+
+# ---------------------------------------------------------------------------
+# PENDING_CONFLICTS_ALERT_THRESHOLD
+# ---------------------------------------------------------------------------
+
+
+def test_alert_threshold_is_200():
+    """Alert threshold must be 200 entries."""
+    assert PENDING_CONFLICTS_ALERT_THRESHOLD == 200
 
 
 # ---------------------------------------------------------------------------
@@ -57,6 +93,36 @@ def test_load_state_seeds_file_if_missing(tmp_path):
     assert "processed_event_keys" in state
 
 
+def test_load_state_adds_trello_if_missing(tmp_path):
+    """Legacy state without trello source should get it added on load."""
+    legacy = {
+        "processed_event_keys": {"github": [], "tldv": []},
+        "last_seen_at": {"github": None, "tldv": None},
+        "version": 1,
+    }
+    p = tmp_path / "state.json"
+    p.write_text(json.dumps(legacy))
+    state = load_state(p)
+    assert "trello" in state["processed_event_keys"]
+    assert "trello" in state["last_seen_at"]
+    assert state["processed_event_keys"]["trello"] == []
+    assert state["last_seen_at"]["trello"] is None
+
+
+def test_load_state_adds_pending_conflicts_if_missing(tmp_path):
+    """Legacy state without pending_conflicts should get it added on load."""
+    legacy = {
+        "processed_event_keys": {"github": [], "tldv": [], "trello": []},
+        "last_seen_at": {"github": None, "tldv": None, "trello": None},
+        "version": 1,
+    }
+    p = tmp_path / "state.json"
+    p.write_text(json.dumps(legacy))
+    state = load_state(p)
+    assert "pending_conflicts" in state
+    assert state["pending_conflicts"] == []
+
+
 # ---------------------------------------------------------------------------
 # save_state
 # ---------------------------------------------------------------------------
@@ -73,7 +139,7 @@ def test_save_state_persists_data(tmp_state_file):
 
 def test_save_state_creates_parent_dirs(tmp_path):
     nested = tmp_path / "a" / "b" / "state.json"
-    save_state(EMPTY_STATE, nested)
+    save_state(FULL_STATE, nested)
     assert nested.exists()
 
 
@@ -109,6 +175,14 @@ def test_upsert_stores_event_at_as_iso(tmp_state_file):
     entry = next(e for e in state["processed_event_keys"]["github"] if e["key"] == "github:pr_merged:99")
     assert "event_at" in entry
     assert "2026-04-18" in entry["event_at"]
+
+
+def test_upsert_trello_source(tmp_state_file):
+    """Trello keys should be storable just like github/tldv."""
+    event_at = datetime(2026, 4, 18, 12, 0, 0, tzinfo=timezone.utc)
+    state = upsert_processed_event_key("trello", "trello:card:42", event_at, tmp_state_file)
+    keys = [e["key"] for e in state["processed_event_keys"]["trello"]]
+    assert "trello:card:42" in keys
 
 
 # ---------------------------------------------------------------------------
@@ -183,3 +257,211 @@ def test_state_metrics_includes_size_bytes(tmp_state_file):
     for source_data in metrics.values():
         assert "size_bytes" in source_data
         assert isinstance(source_data["size_bytes"], int)
+
+
+# ---------------------------------------------------------------------------
+# pending_conflicts API
+# ---------------------------------------------------------------------------
+
+
+def test_get_pending_conflicts_returns_list(tmp_state_file):
+    result = get_pending_conflicts(state_path=tmp_state_file)
+    assert isinstance(result, list)
+
+
+def test_add_pending_conflict_appends_entry(tmp_state_file):
+    entry = {
+        "entity_id": "person_001",
+        "candidates": [
+            {"source": "github", "identifier": "gh_001", "event_at": "2026-04-01T00:00:00Z"},
+            {"source": "tldv", "identifier": "tldv_001", "event_at": "2026-04-10T00:00:00Z"},
+        ],
+        "event_key": "tldv:meeting:42",
+        "status": "pending",
+        "added_at": "2026-04-18T00:00:00+00:00",
+    }
+    state = add_pending_conflict(entry, state_path=tmp_state_file)
+    assert len(state["pending_conflicts"]) == 1
+    assert state["pending_conflicts"][0]["entity_id"] == "person_001"
+    assert state["pending_conflicts"][0]["status"] == "pending"
+
+
+def test_add_pending_conflict_persists(tmp_state_file):
+    entry = {
+        "entity_id": "person_002",
+        "candidates": [],
+        "event_key": "github:pr:1",
+        "status": "pending",
+        "added_at": "2026-04-18T00:00:00+00:00",
+    }
+    add_pending_conflict(entry, state_path=tmp_state_file)
+    reloaded = json.loads(tmp_state_file.read_text())
+    assert len(reloaded["pending_conflicts"]) == 1
+    assert reloaded["pending_conflicts"][0]["entity_id"] == "person_002"
+
+
+def test_add_pending_conflict_is_idempotent(tmp_state_file):
+    """Same entity_id + event_key should not duplicate entries."""
+    entry1 = {
+        "entity_id": "person_003",
+        "candidates": [],
+        "event_key": "github:pr:2",
+        "status": "pending",
+        "added_at": "2026-04-18T00:00:00+00:00",
+    }
+    entry2 = {
+        "entity_id": "person_003",
+        "candidates": [],
+        "event_key": "github:pr:2",
+        "status": "pending",
+        "added_at": "2026-04-18T01:00:00+00:00",
+    }
+    add_pending_conflict(entry1, state_path=tmp_state_file)
+    state = add_pending_conflict(entry2, state_path=tmp_state_file)
+    ids = [e["entity_id"] for e in state["pending_conflicts"]]
+    assert ids.count("person_003") == 1
+
+
+def test_count_pending_conflicts_returns_int(tmp_state_file):
+    assert isinstance(count_pending_conflicts(state_path=tmp_state_file), int)
+
+
+def test_count_pending_conflicts_returns_correct_count(tmp_state_file):
+    for i in range(5):
+        add_pending_conflict({
+            "entity_id": f"person_{i}",
+            "candidates": [],
+            "event_key": f"github:pr:{i}",
+            "status": "pending",
+            "added_at": "2026-04-18T00:00:00+00:00",
+        }, state_path=tmp_state_file)
+    assert count_pending_conflicts(state_path=tmp_state_file) == 5
+
+
+# ---------------------------------------------------------------------------
+# resolve_pending_conflicts
+# ---------------------------------------------------------------------------
+
+
+def test_resolve_pending_conflicts_resolves_by_source_priority(tmp_state_file):
+    """GitHub (priority=3) should win over TLDV (priority=2)."""
+    add_pending_conflict({
+        "entity_id": "person_github_wins",
+        "candidates": [
+            {"source": "github", "identifier": "gh_001", "event_at": "2026-04-01T00:00:00Z"},
+            {"source": "tldv", "identifier": "tldv_001", "event_at": "2026-04-15T00:00:00Z"},
+        ],
+        "event_key": "resolve_key_gh",
+        "status": "pending",
+        "added_at": "2026-04-18T00:00:00+00:00",
+    }, state_path=tmp_state_file)
+
+    result = resolve_pending_conflicts(state_path=tmp_state_file)
+    assert len(result["resolved"]) == 1
+    assert result["resolved"][0]["entity_id"] == "person_github_wins"
+    assert result["resolved"][0]["status"] == "resolved"
+    assert result["resolved"][0]["winner_identifier"] == "gh_001"
+    assert "resolved_by_event_key" in result["resolved"][0]
+
+
+def test_resolve_pending_conflicts_resolves_by_recency_on_tie(tmp_state_file):
+    """Same source priority → most recent event_at wins."""
+    add_pending_conflict({
+        "entity_id": "person_recency",
+        "candidates": [
+            {"source": "github", "identifier": "gh_old", "event_at": "2026-04-01T00:00:00Z"},
+            {"source": "github", "identifier": "gh_new", "event_at": "2026-04-15T00:00:00Z"},
+        ],
+        "event_key": "resolve_key_recency",
+        "status": "pending",
+        "added_at": "2026-04-18T00:00:00+00:00",
+    }, state_path=tmp_state_file)
+
+    result = resolve_pending_conflicts(state_path=tmp_state_file)
+    assert len(result["resolved"]) == 1
+    assert result["resolved"][0]["winner_identifier"] == "gh_new"
+
+
+def test_resolve_pending_conflicts_keeps_pending_on_full_tie(tmp_state_file):
+    """Identical priority + event_at → status stays pending."""
+    add_pending_conflict({
+        "entity_id": "person_tie",
+        "candidates": [
+            {"source": "github", "identifier": "gh_a", "event_at": "2026-04-01T00:00:00Z"},
+            {"source": "github", "identifier": "gh_b", "event_at": "2026-04-01T00:00:00Z"},
+        ],
+        "event_key": "resolve_key_tie",
+        "status": "pending",
+        "added_at": "2026-04-18T00:00:00+00:00",
+    }, state_path=tmp_state_file)
+
+    result = resolve_pending_conflicts(state_path=tmp_state_file)
+    assert len(result["resolved"]) == 0
+    assert len(result["still_pending"]) == 1
+    assert result["still_pending"][0]["entity_id"] == "person_tie"
+
+
+def test_resolve_pending_conflicts_skips_already_resolved(tmp_state_file):
+    """Entries with status=resolved should be skipped."""
+    state = load_state(tmp_state_file)
+    state["pending_conflicts"].append({
+        "entity_id": "person_already_resolved",
+        "candidates": [],
+        "event_key": "github:pr:99",
+        "status": "resolved",
+        "added_at": "2026-04-17T00:00:00+00:00",
+    })
+    save_state(state, tmp_state_file)
+
+    result = resolve_pending_conflicts(state_path=tmp_state_file)
+    assert len(result["resolved"]) == 0
+    assert len(result["still_pending"]) == 0
+
+
+def test_resolve_pending_conflicts_persists_changes(tmp_state_file):
+    """Resolved entries should have status updated in the state file."""
+    add_pending_conflict({
+        "entity_id": "person_persist",
+        "candidates": [
+            {"source": "github", "identifier": "gh_persist", "event_at": "2026-04-01T00:00:00Z"},
+            {"source": "tldv", "identifier": "tldv_persist", "event_at": "2026-04-10T00:00:00Z"},
+        ],
+        "event_key": "resolve_key_persist",
+        "status": "pending",
+        "added_at": "2026-04-18T00:00:00+00:00",
+    }, state_path=tmp_state_file)
+
+    resolve_pending_conflicts(state_path=tmp_state_file)
+
+    reloaded = json.loads(tmp_state_file.read_text())
+    resolved = [e for e in reloaded["pending_conflicts"] if e["entity_id"] == "person_persist"]
+    assert len(resolved) == 1
+    assert resolved[0]["status"] == "resolved"
+    assert "resolved_by_event_key" in resolved[0]
+
+
+def test_resolve_pending_conflicts_returns_summary(tmp_state_file):
+    """Result must include resolved_count, still_pending_count, total_count."""
+    result = resolve_pending_conflicts(state_path=tmp_state_file)
+    assert "resolved_count" in result
+    assert "still_pending_count" in result
+    assert "total_count" in result
+    assert result["total_count"] == result["resolved_count"] + result["still_pending_count"]
+
+
+def test_resolve_pending_conflicts_trello_wins_over_unknown(tmp_state_file):
+    """Trello (priority=1) should win over unknown source (priority=0)."""
+    add_pending_conflict({
+        "entity_id": "person_trello_wins",
+        "candidates": [
+            {"source": "unknown", "identifier": "unk_001", "event_at": "2026-04-20T00:00:00Z"},
+            {"source": "trello", "identifier": "tre_001", "event_at": "2026-04-01T00:00:00Z"},
+        ],
+        "event_key": "resolve_key_trello",
+        "status": "pending",
+        "added_at": "2026-04-18T00:00:00+00:00",
+    }, state_path=tmp_state_file)
+
+    result = resolve_pending_conflicts(state_path=tmp_state_file)
+    assert len(result["resolved"]) == 1
+    assert result["resolved"][0]["winner_identifier"] == "tre_001"
