@@ -63,6 +63,15 @@ class TrelloClient:
     def fetch_events_since(self, last_seen_at: str | None) -> list[dict]: ...
 ```
 
+Verify env vars at init:
+```python
+api_key = os.environ.get("TRELLO_API_KEY")
+token = os.environ.get("TRELLO_TOKEN")
+board_ids = os.environ.get("TRELLO_BOARD_IDS", "").split(",")
+if not api_key or not token:
+    raise EnvironmentError("TRELLO_API_KEY and TRELLO_TOKEN must be set")
+```
+
 - [ ] **Step 4: Run targeted tests to verify GREEN**
 Run: `PYTHONPATH=. pytest -q tests/research/test_trello_client.py -v`
 Expected: PASS
@@ -90,8 +99,13 @@ def test_trello_card_updated_without_action_id_uses_deterministic_fallback():
 Run: `PYTHONPATH=. pytest -q tests/research/test_pipeline_trello.py::test_trello_card_updated_without_action_id_uses_deterministic_fallback -v`
 Expected: FAIL
 
-- [ ] **Step 3: Implement deterministic fallback in pipeline event_key builder**
-- required suffix order: action_id > list_id+updated_at > hash16(field1+field2+timestamp)
+- [ ] **Step 3: Implement deterministic fallback hierarchy in pipeline event_key builder**
+Exact suffix order (use first applicable):
+1. `action_id` (if present and non-empty)
+2. `list_id_at_event + "_" + updated_at_ts` (for card_created/card_updated)
+3. `target_list_id + "_" + card_id + "_" + timestamp` (for list_moved)
+4. `member_id + "_" + timestamp` (for member_added/member_removed)
+5. `hash16(field1 + "_" + field2 + "_" + timestamp)` — last resort to avoid `::`
 
 - [ ] **Step 4: Run tests (GREEN)**
 Run: `PYTHONPATH=. pytest -q tests/research/test_pipeline_trello.py -v`
@@ -145,11 +159,14 @@ Run: `PYTHONPATH=. pytest -q tests/research/test_pipeline_trello.py -v`
 Expected: FAIL
 
 - [ ] **Step 3: Implement `source="trello"` branch in `ResearchPipeline.run()`**
-- poll Trello client
-- normalize payload
-- dedupe
-- context/resolve/hypothesis/validate/apply
-- persist state + rebuild `.research/trello/state.json`
+Normalization rules per event type:
+- `card_created`: write evidence markdown to `memory/vault/entities/cards/{card_id}.md`
+- `card_updated`: upsert card entity with latest fields
+- `list_moved`: parse `listBefore`/`listAfter` and emit status transition old→new
+- `member_added`: emit identity reinforcement linking `member_id` to person candidate
+- `member_removed`: emit weakly-deprecating unlink event (no hard delete)
+
+Pipeline sequence: poll -> normalize -> dedupe -> context -> resolve -> hypothesize -> validate -> apply -> verify -> state persist + rebuild `.research/trello/state.json`
 
 - [ ] **Step 4: Run tests (GREEN)**
 Run: `PYTHONPATH=. pytest -q tests/research/test_pipeline_trello.py -v`
@@ -196,15 +213,29 @@ git commit -m "feat(crons): add research_trello cron runner"
 
 - [ ] **Step 1: Write failing tests for confidence thresholds**
 - >=0.85 auto-apply
-- 0.70-0.84 auto-apply verbose
-- 0.45-0.69 queue
-- <0.45 drop
+- 0.70-0.84 auto-apply + emit verbose log entry (source, confidence, decision)
+- 0.45-0.69 queue for review
+- <0.45 drop silently
+
+Also test env var gating:
+- `SELF_HEALING_WRITE_ENABLED=false` -> all writes dry-run
+- `SELF_HEALING_AGGRESSIVE_MODE=false` -> skip auto-apply even if confidence high
+- `SELF_HEALING_BREAKER_ENABLED=false` -> breaker never transitions to paused
 
 - [ ] **Step 2: Run tests (RED)**
 Run: `PYTHONPATH=. pytest -q tests/research/test_self_healing_apply.py -v`
 Expected: FAIL
 
 - [ ] **Step 3: Implement `apply_decision()` in self_healing module**
+Read and gate on env vars:
+```python
+write_enabled = os.environ.get("SELF_HEALING_WRITE_ENABLED", "true").lower() == "true"
+aggressive = os.environ.get("SELF_HEALING_AGGRESSIVE_MODE", "true").lower() == "true"
+breaker_enabled = os.environ.get("SELF_HEALING_BREAKER_ENABLED", "true").lower() == "true"
+```
+If not write_enabled: accumulate evidence but do not apply.
+If not aggressive: only auto-apply >=0.85 (skip 0.70-0.84 verbose mode).
+If not breaker_enabled: skip breaker transition checks.
 
 - [ ] **Step 4: Run tests (GREEN)**
 Run: `PYTHONPATH=. pytest -q tests/research/test_self_healing_apply.py -v`
@@ -220,10 +251,11 @@ git commit -m "feat(research): add self-healing aggressive apply policy"
 
 **Files:**
 - Modify: `vault/research/self_healing.py`
-- Modify: `memory/consolidation-log.md` (runtime output)
+- Modify: `vault/logs/experiments.jsonl`
 - Test: `tests/research/test_self_healing_rollback.py`
 
 - [ ] **Step 1: Write failing rollback tests (append-only invariant)**
+- include explicit test `test_rollback_never_edits_existing_lines`
 - [ ] **Step 2: Run tests (RED)**
 Run: `PYTHONPATH=. pytest -q tests/research/test_self_healing_rollback.py -v`
 Expected: FAIL
@@ -259,7 +291,9 @@ Expected: FAIL
 
 - [ ] **Step 3: Implement breaker state machine + metrics schema writer**
 - file: `state/identity-graph/self_healing_metrics.json`
+- include exact fields: `revert_streak_by_source`, `error_streak_by_source`, `availability_error_by_source`
 - validate schema in consolidation cron
+- emit breaker transitions to `vault/logs/experiments.jsonl` in JSONL format (`ts`, `source`, `breaker_mode`, `decision`, `reason`)
 
 - [ ] **Step 4: Run tests (GREEN)**
 Run: `PYTHONPATH=. pytest -q tests/research/test_circuit_breaker.py -v`
@@ -283,6 +317,11 @@ Run: `PYTHONPATH=. pytest -q tests/research/test_state_store.py -v`
 Expected: FAIL
 
 - [ ] **Step 3: Implement trello-aware state metrics + pending_conflicts alert threshold (200)**
+- implement `pending_conflicts` resolver in consolidation:
+  1. reapply source priority + recency
+  2. keep pending on tie
+  3. append `status: resolved` + `resolved_by_event_key` when resolved
+- if `len(pending_conflicts) > 200`, emit alert entry in consolidation log
 
 - [ ] **Step 4: Run tests (GREEN)**
 Run: `PYTHONPATH=. pytest -q tests/research/test_state_store.py -v`
@@ -326,7 +365,7 @@ Run: `python3 - <<'PY'
 import json
 p='state/identity-graph/self_healing_metrics.json'
 obj=json.load(open(p))
-for k in ['mode','paused_sources','apply_count_by_source','rollback_count_by_source','error_streak_by_source','availability_error_by_source']:
+for k in ['mode','paused_sources','apply_count_by_source','rollback_count_by_source','revert_streak_by_source','error_streak_by_source','availability_error_by_source']:
     assert k in obj
 print('OK')
 PY`
@@ -335,6 +374,39 @@ Expected: OK
 - [ ] **Step 3: Commit verification note**
 ```bash
 git commit --allow-empty -m "chore(gate): pass S1 self-healing gate"
+```
+
+### Task 11b: Watchdog integration (evo observation loop)
+
+**Files:**
+- Modify: `vault/crons/research_consolidation_cron.py`
+- Test: `tests/research/test_consolidation_loop.py`
+
+- [ ] **Step 1: Write failing test for watchdog observation loop**
+- test that consolidation reads `self_healing_metrics.json` and evaluates:
+  - revert rate >5% -> alert
+  - pending_review backlog >50 -> alert
+  - 3 consecutive revert cycles >10% -> global pause trigger
+
+- [ ] **Step 2: Run tests (RED)**
+Run: `PYTHONPATH=. pytest -q tests/research/test_consolidation_loop.py -v`
+Expected: FAIL
+
+- [ ] **Step 3: Implement watchdog observation in `research_consolidation_cron.py`**
+After each consolidation run:
+1. read `state/identity-graph/self_healing_metrics.json`
+2. evaluate revert rate, backlog size, error streaks
+3. if threshold crossed: emit alert to consolidation log + update breaker state
+4. append decision to `vault/logs/experiments.jsonl`
+
+- [ ] **Step 4: Run tests (GREEN)**
+Run: `PYTHONPATH=. pytest -q tests/research/test_consolidation_loop.py -v`
+Expected: PASS
+
+- [ ] **Step 5: Commit**
+```bash
+git add vault/crons/research_consolidation_cron.py tests/research/test_consolidation_loop.py
+git commit -m "feat(research): add evo watchdog observation loop in consolidation"
 ```
 
 ### Task 12: Final regression + docs + operational registration
@@ -358,8 +430,17 @@ Run:
 Expected: all success
 
 - [ ] **Step 3: Register `research-trello` cron in OpenClaw + document ID**
-- add cron job with schedule from env (default 20m)
-- update HEARTBEAT with job id and status
+Run:
+```bash
+openclaw cron add \
+  --name "research-trello" \
+  --command "python3 vault/crons/research_trello_cron.py" \
+  --schedule "*/20 * * * *" \
+  --workspace /home/lincoln/.openclaw/workspace-livy-memory \
+  --timeout 600 \
+  --isolated
+```
+Then capture the cron ID returned and record it in HEARTBEAT.md under the `research-trello` job entry.
 
 - [ ] **Step 4: Update memory docs (STM/LTM/napkin)**
 - HEARTBEAT current timestamp and incidents
