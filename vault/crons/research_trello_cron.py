@@ -29,15 +29,17 @@ STATE_PATH = "state/identity-graph/state.json"
 
 def main() -> None:
     try:
-        interval_min = int(os.environ.get("RESEARCH_TRELLO_INTERVAL_MIN", "20"))
+        # Batch cadence: 4x/day (0h, 6h, 12h, 18h BRT) — interval_min is informational only.
+        # Actual schedule is governed by OpenClaw cron (id: 49d1d21e-9bad-4e20-a638-196dcf29f37e).
+        interval_min = int(os.environ.get("RESEARCH_TRELLO_INTERVAL_MIN", "360"))  # 6h
     except ValueError:
-        interval_min = 20
+        interval_min = 360
         logger.warning(
             "RESEARCH_TRELLO_INTERVAL_MIN=%r is not a valid integer; falling back to %d",
             os.environ.get("RESEARCH_TRELLO_INTERVAL_MIN"),
             interval_min,
         )
-    print(f"[research_trello] acquiring lock {LOCK_PATH} (ttl={LOCK_TTL}s, interval={interval_min}min)")
+    print(f"[research_trello] acquiring lock {LOCK_PATH} (ttl={LOCK_TTL}s, batch cadence 4x/day BRT)")
 
     if not acquire_lock(LOCK_PATH):
         print("[research_trello] lock held by another process — skipping this run")

@@ -45,8 +45,8 @@ class TestResearchTrelloCron:
         from vault.crons.research_trello_cron import RESEARCH_DIR
         assert RESEARCH_DIR == ".research/trello"
 
-    def test_trello_cron_interval_env_var_default_20(self, monkeypatch, capsys):
-        """Default interval should be 20 minutes when env var is not set."""
+    def test_trello_cron_batch_cadence_output(self, monkeypatch, capsys):
+        """When RESEARCH_TRELLO_INTERVAL_MIN is not set, output reflects batch cadence."""
         monkeypatch.delenv("RESEARCH_TRELLO_INTERVAL_MIN", raising=False)
         from vault.crons import research_trello_cron
 
@@ -61,7 +61,7 @@ class TestResearchTrelloCron:
                     research_trello_cron.main()
 
         captured = capsys.readouterr()
-        assert "interval=20min" in captured.out
+        assert "batch cadence 4x/day BRT" in captured.out
 
     def test_trello_cron_calls_pipeline_with_source_trello(self, tmp_path, monkeypatch):
         """When run, cron must instantiate ResearchPipeline with source='trello'."""
