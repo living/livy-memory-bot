@@ -151,6 +151,45 @@ Conectar o feature flag `WIKI_V2_ENABLED` ao `ResearchPipeline` para permitir ro
 
 - `d81eb7e` — `feat(research): connect WIKI_V2_ENABLED flag to ResearchPipeline`
 
+## Wiki v2 em produção (github) — 2026-04-19
+
+### Decisão
+
+Ativar Wiki v2 em produção para o source github (não apenas auditoria), conforme decisão do Lincoln.
+
+### Implementação
+
+- `vault/research/pipeline.py`
+  - quando `WIKI_V2_ENABLED=true` e `source=github`:
+    - converte payload rico em claims via `pr_to_claims()`
+    - faz `fuse()` contra claims existentes em `state/identity-graph/state.json`
+    - persiste claim fused + updates de supersession no SSOT (`state["claims"]`)
+    - escreve blob canônico em `memory/vault/claims/<claim_id>.md`
+    - audita `wiki_v2_claim_written` e `wiki_v2_event_processed`
+  - quando flag=false, mantém caminho legado `_apply()` (markdown hypothesis)
+
+### Testes (TDD)
+
+Arquivo novo/expandido:
+- `tests/research/test_pipeline_wiki_v2_flag.py`
+
+Cobertura:
+- gating true/false/unset
+- auditoria de flag em `run_started`
+- persistência de claims no SSOT em modo v2
+- ausência de escrita markdown legada em modo v2
+- supersession de claim antiga por claim nova
+- preservação do caminho antigo com flag=false
+
+Resultado:
+- `PYTHONPATH=. pytest tests/research/test_pipeline_wiki_v2_flag.py -q` → **7 passed**
+- `PYTHONPATH=. pytest tests/research/ -q` → **446 passed**
+- `PYTHONPATH=. pytest tests/vault/ -q` → **90 passed**
+
+### Commit
+
+- `30a3b29` — `feat(research): enable wiki v2 production path for github pipeline`
+
 ---
 
 ## PR #18 — Batch-first Research Pipeline (merge 2026-04-19)

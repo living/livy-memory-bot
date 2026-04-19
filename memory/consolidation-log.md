@@ -232,5 +232,15 @@
   - `agenda-trello-1700` (id: `23bc1aba-7b78-4ca1-b662-e9cbbd2f27e2`) — ✅ removido
 - Lincoln definiu que Wiki v2 vai para produção (não só auditoria).
 - Flag `WIKI_V2_ENABLED=true` já está ativo em `~/.openclaw/.env` desde sessão anterior.
-- Pipeline agora audita `wiki_v2_active` em cada run (commit `d81eb7e`).
-- Comportamento v2 real (FusionEngine + MemoryCore serializing) é a próxima fase de implementação — mais complexa, requer planejamento.
+
+## Session Log — 2026-04-19 17:15 UTC (wiki v2 produção ativado)
+
+- Commit `30a3b29`: wiki v2 production path para github habilitado
+- `WIKI_V2_ENABLED=true` agora faz github rich events passarem pelo FusionEngine
+- Fluxo: `pr_to_claims()` → `fuse()` com SSOT state claims → `state/identity-graph/state.json` (key: `claims`)
+- Blobs de claim escritos em `memory/vault/claims/<claim_id>.md`
+- Supersession detection ativa: claims mais novos substituem claims mais antigos do mesmo entity_id
+- Old markdown path (`_apply()`) preservado quando flag=false
+- 7 novos testes em `tests/research/test_pipeline_wiki_v2_flag.py`
+- Suite completa: 446 research + 90 vault tests passando
+- Rollback: `gateway config.patch(features.wiki_v2.enabled=false)` via `vault/ops/rollback.py`
