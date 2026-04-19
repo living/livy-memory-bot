@@ -262,3 +262,28 @@
   - `PYTHONPATH=. pytest tests/research/test_pipeline_wiki_v2_trello.py tests/research/test_pipeline_wiki_v2_tldv.py -q` → 6 passed
   - `PYTHONPATH=. pytest tests/research/ -q` → 452 passed
   - `PYTHONPATH=. pytest tests/vault/ -q` → 90 passed
+
+## Session Log — 2026-04-19 19:14 UTC (PR #21 merge + hotfix PR #22 + E2E produção)
+
+- Solicitação do Lincoln: merge PR #21, validar ponta a ponta com dados reais, corrigir produção, documentar STM/LTM/napkin.
+- PR #21 mergeada em `master`:
+  - commit `dbf9149` — `feat: weekly insights claims-first with HTML group attachment (#21)`
+- Durante validação E2E, bug de produção detectado:
+  - DM pessoal enviava OK
+  - grupo `-5158607302` falhava com `Bad Request: chat not found`
+- Root cause confirmado: resolução de token em `vault_insights_weekly_generate.py` caía em `.env TELEGRAM_TOKEN` (`@livy_chat_bot`) e não no bot `memory` (`@livy_agentic_memory_bot`) que é membro do grupo.
+- Hotfix implementado e mergeado:
+  - PR #22 `fix: insights weekly cron uses memory account Telegram token`
+  - commit `7c86f4b`
+  - resolução de token com precedência:
+    1. `TELEGRAM_BOT_TOKEN`
+    2. `TELEGRAM_MEMORY_BOT_TOKEN`
+    3. `~/.openclaw/openclaw.json -> channels.telegram.accounts.memory.botToken`
+    4. `TELEGRAM_TOKEN`
+  - overrides opcionais de chat ID: `TELEGRAM_CHAT_ID_PERSONAL` / `TELEGRAM_CHAT_ID_GROUP`
+- Verificações pós-fix:
+  - `pytest vault/tests/test_vault_insights_weekly_generate.py vault/tests/test_renderers.py vault/tests/test_claim_inspector.py -q` → **44 passed**
+  - E2E em `master`: 
+    - `[OK] Personal report sent to 7426291192`
+    - `[OK] Group HTML document sent to -5158607302`
+- Estado final: PR #21 e PR #22 em produção com entrega dual-channel funcional.

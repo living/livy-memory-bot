@@ -238,4 +238,26 @@ Validação:
 Commit: `d81eb7e`
 Topic file: `memory/curated/livy-memory-agent.md`
 
+### 2026-04-19 — PR #21 mergeada: Weekly Insights claims-first com HTML group attachment
+
+Merge da evolução do weekly insights para formato claims-first com entrega dual-channel:
+- `vault/insights/claim_inspector.py` — extrai e filtra claims do SSOT (`state/identity-graph/state.json`)
+- `vault/insights/renderers.py` — renderiza claims em formato markdown (DM pessoal) e HTML (documento grupo)
+- `vault/crons/vault_insights_weekly_generate.py` — script de geração com dedupe, fallback markdown e entrega Telegram
+- Entrega dual: DM pessoal (markdown, 7426291192) + documento HTML no grupo (-5158607302)
+
+**Commits:** `dbf9149` (PR #21) + `7c86f4b` (hotfix PR #22)
+
+**Validação pós-merge:**
+- `pytest vault/tests/test_vault_insights_weekly_generate.py vault/tests/test_renderers.py vault/tests/test_claim_inspector.py -q` → **44 passed**
+- E2E produção: DM enviado para 7426291192, documento HTML enviado para -5158607302 ✅
+
+**Bug encontrado na validação E2E:**
+- `vault_insights_weekly_generate.py` resolvia token via `.env` (`TELEGRAM_TOKEN`) que aponta para `@livy_chat_bot`, não `@livy_agentic_memory_bot`
+- Resultado: `sendDocument` ao grupo falhava com `Bad Request: chat not found`
+- Fix: `_resolve_bot_token()` com precedência: `TELEGRAM_BOT_TOKEN` → `TELEGRAM_MEMORY_BOT_TOKEN` → OpenClaw config `channels.telegram.accounts.memory.botToken` → `TELEGRAM_TOKEN`
+- Fix commitado em PR #22 (`7c86f4b`)
+
+Topic file: `memory/curated/livy-memory-agent.md`
+
 _Last updated: 2026-04-19_

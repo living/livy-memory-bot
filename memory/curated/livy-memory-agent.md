@@ -286,6 +286,48 @@ Mergear PR #19 após fix de blockers de review e sanity completo da suíte resea
   - **11 PRs processados** (inclui PRs #17/#18/#19)
   - 4 PRs com 404 no fetch individual (`#133/#132/#131/#42`) permanecem como edge case não bloqueante (itens antigos/inconsistentes de índice)
 
+## PR #21 — Weekly Insights claims-first + HTML group attachment (merge 2026-04-19)
+
+### O que entrou no merge
+
+- `vault/insights/claim_inspector.py` — extrai e filtra claims do SSOT por janela semanal
+- `vault/insights/renderers.py` — renderizadores markdown (DM) e HTML (grupo via `sendDocument`)
+- `vault/crons/vault_insights_weekly_generate.py` — geração com dedupe semanal e entrega dual-channel
+- 44 testes focados (claim_inspector + renderers + cron)
+
+### Entrega dual-channel
+
+| Canal | Destino | Formato |
+|---|---|---|
+| DM pessoal | `7426291192` | Markdown |
+| Grupo | `-5158607302` | HTML como `sendDocument` |
+
+### Bug de produção descoberto na validação E2E
+
+`sendDocument` ao grupo falhava com `Bad Request: chat not found` — token do `.env` resolvia para `@livy_chat_bot` em vez de `@livy_agentic_memory_bot`. Fixado em PR #22.
+
+### Verificação
+
+- PR #21: `MERGED` (`dbf9149`) + PR #22: `MERGED` (`7c86f4b`)
+- E2E produção: `[OK] Group HTML document sent to -5158607302` ✅
+
+---
+
+## PR #22 — Hotfix: token resolution no insights weekly cron (merge 2026-04-19)
+
+### Root cause
+
+`vault_insights_weekly_generate.py` resolvia token via `.env` (`TELEGRAM_TOKEN`) que aponta para `@livy_chat_bot` — bot não é membro do grupo `-5158607302`.
+
+### Fix
+
+`_load_openclaw_telegram_token(account_id="memory")` lê `~/.openclaw/openclaw.json` → `channels.telegram.accounts.memory.botToken`. Precedência: `TELEGRAM_BOT_TOKEN` → `TELEGRAM_MEMORY_BOT_TOKEN` → OpenClaw config → `TELEGRAM_TOKEN`.
+
+### Commit
+
+`7c86f4b` — `fix(insights-cron): resolve memory bot token from OpenClaw account config`
+
+---
 
 ## Crosslink Pipeline (Vault Ingest)
 
