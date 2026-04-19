@@ -26,8 +26,14 @@ class TLDVClient:
         supabase_key: str | None = None,
     ) -> None:
         self.lookback_days = lookback_days
-        self.supabase_url = supabase_url or os.environ.get("SUPABASE_URL", "")
-        self.supabase_key = supabase_key or os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
+        # Use explicit value if provided (including empty string to override env);
+        # otherwise fall back to environment.
+        self.supabase_url = (
+            supabase_url if supabase_url is not None else os.environ.get("SUPABASE_URL", "")
+        )
+        self.supabase_key = (
+            supabase_key if supabase_key is not None else os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
+        )
 
     def fetch_events_since(self, last_seen_at: str | None) -> list[dict[str, Any]]:
         """Fetch normalized tldv:meeting events since last_seen_at."""
@@ -42,8 +48,20 @@ class TLDVClient:
             "limit": 100,
         }
 
-        # Always apply temporal filter (including first-run lookback) to avoid
-        # arbitrary windows and state drift.
+        # Primary path (backward-compatible with existing test contract):
+        # apply temporal cursor on updated_at.
+        params["updated_at"] = f"gte.{cutoff.isoformat()}"
+
+        cutoff = self._compute_cutoff(last_seen_at)
+        headers = self._headers()
+        params: dict[str, Any] = {
+            "select": "id,name,created_at,updated_at,meeting_id",
+            "order": "updated_at.desc",
+            "limit": 100,
+        }
+
+        # Primary path (backward-compatible with existing test contract):
+        # apply temporal cursor on updated_at.
         params["updated_at"] = f"gte.{cutoff.isoformat()}"
 
         try:
@@ -53,6 +71,23 @@ class TLDVClient:
                 params=params,
                 timeout=30,
             )
+
+            # Production schema fallback: some environments do not expose
+            # meetings.updated_at (only created_at). Retry once with created_at.
+            if resp.status_code == 400 and "updated_at" in (resp.text or ""):
+                fallback_params = {
+                    "select": "id,name,created_at",
+                    "order": "created_at.desc",
+                    "limit": 100,
+                    "created_at": f"gte.{cutoff.isoformat().replace('+00:00', 'Z')}",
+                }
+                resp = requests.get(
+                    f"{self.supabase_url}/rest/v1/meetings",
+                    headers=headers,
+                    params=fallback_params,
+                    timeout=30,
+                )
+
             if resp.status_code != 200:
                 logger.warning(
                     "source=tldv status_code=%s url=%s",
@@ -60,6 +95,7 @@ class TLDVClient:
                     self.supabase_url,
                 )
                 return []
+
             rows = resp.json() or []
             return [self._normalize_meeting(row) for row in rows]
         except Exception as exc:

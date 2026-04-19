@@ -43,6 +43,7 @@ class TestTLDVClientFetchEventsSince:
         """Without URL/key configured, returns empty list."""
         from vault.research.tldv_client import TLDVClient
 
+        # Empty strings explicitly disable credentials and must not fallback to env.
         client = TLDVClient(supabase_url="", supabase_key="")
         assert client.fetch_events_since("2026-04-13T00:00:00Z") == []
 
