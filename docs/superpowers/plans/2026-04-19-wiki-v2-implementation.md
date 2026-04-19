@@ -157,7 +157,7 @@ class Claim:
         author: str,
         event_timestamp: str,
         topic_id: str | None = None,
-        privacy_level: PrivacyLevel = "public",
+        privacy_level: PrivacyLevel,
         model_used: str = "omniroute/fastest",
         parser_version: str = "v1",
     ) -> "Claim":
@@ -704,6 +704,30 @@ def test_no_contradiction_same_text():
 Run: `PYTHONPATH=. pytest tests/vault/test_confidence.py tests/vault/test_supersession.py tests/vault/test_contradiction.py -v`
 Expected: all PASS
 
+```python
+# tests/vault/test_contradiction.py — helper mínimo válido
+from vault.memory_core.models import Claim, SourceRef
+
+def _claim(claim_id: str, topic_id: str, entity_id: str, text: str) -> Claim:
+    ref = SourceRef(source_id=claim_id, url="https://example.com")
+    c = Claim.new(
+        entity_type="topic",
+        entity_id=entity_id,
+        topic_id=topic_id,
+        claim_type="decision",
+        text=text,
+        source="github",
+        source_ref=ref,
+        evidence_ids=[f"ev-{claim_id}"],
+        author="system",
+        event_timestamp="2026-04-19T12:00:00Z",
+        privacy_level="internal",
+    )
+    c.claim_id = claim_id
+    c.confidence = 0.9
+    return c
+```
+
 ---
 
 - [ ] **Step 6: Commit**
@@ -857,12 +881,33 @@ O `trello_client.py` existente precisa ser atualizado para expor cards normaliza
 # vault/research/trello_client.py — adicionar método
 # (ao final do arquivo existente, NÃO reescrever o arquivo inteiro)
 
-def get_normalized_cards(self, username: str | None = None) -> list[ParsedTrelloCard]:
-    """Retorna cards normalizados prontos para claim extraction."""
+def get_normalized_cards(self, last_seen_at: str | None = None) -> list[ParsedTrelloCard]:
+    """Retorna cards/eventos normalizados a partir da API real do TrelloClient."""
     import vault.research.trello_parsers as parsers
-    username = username or self.username
-    raw_cards = self.fetch_cards(username)
-    return [parsers.parse_trello_card(c) for c in raw_cards]
+
+    events = self.fetch_events_since(last_seen_at)
+    normalized: list[ParsedTrelloCard] = []
+    for e in events:
+        # Usa payload normalizado já entregue pelo cliente real
+        raw = e.get("raw", {})
+        data = raw.get("data", {})
+        card = data.get("card") or {}
+        if not card.get("id"):
+            continue
+        # list_name pode não estar disponível em todo evento; usa fallback
+        list_name = (data.get("listAfter") or data.get("list") or {}).get("name", "Unknown")
+        normalized.append(parsers.parse_trello_card({
+            "id": card.get("id"),
+            "name": card.get("name", ""),
+            "url": card.get("url", ""),
+            "idBoard": (data.get("board") or {}).get("id", ""),
+            "desc": card.get("desc", ""),
+            "labels": card.get("labels", []),
+            "due": card.get("due"),
+            "dateLastActivity": e.get("timestamp", ""),
+            "attachments": card.get("attachments", []),
+        }, list_name=list_name))
+    return normalized
 ```
 
 Run: `python -c "from vault.research.trello_client import TrelloClient; c = TrelloClient(); print(list(c.get_normalized_cards.__doc__))"`
@@ -926,42 +971,23 @@ git commit -m "feat: Trello connector com extração de GitHub links e claim par
 
 ---
 
-- [ ] **Step 1: Adicionar método de reviews ao GitHubClient**
+- [ ] **Step 1: Reusar GitHubRichClient (sem duplicar fetch de reviews)**
 
 ```python
-# vault/research/github_client.py — adicionar método
-# (após _normalize_pr, no final da classe GitHubClient)
-
-def _fetch_pr_reviews(self, repo: str, pr_number: int) -> list[dict]:
-    """Fetch approved/rejected reviews for a PR."""
-    cmd = [
-        "gh", "api",
-        f"repos/{repo}/pulls/{pr_number}/reviews",
-        "--jq", ".[] | {user: .user.login, state: .state, submitted_at: .submitted_at}",
-    ]
-    try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
-        if result.returncode != 0:
-            return []
-        import json
-        return json.loads(result.stdout) or []
-    except Exception:
-        return []
+# vault/research/github_parsers.py — usar GitHubRichClient existente
+from vault.research.github_rich_client import GitHubRichClient
 
 
-def fetch_pr_with_reviews(self, repo: str, pr_number: int) -> dict:
-    """Fetch full PR details including all reviews and approvers."""
-    pr = self._fetch_pr_details(repo, pr_number)
-    if not pr:
-        return {}
-    reviews = self._fetch_pr_reviews(repo, pr_number)
+def fetch_pr_with_reviews(repo: str, pr_number: int) -> dict:
+    """Fetch full PR + reviews usando cliente rico existente (sem duplicação)."""
+    rich = GitHubRichClient()
+    pr = rich.fetch_rich_pr(pr_number, repo)
+    reviews = rich.fetch_reviews(pr_number, repo)
     pr["reviews"] = reviews
-    approvers = [r["user"] for r in reviews if r["state"] == "APPROVED"]
-    pr["approvers"] = approvers
     return pr
 ```
 
-Run: `python -c "from vault.research.github_client import GitHubClient; print('OK')"`
+Run: `python -c "from vault.research.github_parsers import fetch_pr_with_reviews; print('OK')"`
 Expected: `OK`
 
 ---
@@ -978,7 +1004,7 @@ from vault.memory_core.models import Claim, SourceRef
 def pr_to_claims(pr: dict) -> list[Claim]:
     """Convert full PR dict (with reviews) into claims."""
     claims = []
-    repo = pr.get("repository", {}).get("full_name", pr.get("repo", ""))
+    repo = pr.get("repo", "") or pr.get("base", {}).get("repo", {}).get("full_name", "")
     pr_number = pr.get("number")
     pr_url = pr.get("url", f"https://github.com/{repo}/pull/{pr_number}")
     author = pr.get("user", {}).get("login", "unknown")
@@ -1006,7 +1032,14 @@ def pr_to_claims(pr: dict) -> list[Claim]:
         claims.append(decision_claim)
 
         # Reviewer claims
-        for approver in (pr.get("approvers") or []):
+        approvers = [
+            ((r.get("user") or {}).get("login"))
+            for r in (pr.get("reviews") or [])
+            if r.get("state") == "APPROVED"
+        ]
+        approvers = [a for a in approvers if a]
+
+        for approver in approvers:
             appr_ref = SourceRef(source_id=f"{pr_number}-review-{approver}", url=pr_url)
             appr_evidence = str(uuid.uuid4())
             appr_claim = Claim.new(
@@ -1042,6 +1075,10 @@ git commit -m "feat: GitHub client com reviews, approvers e claim parser"
 ---
 
 ### Tarefa 5: Azure Blob como Fonte Primária de Transcripts
+
+- [ ] **Pré-check obrigatório:** validar naming real dos blobs no producer (`living/livy-tldv-jobs`) antes de hardcode de path.
+  - Confirmar se produção usa `meetings/{id}.transcript.json` e `meetings/{id}.transcript.tldv.json`.
+  - Se divergir, parametrizar pattern com env vars (`AZURE_TRANSCRIPT_CONSOLIDATED_PATTERN`, `AZURE_TRANSCRIPT_ORIGINAL_PATTERN`).
 
 **Files:**
 - Create: `vault/capture/azure_blob_client.py`
@@ -1467,7 +1504,7 @@ def rollback_wiki_v2() -> dict[str, Any]:
     }
 
     # Validação: simula o que seria enviado (não executa gateway diretamente)
-    # A execução real é feita via tool call `gateway(action="config.patch", ...)`
+    # A execução real é feita via tool call `gateway(action="config.patch", raw=json.dumps(payload), note="Rollback wiki_v2")`
     return {
         "success": True,
         "payload": payload,
@@ -1551,15 +1588,51 @@ def replay_events(
     errors = 0
     for event in events:
         try:
-            existing = []  # TODO: load from SSOT state
+            existing_state = _load_state(state_path)
+            existing = _load_claims_from_state(existing_state)
             new_claim = _event_to_claim(event)
             result = fuse(new_claim, existing)
-            # TODO: persist result to state_path
+            _persist_fusion_result(state_path, result)
             processed += 1
         except Exception:
             errors += 1
 
     return {"processed": processed, "errors": errors, "total": len(events)}
+
+
+def _load_state(state_path: Path) -> dict:
+    if not state_path.exists():
+        return {"claims": []}
+    return json.loads(state_path.read_text())
+
+
+def _load_claims_from_state(state: dict) -> list:
+    # Placeholder mapping; adaptador real converte dict->Claim quando schema final estiver estável.
+    return []
+
+
+def _persist_fusion_result(state_path: Path, result) -> None:
+    # Placeholder persist; implementação final deve gravar claim + supersession + audit.
+    pass
+
+
+def _event_to_claim(event: dict):
+    """Converte evento do audit log em Claim para replay."""
+    # TODO: mapear todos os tipos de evento; por ora, contrato mínimo para wiring
+    from vault.memory_core.models import Claim, SourceRef
+    return Claim.new(
+        entity_type="topic",
+        entity_id=str(event.get("entity_id", "unknown")),
+        topic_id=event.get("topic_id"),
+        claim_type="timeline_event",
+        text=str(event.get("text", "replayed event")),
+        source=event.get("source", "github"),
+        source_ref=SourceRef(source_id=str(event.get("id", "unknown")), url=event.get("url")),
+        evidence_ids=[str(event.get("evidence_id", "replay-evidence"))],
+        author=str(event.get("author", "system")),
+        event_timestamp=str(event.get("event_at", "2026-04-19T00:00:00Z")),
+        privacy_level="internal",
+    )
 
 
 def main() -> None:
@@ -1638,13 +1711,13 @@ Após implementar todas as tarefas:
 
 - [ ] Implementar `GmailConnector.get_recent_messages()` com filtro oficial v1
 - [ ] Claim parser para Gmail (spec Section 3.4 exemplos)
-- [ ] Cron `research-gmail` (`*/15 * * * *`) operacional
+- [ ] Cron `research-gmail` com cadência **batch-first 6h** (`0 0,6,12,18 * * *`, BRT) na transição
 
 ### Tarefa 10: Calendar Connector — Eventos e Participantes
 
 - [ ] Implementar `GoogleCalendarConnector.get_events()`
 - [ ] Claim parser para Calendar
-- [ ] Cron `research-calendar` (`*/30 * * * *`) operacional
+- [ ] Cron `research-calendar` com cadência **batch-first 6h** (`0 0,6,12,18 * * *`, BRT) na transição
 
 ### Tarefa 11: Privacy Filter v1
 
