@@ -25,8 +25,10 @@ STATE_PATH = "state/identity-graph/state.json"
 
 
 def main() -> None:
-    interval_min = int(os.environ.get("RESEARCH_TLDV_INTERVAL_MIN", "15"))
-    print(f"[research_tldv] acquiring lock {LOCK_PATH} (ttl={LOCK_TTL}s, interval={interval_min}min)")
+    # Batch cadence: 4x/day (0h, 6h, 12h, 18h BRT) — interval_min is informational only.
+    # Actual schedule is governed by OpenClaw cron (id: 88e37467-f7dd-4637-a63a-58b6ca4ecef5).
+    interval_min = int(os.environ.get("RESEARCH_TLDV_INTERVAL_MIN", "360"))  # 6h
+    print(f"[research_tldv] acquiring lock {LOCK_PATH} (ttl={LOCK_TTL}s, batch cadence 4x/day BRT)")
 
     if not acquire_lock(LOCK_PATH):
         print("[research_tldv] lock held by another process — skipping this run")

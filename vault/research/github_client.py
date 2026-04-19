@@ -75,14 +75,31 @@ class GitHubClient:
         return out
 
     def _normalize_pr(self, pr: dict[str, Any]) -> dict[str, Any]:
+        repo = (pr.get("repository") or {}).get("full_name", "")
+        pr_number = pr.get("number")
+        event_id = f"{repo}#{pr_number}" if repo and pr_number is not None else str(pr_number)
+
         return {
             "source": "github",
+            "type": "pr_merged",
+            "id": event_id,
             "event_type": "github:pr_merged",
-            "pr_number": pr.get("number"),
+            "pr_number": pr_number,
             "title": pr.get("title"),
             "merged_at": pr.get("merged_at"),
             "created_at": pr.get("created_at"),
             "author": pr.get("user", {}),
-            "repo": (pr.get("repository") or {}).get("full_name", ""),
+            "repo": repo,
             "merged": pr.get("merged", False),
+        }
+
+    def fetch_pr(self, pr_number: int) -> dict[str, Any]:
+        """Compatibility helper for pipeline context stage.
+
+        Research pipeline already receives normalized event payload from `fetch_events_since`.
+        For now, we return a minimal payload containing author metadata shape used by resolver.
+        """
+        return {
+            "pr_number": pr_number,
+            "author": {},
         }

@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -27,7 +28,9 @@ from typing import Any
 from vault.research.event_key import build_event_key
 from vault.research.identity_resolver import resolve_identity
 from vault.research.state_store import DEFAULT_STATE, load_state, save_state, upsert_processed_event_key
+from vault.research.github_client import GitHubClient
 from vault.research.trello_client import TrelloClient
+from vault.research.tldv_client import TLDVClient
 
 
 def _hash16(s: str) -> str:
@@ -110,24 +113,7 @@ def get_claude_mem_context(payload: dict[str, Any]) -> dict[str, Any]:
     return {"recent_sessions": [], "entities": [], "query": payload}
 
 
-class TLDVClient:
-    """Minimal placeholder client (patched in tests)."""
-
-    def fetch_events_since(self, last_seen_at: str | None) -> list[dict[str, Any]]:
-        return []
-
-    def fetch_meeting(self, meeting_id: str) -> dict[str, Any]:
-        return {"id": meeting_id}
-
-
-class GitHubClient:
-    """Minimal placeholder client (patched in tests)."""
-
-    def fetch_events_since(self, last_seen_at: str | None) -> list[dict[str, Any]]:
-        return []
-
-    def fetch_pr(self, pr_number: int) -> dict[str, Any]:
-        return {"number": pr_number}
+CROSS_SOURCE_IDENTITY_ENABLED = os.environ.get("CROSS_SOURCE_IDENTITY_ENABLED", "false").lower() == "true"
 
 
 class ResearchPipeline:
@@ -150,6 +136,7 @@ class ResearchPipeline:
         self.wiki_root = Path(wiki_root) if wiki_root else Path("memory/vault")
         self.allowed_paths = [str(Path(p).resolve()) for p in (allowed_paths or ["memory/vault"])]
         self.read_only_mode = read_only_mode
+        self.cross_source_identity_enabled = CROSS_SOURCE_IDENTITY_ENABLED
 
         self.audit_path = self.research_dir / "audit.log"
         self.self_healing_path = self.research_dir / "self_healing_evidence.jsonl"
@@ -549,4 +536,10 @@ class ResearchPipeline:
             "status": "success",
             "events_processed": processed,
             "events_skipped": skipped,
+            "token_used": 0,
+            "token_budget": 0,
+            "api_calls": len(events),
+            "api_cost_usd_estimate": 0.0,
+            "cost_usd_estimate": 0.0,
+            "source": self.source,
         }
