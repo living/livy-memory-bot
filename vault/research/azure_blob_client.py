@@ -8,10 +8,16 @@ from __future__ import annotations
 
 import logging
 import os
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 DEFAULT_CONTAINER_NAME = "transcripts"
+
+# Kept as module attrs for test patch targets; resolved lazily at runtime.
+BlobServiceClient: Any | None = None
+ResourceNotFoundError: Any | None = None
+AzureError: Any | None = None
 
 
 class AzureBlobClient:
@@ -35,32 +41,61 @@ class AzureBlobClient:
         clean_id = (meeting_id or "").lstrip("/")
         return f"meetings/{clean_id}.transcript.json"
 
+    def _load_azure_clients(self):
+        """Lazy-load azure SDK classes; returns (BlobServiceClient, azure_exceptions_tuple)."""
+        global BlobServiceClient, ResourceNotFoundError, AzureError
+
+        if BlobServiceClient is None or ResourceNotFoundError is None or AzureError is None:
+            try:
+                from azure.storage.blob import BlobServiceClient as _BlobServiceClient
+                from azure.core.exceptions import (
+                    ResourceNotFoundError as _ResourceNotFoundError,
+                    AzureError as _AzureError,
+                )
+            except ImportError:
+                return None
+
+            BlobServiceClient = _BlobServiceClient
+            ResourceNotFoundError = _ResourceNotFoundError
+            AzureError = _AzureError
+
+        return BlobServiceClient, (ResourceNotFoundError, AzureError)
+
     def fetch_transcript(self, meeting_id: str) -> str | None:
         """Download blob content and return raw text, or None if unavailable."""
-        if not self._connection_string:
+        normalized_meeting_id = (meeting_id or "").strip()
+        if not self._connection_string or not normalized_meeting_id:
+            return None
+        if not meeting_id or not str(meeting_id).strip():
             return None
 
-        try:
-            from azure.storage.blob import BlobServiceClient
-            from azure.core.exceptions import ResourceNotFoundError, AzureError
-        except ImportError:
+        result = self._load_azure_clients()
+        if result is None:
+            return None
+        BlobServiceClientCls, azure_exceptions = result
+        if BlobServiceClientCls is None:
             return None
 
-        blob_path = self._build_blob_path(meeting_id)
+        if not isinstance(azure_exceptions, tuple):
+            azure_exceptions = (Exception,)
+        not_found_exc = azure_exceptions[0] if azure_exceptions else Exception
+        other_exc = azure_exceptions[1] if len(azure_exceptions) > 1 else Exception
+
+        blob_path = self._build_blob_path(normalized_meeting_id)
         try:
-            service = BlobServiceClient.from_connection_string(self._connection_string)
+            service = BlobServiceClientCls.from_connection_string(self._connection_string)
             blob_client = service.get_blob_client(container=self._container_name, blob=blob_path)
             content = blob_client.download_blob().readall()
 
             if isinstance(content, bytes):
                 return content.decode("utf-8", errors="replace")
             return str(content)
-        except ResourceNotFoundError:
+        except not_found_exc:
             return None
-        except AzureError as exc:
+        except other_exc as exc:
             logger.warning(
                 "azure_blob_transcript_fetch_failed meeting_id=%s err=%s",
-                meeting_id,
+                normalized_meeting_id,
                 exc,
             )
             return None

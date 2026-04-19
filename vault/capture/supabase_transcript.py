@@ -76,7 +76,7 @@ def load_segments_from_supabase(meeting_id: str | None) -> list[dict[str, Any]]:
             params=params,
             timeout=15,
         )
-    except requests.RequestException as exc:
+    except (requests.RequestException, ValueError, RuntimeError) as exc:
         logger.warning(
             "supabase_segments_request_failed meeting_id=%s err=%s",
             meeting_id,

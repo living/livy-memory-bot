@@ -130,9 +130,10 @@ class TestSupabaseTranscriptClient:
 
     def test_returns_none_on_request_exception(self):
         """Request exceptions are handled gracefully."""
+        import requests
         from vault.research.supabase_transcript import SupabaseTranscriptClient
 
-        with patch("requests.get", side_effect=RuntimeError("network")):
+        with patch("requests.get", side_effect=requests.RequestException("network")):
             client = SupabaseTranscriptClient(
                 supabase_url="https://example.supabase.co",
                 supabase_key="key123",

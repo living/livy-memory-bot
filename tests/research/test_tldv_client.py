@@ -5,7 +5,7 @@ GREEN phase: implement minimal code to pass.
 """
 from unittest.mock import MagicMock, patch
 
-import pytest
+import requests
 
 
 class TestTLDVClientFetchEventsSince:
@@ -65,7 +65,7 @@ class TestTLDVClientFetchEventsSince:
         """Request exceptions are handled gracefully with empty list."""
         from vault.research.tldv_client import TLDVClient
 
-        with patch("requests.get", side_effect=RuntimeError("network")):
+        with patch("requests.get", side_effect=requests.RequestException("network")):
             client = TLDVClient(
                 supabase_url="https://example.supabase.co",
                 supabase_key="key123",

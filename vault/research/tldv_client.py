@@ -106,12 +106,13 @@ class TLDVClient:
 
     def fetch_meeting(self, meeting_id: str) -> dict[str, Any]:
         """Fetch one meeting by ID and normalize it."""
-        if not self.supabase_url or not self.supabase_key:
+        normalized_meeting_id = (meeting_id or "").strip()
+        if not self.supabase_url or not self.supabase_key or not normalized_meeting_id:
             return {}
 
         headers = self._headers()
         params = {
-            "id": f"eq.{meeting_id}",
+            "id": f"eq.{normalized_meeting_id}",
             "limit": 1,
         }
 
@@ -133,15 +134,16 @@ class TLDVClient:
 
     def fetch_meeting_transcript(self, meeting_id: str) -> str | None:
         """Fetch transcript preferring Azure Blob, fallback to Supabase transcript fields."""
-        if not meeting_id:
+        normalized_meeting_id = (meeting_id or "").strip()
+        if not normalized_meeting_id:
             return None
 
         azure_client, supabase_client = self._transcript_clients()
-        transcript = azure_client.fetch_transcript(meeting_id)
+        transcript = azure_client.fetch_transcript(normalized_meeting_id)
         if transcript:
             return transcript
 
-        return supabase_client.fetch_transcript(meeting_id)
+        return supabase_client.fetch_transcript(normalized_meeting_id)
 
     def load_transcript_segments(self, meeting_id: str) -> list[dict[str, Any]]:
         """Load structured transcript segments via vault.capture module.
