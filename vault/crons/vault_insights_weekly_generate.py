@@ -16,6 +16,7 @@ import os
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Optional
 
 # Bootstrap: same pattern as other operational crons in this repo
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
@@ -126,11 +127,47 @@ def _log(msg: str) -> None:
     print(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}")
 
 
+def _load_openclaw_telegram_token(account_id: str = "memory") -> Optional[str]:
+    """Fallback token loader from local OpenClaw config (for ops crons).
+
+    Useful when .env TELEGRAM_TOKEN points to a different bot account.
+    """
+    try:
+        cfg_path = Path.home() / ".openclaw" / "openclaw.json"
+        if not cfg_path.exists():
+            return None
+        cfg = json.loads(cfg_path.read_text(encoding="utf-8"))
+        token = (
+            cfg.get("channels", {})
+            .get("telegram", {})
+            .get("accounts", {})
+            .get(account_id, {})
+            .get("botToken")
+        )
+        if isinstance(token, str) and token.strip():
+            return token.strip()
+        return None
+    except Exception:
+        return None
+
+
+def _resolve_bot_token() -> str:
+    """Resolve token with explicit precedence for memory-agent operations."""
+    return (
+        os.environ.get("TELEGRAM_BOT_TOKEN")
+        or os.environ.get("TELEGRAM_MEMORY_BOT_TOKEN")
+        or _load_openclaw_telegram_token("memory")
+        or os.environ.get("TELEGRAM_TOKEN", "")
+    )
+
+
 def main() -> dict:
     load_env()
 
-    global BOT_TOKEN, BASE_URL
-    BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN") or os.environ.get("TELEGRAM_TOKEN", "")
+    global BOT_TOKEN, BASE_URL, CHAT_ID_PERSONAL, CHAT_ID_GROUP
+    BOT_TOKEN = _resolve_bot_token()
+    CHAT_ID_PERSONAL = os.environ.get("TELEGRAM_CHAT_ID_PERSONAL", CHAT_ID_PERSONAL)
+    CHAT_ID_GROUP = os.environ.get("TELEGRAM_CHAT_ID_GROUP", CHAT_ID_GROUP)
     BASE_URL = f"https://api.telegram.org/bot{BOT_TOKEN}" if BOT_TOKEN else ""
 
     dry_run = os.environ.get("DRY_RUN_INSIGHTS", "").lower() in ("1", "true")
