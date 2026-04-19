@@ -461,7 +461,7 @@ class TestPipelineDualKeyDedup:
             "repo": "living/livy-memory-bot",
             "body": "Original PR body",
             "event_at": "2026-04-18T11:00:00Z",
-            "event_key": "github:pr_merged:ev_new_content",
+            # event_key intentionally omitted — content hash must not depend on event identity
         }
 
         def fetch_pr_side_effect(pr_number):
