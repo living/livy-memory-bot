@@ -138,7 +138,7 @@ BOT_ACCOUNTS = {
 
 ---
 
-## Evo Wiki Research Pipeline (Fase 1)
+## Evo Wiki Research Pipeline (Fase 2 — mergeada 2026-04-19)
 
 Pipeline de pesquisa evolutiva que substitui o loop `dream-memory-consolidation` por um sistema de pesquisa incremental com deduplicação por `event_key` e resolução de identidade cross-source.
 
@@ -172,17 +172,16 @@ Fase 1 é **read-only**: acumula evidência em `self_healing_evidence.jsonl`, n�
 ### Testes
 
 ```bash
-PYTHONPATH=. pytest -q tests/research/          # 150 tests
-PYTHONPATH=. pytest -q vault/tests/test_identity_resolution.py vault/tests/test_resilience.py --ignore=vault/tests/test_reverify_module.py  # 46 tests
+python3 -m pytest tests/research/ -q           # 321 tests (inclui Trello pipeline + self-healing)
 ```
 
-**Merge commit:** `e68d9cd` (PR #16)
+**Merge commit:** `842852c` (squash, PR #17 — 2026-04-19)
 
 ---
 
 ## Status
 
-**ativo** — 2026-04-18
+**ativo** — 2026-04-19
 
 - ✅ Bug #1781 corrigido: agent name era `livy-memory`, deveria ser `memory-agent`
 - ✅ Bug #1661 corrigido: accountId `livy-memory-feed` → `memory`; regra channel-per-agent adicionada
@@ -191,6 +190,7 @@ PYTHONPATH=. pytest -q vault/tests/test_identity_resolution.py vault/tests/test_
 - ✅ Crosslink pipeline Stage 8 corrigido (dd0f7c1) — 31/31 PR authors, 729 edges, 70 testes
 - ✅ github-login-map.yaml: 9 mapeamentos github-login → person source_key
 - ✅ Bot filtering: dependabot, pre-commit-ci, renovate, github-actions, allcontributor
+- ✅ **Evo Wiki Research Phase 2 mergeada** (PR #17, `842852c`) — Trello stream + circuit breaker + self-healing + board mapper + research-trello cron; 2 bloqueantes corrigidos no review
 
 ---
 

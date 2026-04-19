@@ -83,3 +83,15 @@
   "snapshot_created": false,
   "watchdog_alerts": []
 }
+
+## Session Log — 2026-04-19 00:33 UTC (PR #17 merge + sanity)
+
+- PR #17 (`feature/evo-wiki-research-phase2` → `master`) **mergeada via squash**.
+- Merge commit: `842852c86916eff5cf20b68cfc762a7a3f20872e`.
+- Review blockers aplicados antes do merge:
+  1. `build_trello_event_key()` com namespace `trello:{action_id}`.
+  2. `state/identity-graph/self_healing_metrics.json` removido do versionamento (`.gitignore` + `git rm --cached`).
+- Sanity check pós-merge:
+  - `git reset --hard origin/master` → workspace sincronizado com `842852c`.
+  - `python3 -m pytest tests/research/ -q` → **321 passed**.
+  - Cron status: `research-tldv` e `research-github` OK; `research-trello` com erro de delivery (`Delivering to Telegram requires target <chatId>`), não de execução do pipeline.

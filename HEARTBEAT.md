@@ -1,6 +1,6 @@
 # HEARTBEAT — Livy Memory Agent
 
-_Atualizado: 2026-04-19 00:01 UTC (21:01 BRT)_
+_Atualizado: 2026-04-19 00:32 UTC (21:32 BRT)_
 
 ## Jobs Ativos — 21 crons
 
@@ -38,6 +38,7 @@ _Atualizado: 2026-04-19 00:01 UTC (21:01 BRT)_
 | 🟡 | Jobs legados desabilitados (openclaw-health, sonhar, signal-curation, daily-memory-save) | Manter desabilitados ou replanejar com configuração nova |
 | 🟢 | Vault insights semanal operacional | Manter monitoramento das segundas 06:30/07:00 |
 | 🟢 | Loop de research v1 (TLDV/GitHub/Trello/Consolidation) ativo | Manter observabilidade de lock, rebuild de estado e retry policy |
+| ✅ | **PR #17 mergeada — Evo Wiki Research Phase 2** | merge `842852c` squash; 15 commits; 321 testes; 2 bloqueantes corrigidos (namespace event_key + untrack metrics) |
 
 ## Mudanças desde Último HEARTBEAT
 
@@ -51,6 +52,7 @@ _Atualizado: 2026-04-19 00:01 UTC (21:01 BRT)_
 | 🆕 Crons `research-tldv`, `research-github` e `research-trello` | Polling por fonte com lock distribuído e rebuild de estado derivado |
 | 🆕 Cron `research-consolidation` | Consolidação diária 07h BRT substituindo `dream-memory-consolidation` |
 | ✅ Smoke test manual dos crons de research | `research-trello` processed=390, `research-github`/`research-tldv` ok, `research-consolidation` sem alertas |
+| ✅ **PR #17 mergeada — Evo Wiki Research Phase 2** | merge `842852c` squash; Trello stream + circuit breaker + self-healing write-mode; 2 bloqueantes corrigidos (namespace event_key + untrack metrics); 321 testes passing |
 
 ## Memória
 

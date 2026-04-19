@@ -89,6 +89,17 @@ Decisão: substituir a consolidação legada por um loop de research v1 composto
 SSOT permanece em `state/identity-graph/state.json`; arquivos `.research/<source>/state.json` são cache derivado e descartável.
 Impacto: consolidação diária passa a refletir pipeline research v1 com lock distribuído, retry policy e rebuild determinístico do estado por fonte.
 
+### 2026-04-19 — PR #17 mergeada: Evo Wiki Research Phase 2 (Trello + self-healing)
+
+Merge da fase 2 do pipeline de research: streaming de eventos Trello, circuit breaker com thresholds, rollback append-only, board-to-project mapper, e cron `research-trello` registrado.
+
+**Bloqueantes corrigidos no review:**
+1. `build_trello_event_key()` agora retorna `trello:{action_id}` (evita colisão cross-source).
+2. `state/identity-graph/` adicionado ao `.gitignore` — `self_healing_metrics.json` não é mais versionado.
+
+**Merge commit:** `842852c` (squash) | Branch: `feature/evo-wiki-research-phase2` | 321 testes passando.
+Topic file: `memory/curated/livy-memory-agent.md`
+
 ### 2026-03-31 — Sistema de Memória como Infraestrutura de Decisão
 
 Decisão: criar agente `@livy_agentic_memory_bot` com memória agêntica de 3 camadas.
