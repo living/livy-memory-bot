@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+
+from vault.research.lock_manager import acquire_lock, release_lock
+from vault.research.state_store import load_state, save_state
 
 # ---------------------------------------------------------------------------
 # Defaults
@@ -25,6 +29,16 @@ DEFAULT_METRICS = {
     "last_applied_at": None,
     "last_queued_at": None,
     "last_dropped_at": None,
+}
+
+DEFAULT_METRICS_V2 = {
+    "schema_version": 2,
+    "hourly_24h": {},
+    "contradictions_detected": 0,
+    "supersessions_applied": 0,
+    "avg_confidence_by_source": {},
+    "auto_rejected_below_threshold": 0,
+    "apply_errors": 0,
 }
 
 # Circuit breaker thresholds
@@ -364,6 +378,11 @@ def _aggressive_mode() -> bool:
     return os.environ.get("SELF_HEALING_AGGRESSIVE_MODE", "true").lower() != "false"
 
 
+def _policy_version() -> str:
+    raw = os.environ.get("SELF_HEALING_POLICY_VERSION", "v1").strip().lower()
+    return raw if raw in {"v1", "v2"} else "v1"
+
+
 def _breaker_enabled() -> bool:
     return os.environ.get("SELF_HEALING_BREAKER_ENABLED", "true").lower() != "false"
 
@@ -377,10 +396,11 @@ THRESHOLD_AGGRESSIVE = 0.70     # confidence >= 0.70 (and < 0.85) → aggressive
 THRESHOLD_QUEUE = 0.45          # confidence >= 0.45 (and < 0.70) → queued
 
 
-def _confidence_bucket(confidence: float) -> str:
+def _confidence_bucket(confidence: float, policy_version: str) -> str:
     if confidence >= THRESHOLD_APPLY:
         return "applied"
-    if confidence >= THRESHOLD_AGGRESSIVE:
+    # v2 policy is strict: no aggressive auto-apply in 0.70-0.84
+    if policy_version == "v1" and confidence >= THRESHOLD_AGGRESSIVE:
         return "aggressive"
     if confidence >= THRESHOLD_QUEUE:
         return "queued"
@@ -404,6 +424,30 @@ def _log_aggressive(source: str, confidence: float, hypothesis: dict[str, Any]) 
 # apply_decision — main entry point
 # ---------------------------------------------------------------------------
 
+def _ensure_metrics_schema(metrics: dict[str, Any], policy_version: str) -> dict[str, Any]:
+    """Upgrade/normalize metrics schema in-memory for the selected policy."""
+    result = dict(metrics)
+    if policy_version != "v2":
+        return result
+
+    # v2 canonical schema extension (backwards-compatible)
+    if result.get("schema_version") != 2:
+        result["schema_version"] = 2
+    for key, value in DEFAULT_METRICS_V2.items():
+        result.setdefault(key, value if not isinstance(value, dict) else dict(value))
+    return result
+
+
+def _merge_id(hypothesis: dict[str, Any], confidence: float, source: str) -> str:
+    payload = {
+        "hypothesis": hypothesis,
+        "confidence": round(confidence, 6),
+        "source": source,
+    }
+    encoded = json.dumps(payload, sort_keys=True, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
 def apply_decision(
     hypothesis: dict[str, Any],
     confidence: float,
@@ -414,32 +458,29 @@ def apply_decision(
     """
     Apply a self-healing decision based on confidence thresholds.
 
+    Policy versions:
+      - v1 (default): legacy behavior with aggressive 0.70–0.84 when enabled
+      - v2: strict behavior (only >=0.85 applies automatically)
+
     Decision outcomes:
-      - applied  : confidence >= 0.85 (or >= 0.70 in aggressive mode)
-      - queued   : confidence 0.45–0.69
+      - applied  : confidence >= 0.85 (or >=0.70 in v1 aggressive mode)
+      - queued   : confidence 0.45–0.84 in v2, or 0.45–0.69 in v1
       - dropped  : confidence < 0.45
-      - skipped  : dry-run, breaker-disabled, or aggressive mode off for 0.70–0.84,
+      - skipped  : dry-run, breaker-disabled, aggressive mode off for v1 0.70–0.84,
                    or source/global pause active
 
-    Environment flags:
-      SELF_HEALING_WRITE_ENABLED=false    → dry-run (skipped)
-      SELF_HEALING_BREAKER_ENABLED=false  → skipped with reason "breaker-disabled"
-      SELF_HEALING_AGGRESSIVE_MODE=false  → 0.70–0.84 range is skipped
-
-    Circuit breaker gates:
-      breaker mode=write_paused + source in paused_sources → skipped
-      breaker mode=global_paused                              → skipped
-
     Returns:
-      dict with keys: decision, confidence, reason, source
+      dict with keys: decision, confidence, reason, source, policy_version, merge_id
     """
     m_path = Path(metrics_path) if metrics_path else DEFAULT_METRICS_PATH
     b_path = Path(breaker_metrics_path) if breaker_metrics_path else DEFAULT_METRICS_PATH
-    metrics = load_metrics(m_path)
+    policy_version = _policy_version()
+    metrics = _ensure_metrics_schema(load_metrics(m_path), policy_version)
 
     write_enabled = _write_enabled()
     aggressive = _aggressive_mode()
     breaker_enabled = _breaker_enabled()
+    merge_id = _merge_id(hypothesis, confidence, source)
 
     # Dry-run gate: accumulate evidence but don't apply
     if not write_enabled:
@@ -451,6 +492,8 @@ def apply_decision(
             "confidence": confidence,
             "reason": "dry-run",
             "source": source,
+            "policy_version": policy_version,
+            "merge_id": None,
         }
 
     if not breaker_enabled:
@@ -460,6 +503,8 @@ def apply_decision(
             "confidence": confidence,
             "reason": "breaker-disabled",
             "source": source,
+            "policy_version": policy_version,
+            "merge_id": None,
         }
 
     # Circuit breaker gate — check before applying
@@ -471,9 +516,11 @@ def apply_decision(
             "confidence": confidence,
             "reason": f"breaker-{breaker_mode}",
             "source": source,
+            "policy_version": policy_version,
+            "merge_id": None,
         }
 
-    bucket = _confidence_bucket(confidence)
+    bucket = _confidence_bucket(confidence, policy_version)
 
     if bucket == "applied":
         _bump_metrics(metrics, "applied", m_path)
@@ -483,6 +530,8 @@ def apply_decision(
             "confidence": confidence,
             "reason": f"confidence {confidence:.2f} >= {THRESHOLD_APPLY}",
             "source": source,
+            "policy_version": policy_version,
+            "merge_id": merge_id,
         }
 
     if bucket == "aggressive":
@@ -495,6 +544,8 @@ def apply_decision(
                 "confidence": confidence,
                 "reason": f"aggressive: confidence {confidence:.2f} >= {THRESHOLD_AGGRESSIVE}",
                 "source": source,
+                "policy_version": policy_version,
+                "merge_id": merge_id,
             }
         else:
             _bump_metrics(metrics, "skipped", m_path)
@@ -503,15 +554,24 @@ def apply_decision(
                 "confidence": confidence,
                 "reason": "aggressive-mode disabled",
                 "source": source,
+                "policy_version": policy_version,
+                "merge_id": None,
             }
 
     if bucket == "queued":
         _bump_metrics(metrics, "queued", m_path)
+        if policy_version == "v2":
+            metrics = load_metrics(m_path)
+            metrics["auto_rejected_below_threshold"] = metrics.get("auto_rejected_below_threshold", 0) + 1
+            save_metrics(metrics, m_path)
+        upper = THRESHOLD_APPLY if policy_version == "v2" else THRESHOLD_AGGRESSIVE
         return {
             "decision": "queued",
             "confidence": confidence,
-            "reason": f"confidence {confidence:.2f} in [{THRESHOLD_QUEUE}, {THRESHOLD_AGGRESSIVE})",
+            "reason": f"confidence {confidence:.2f} in [{THRESHOLD_QUEUE}, {upper})",
             "source": source,
+            "policy_version": policy_version,
+            "merge_id": None,
         }
 
     # bucket == "dropped"
@@ -521,12 +581,132 @@ def apply_decision(
         "confidence": confidence,
         "reason": f"confidence {confidence:.2f} < {THRESHOLD_QUEUE}",
         "source": source,
+        "policy_version": policy_version,
+        "merge_id": None,
     }
 
 
 # ---------------------------------------------------------------------------
 # Append-only rollback engine
 # ---------------------------------------------------------------------------
+
+def _prune_applied_merges(entries: list[dict[str, Any]], days: int = 180) -> list[dict[str, Any]]:
+    """Keep only applied_merges entries newer than retention window."""
+    cutoff = datetime.now(timezone.utc).timestamp() - (days * 86400)
+    kept: list[dict[str, Any]] = []
+    for item in entries:
+        ts = item.get("applied_at")
+        if not isinstance(ts, str):
+            continue
+        try:
+            parsed = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+            if parsed.timestamp() >= cutoff:
+                kept.append(item)
+        except ValueError:
+            continue
+    return kept
+
+
+def apply_merge_to_ssot(
+    *,
+    decision: dict[str, Any],
+    winner_claim: dict[str, Any],
+    loser_claim: dict[str, Any] | None,
+    entity_id: str,
+    event_key: str,
+    state_path: str | Path,
+    lock_path: str | Path,
+    lock_ttl: int = 600,
+) -> dict[str, Any]:
+    """Persist an applied merge into SSOT with lock + idempotency.
+
+    Parameters
+    ----------
+    decision : dict
+        Result of ``apply_decision`` with at least ``decision``, ``merge_id``,
+        ``source``, ``confidence``, ``policy_version``.
+        If the merge represents a contradiction and the caller holds the
+        contradicting source, set ``decision["contradiction"] = True`` so the
+        entry is stamped correctly in SSOT.  (Currently ``apply_decision``
+        does not populate this field — the calling pipeline is responsible for
+        injecting it when the merge originates from a fusion contradiction.)
+    state_path : str | Path
+        Path to the SSOT state file.  Expected value:
+        ``state/identity-graph/state.json``.
+    lock_path : str | Path
+        Path to the lockfile used by ``lock_manager``.  Must be passed
+        explicitly by callers; there is no module-level default because the
+        lock directory is deployment-specific.  Typical value:
+        ``state/identity-graph/.apply.lock``.
+
+    Returns dict with: merge_id, state_changed, reason.
+
+    Note
+    ----
+    The ``merge_id`` in the SSOT entry is derived from
+    ``(hypothesis, confidence, source)``, not from ``claim_ids + reason`` as
+    the wiki-v2 spec describes for supersession.  This means two different
+    claim pairs that produce the same hypothesis and confidence from the same
+    source will share a merge_id and the second will be deduplicated as a
+    duplicate — even if they represent distinct supersession events.
+    Alignment of the deduplication key with the spec is a pending follow-up
+    once the pipeline that calls this function is updated to provide
+    ``claim_ids`` and ``reason`` in the hypothesis context.
+    """
+    if decision.get("decision") != "applied":
+        return {
+            "merge_id": decision.get("merge_id"),
+            "state_changed": False,
+            "reason": "no-apply-needed",
+        }
+
+    if not acquire_lock(str(lock_path), ttl=lock_ttl):
+        return {
+            "merge_id": decision.get("merge_id"),
+            "state_changed": False,
+            "reason": "lock-timeout",
+        }
+
+    try:
+        state = load_state(state_path)
+        applied = list(state.get("applied_merges", []))
+        applied = _prune_applied_merges(applied, days=180)
+
+        merge_id = decision.get("merge_id")
+        if merge_id and any(item.get("merge_id") == merge_id for item in applied):
+            state["applied_merges"] = applied
+            save_state(state, state_path)
+            return {
+                "merge_id": merge_id,
+                "state_changed": False,
+                "reason": "duplicate-merge-id",
+            }
+
+        entry = {
+            "merge_id": merge_id,
+            "applied_at": datetime.now(timezone.utc).isoformat(),
+            "source": decision.get("source"),
+            "event_key": event_key,
+            "entity_id": entity_id,
+            "winner_claim_id": winner_claim.get("id"),
+            "loser_claim_id": loser_claim.get("id") if loser_claim else None,
+            "confidence": decision.get("confidence"),
+            "contradiction": bool(decision.get("contradiction", False)),
+            "policy_version": decision.get("policy_version"),
+            "reason": decision.get("reason"),
+        }
+        applied.append(entry)
+
+        state["applied_merges"] = applied
+        save_state(state, state_path)
+        return {
+            "merge_id": merge_id,
+            "state_changed": True,
+            "reason": "applied",
+        }
+    finally:
+        release_lock(str(lock_path))
+
 
 def rollback_append(
     log_path: Path | str,

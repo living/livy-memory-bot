@@ -284,10 +284,13 @@ def test_returns_complete_decision_dict(tmp_metrics_file):
         metrics_path=tmp_metrics_file,
     )
     assert isinstance(result, dict)
-    assert set(result.keys()) == {"decision", "confidence", "reason", "source"}
+    # v2 contract extends legacy decision payload with policy metadata
+    assert set(result.keys()) == {"decision", "confidence", "reason", "source", "policy_version", "merge_id"}
     assert result["decision"] == "applied"
     assert result["confidence"] == 0.88
     assert result["source"] == "github"
+    assert result["policy_version"] in {"v1", "v2"}
+    assert isinstance(result["merge_id"], str)
     assert isinstance(result["reason"], str)
 
 
