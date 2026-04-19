@@ -62,6 +62,8 @@ class GitHubClient:
             "gh",
             "api",
             "search/issues",
+            "-X",
+            "GET",
             "-f",
             f"q={query}",
             "--jq",
