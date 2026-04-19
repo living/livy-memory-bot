@@ -1,6 +1,6 @@
 # HEARTBEAT — Livy Memory Agent
 
-_Atualizado: 2026-04-19 16:12 UTC (13:12 BRT)_
+_Atualizado: 2026-04-19 21:45 UTC (18:45 BRT)_
 
 ## Jobs Ativos — 21 crons
 
@@ -41,6 +41,8 @@ _Atualizado: 2026-04-19 16:12 UTC (13:12 BRT)_
 | ✅ | **agenda-trello-* removidos da memória-agent** | 3 jobs eram do Victor/neo e foram removidos do gateway |
 | ✅ | **PR #18 mergeada — batch-first research clients + cadence wiring** | merge `08672fd` squash; 958 inserções; 6 correções de review implementadas; 343 testes research passando |
 | ✅ | **PR #17 mergeada — Evo Wiki Research Phase 2** | merge `842852c` squash; 15 commits; 321 testes; 2 bloqueantes corrigidos (namespace event_key + untrack metrics) |
+| ✅ | **PR #23 mergeada — Self-Healing Apply V2** | merge `cea58c8` squash; apply_decision v2 + apply_merge_to_ssot + circuit breaker v2 + rollback append-only; 50 testes passando; E2E validado |
+| ✅ | **Hotfix `e645c42` — GitHub search cross-repo noise** | `repo:` + `org:` no search vazava PRs de outros repos; filtro defensivo por `repository_url` normalizado; suíte research 476 passing |
 
 ## Mudanças desde Último HEARTBEAT
 
@@ -59,6 +61,8 @@ _Atualizado: 2026-04-19 16:12 UTC (13:12 BRT)_
 | ✅ **Hotfix `8e1bc76` — gh search GET** | `gh api search/issues` precisa `-X GET` senão usa POST → 404 em todos os repos; 370 tests passing; 11 PRs processados (inclui #19) |
 | ✅ **PR #20 mergeada — Wiki v2 Phase 1 Foundation** | merge `a1c0dd3` squash; Memory Core + Fusion Engine + Azure-first capture + dual-key idempotency + ops (shadow/rollback/replay); validação pós-merge: 439 tests research + 90 tests vault |
 | ✅ **PR #17 mergeada — Evo Wiki Research Phase 2** | merge `842852c` squash; Trello stream + circuit breaker + self-healing write-mode; 2 bloqueantes corrigidos (namespace event_key + untrack metrics); 321 testes passing |
+| ✅ **PR #23 mergeada — Self-Healing Apply V2** | merge `cea58c8` squash; política v2 + lock/idempotência/prune; 50 testes passando |
+| ✅ **Hotfix `e645c42` — GitHub search cross-repo noise** | remove `org:living` da query + filtro por `repository_url`; elimina 404 de pull lookup cross-repo |
 
 ## Memória
 
