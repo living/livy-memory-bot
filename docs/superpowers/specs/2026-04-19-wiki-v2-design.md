@@ -70,6 +70,7 @@ A Wiki v2 é o sistema de memória institucional da Living Consultoria construid
   1. Blocklist hit ⇒ bloqueia publicação wiki + registra `privacy_decision=blocked`
   2. Edge case ⇒ LLM judge (`allow|redact|block`) + racional
   3. `block` ⇒ exige revisão humana; `allow/redact` segue pipeline com auditoria
+- **Processo de manutenção da blocklist:** revisão trimestral (Q1/Q2/Q3/Q4) + notificação automática ao owner a cada hit crítico
 
 ---
 
@@ -106,6 +107,47 @@ EmailThread → Person    (sender | receiver)
 ```
 
 ### 3.3 Evidência Bruta (Raw Evidence)
+
+### 3.4 Claim Schema (obrigatório)
+
+Todo parser de fonte deve produzir `Claim` nesse contrato único:
+
+```json
+{
+  "claim_id": "uuid",
+  "entity_type": "person|project|repository|pull_request|meeting|topic|decision|email_thread",
+  "entity_id": "canonical-id",
+  "topic_id": "topic-canonical-id",
+  "claim_type": "status|decision|action_item|risk|ownership|timeline_event|linkage",
+  "text": "afirmação normalizada",
+  "source": "trello|github|tldv|gmail|gcal",
+  "source_ref": {
+    "source_id": "id original",
+    "url": "https://...",
+    "blob_path": "meetings/<id>.transcript.json"
+  },
+  "evidence_ids": ["uuid-1", "uuid-2"],
+  "author": "email/login/id",
+  "event_timestamp": "2026-04-19T12:00:00Z",
+  "ingested_at": "2026-04-19T12:01:00Z",
+  "confidence": 0.0,
+  "privacy_level": "public|internal|restricted",
+  "superseded_by": null,
+  "audit_trail": {
+    "model_used": "omniroute/fastest",
+    "parser_version": "v1",
+    "trace_id": "uuid"
+  }
+}
+```
+
+#### Exemplos por fonte
+
+- **Trello (card):** `claim_type=status`, `text="Card X movido para Done"`, `source_ref.url=<card_url>`
+- **GitHub (PR):** `claim_type=decision`, `text="PR #19 aprovado por @alice e mergeado"`, `source_ref.url=<pr_url>`
+- **TLDV (meeting):** `claim_type=decision`, `text="Decidido migrar transcripts para Azure-first"`, `source_ref.blob_path=<transcript_path>`
+- **Gmail (thread):** `claim_type=action_item`, `text="Cliente abriu chamado Sev2 no sistema BAT"`, `source_ref.url=<gmail_thread_url>`
+- **Calendar (evento):** `claim_type=timeline_event`, `text="Reunião de incidente BAT com participantes X,Y,Z"`, `source_ref.source_id=<event_id>`
 
 Cada peça de dado capturada de fonte externa é registrada como evidência imutável:
 
@@ -188,6 +230,11 @@ segments = data if isinstance(data, list) else data.get("segments", [data])
 
 ## 5. Motor de Fusão (Fusion Engine)
 
+> **Definição para evitar ambiguidade:**
+> - **Fusion Engine** = componente lógico (biblioteca/regras) que reconcilia claims, calcula confiança, detecta contradição e aplica supersession.
+> - **research-consolidation** = job/orquestrador que invoca o Fusion Engine em lote, executa dedupe global, roda cross-source linker e publica resultados.
+> - Em resumo: **Fusion Engine é o "motor"; research-consolidation é o "driver" operacional**.
+
 ### 5.1 Responsabilidades
 
 1. **Reconciliação** de claims de fontes diferentes sobre o mesmo Topic/Person/Project
@@ -250,6 +297,8 @@ AND do NOT auto-supersede - human review required
   - título: `⚠️ Contradição detectada: {topic_name}`
   - resumo: fonte A vs fonte B + confidence
   - ação: `Revisar agora` (link para página de contradição)
+- **Canal de saída oficial:** Telegram recebe **markdown renderizado** via `message` tool.
+- **Destino do JSON:** payload estruturado é persistido no `audit_log`/estado interno para rastreabilidade e replay.
 - **Política de execução:** pipeline marca `status=pending_human_review` para o tópico contraditório, mas **não pausa** ingestão global.
 ```
 
@@ -331,6 +380,11 @@ Cada página wiki representa uma **entidade canônica** com:
 
 ### 7.1 Arquitetura de Polling
 
+> **Compatibilidade com spec anterior (batch 6h):**
+> Esta seção descreve a **intenção-alvo da Wiki v2** (cadências menores para near-real-time).
+> A implementação deve preservar compatibilidade com o desenho batch existente (6h) durante transição.
+> **Regra de migração:** iniciar em modo compatível (batch) e reduzir gradualmente os intervalos por feature flag e validação de custo/qualidade.
+
 ```
 research-{source}  (cron com lock)
     ↓
@@ -354,11 +408,16 @@ Alerting (se contradição / nova decisão)
 | `research-tldv` | a cada 15 min | Meetings, transcripts (via Azure Blob) |
 | `research-gmail` | a cada 15 min (`*/15 * * * *`) | Threads, decisões, chamados |
 | `research-calendar` | a cada 30 min (`*/30 * * * *`) | Eventos, participantes |
-| `research-consolidation` | 07h BRT | Consolidação, dedupe, supersession |
+| `research-consolidation` | 07h BRT | Orquestra Fusion Engine em lote, dedupe global, cross-source linker, supersession |
 
 ### 7.2 Cross-Source Linker
 
-Responsável por conectar entidades descubertas em uma fonte com entidades de outras fontes:
+Responsável por conectar entidades descubertas em uma fonte com entidades de outras fontes.
+
+**Quando roda (timing oficial):**
+1. **Inline leve** em cada `research-{source}` (links diretos óbvios, ex.: PR URL dentro do card Trello)
+2. **Reconciliação completa** no `research-consolidation` após ingestões da janela
+3. **On-demand** para debugging/replay manual
 
 - `Trello card GitHub plugin link` → `PullRequest`
 - `PR author email` → `Person` (via GitHub login + email map)
@@ -425,11 +484,19 @@ Responsável por conectar entidades descubertas em uma fonte com entidades de ou
 ### 9.1 Invariantes Hardcoded
 
 ```python
+class CorruptStateError(Exception):
+    pass
+
 # Em qualquer write para o Memory Core:
-assert claim.evidence_id is not None, "Claim sem proveniência"
-assert claim.audit_trail is not None, "Write sem auditoria"
-assert claim.supersession_reason is not None or not is_superseding, "Supersession sem motivo"
+if claim.evidence_id is None:
+    raise CorruptStateError("Claim sem proveniência")
+if claim.audit_trail is None:
+    raise CorruptStateError("Write sem auditoria")
+if is_superseding and not claim.supersession_reason:
+    raise CorruptStateError("Supersession sem motivo")
 ```
+
+> **Regra:** não usar `assert` para invariantes de produção.
 
 ### 9.2 Idempotência
 
@@ -537,6 +604,7 @@ else:
 
 - `research-consolidation`: **PremiumFirst** (fusão, contradição, priorização)
 - `research-github|trello|tldv|gmail|calendar`: **fastest** no ingest/normalize; **PremiumFirst** apenas no estágio de síntese inferencial
+- **Privacy judge (edge cases): PremiumFirst**
 - Alertas e mensagens padronizadas: **fastest**
 
 #### Guardrails de custo/qualidade
@@ -573,6 +641,13 @@ else:
 | Google OAuth | ❌ Não configurado | Setup via Desktop Client flow para as 2 contas |
 | TLDV API | ✅ JWT válido até ~2026-04-29 | Usar só para metadata; conteúdo vem do Azure |
 
+### 12.1 Ação operacional obrigatória (data fixa)
+
+- **Ação:** Renovar `TLDV_JWT_TOKEN`
+- **Owner:** Lincoln
+- **Prazo:** **2026-04-26** (3 dias antes da expiração estimada)
+- **Critério de aceite:** token novo validado com chamada real `watch-page` e cron `research-tldv` em status `ok` no run seguinte.
+
 ---
 
 ## 13. Riscos e Mitigações
@@ -580,10 +655,10 @@ else:
 | Risco | Probabilidade | Impacto | Mitigação |
 |-------|--------------|---------|-----------|
 | Google OAuth Desktop App não funciona no VPS | Média | Alto | Testar antes; fallback para Service Account se necessário |
-| Trello GitHub plugin data é incompleta | Alta | Médio | Manter fallback via GitHub API direta |
+| Trello GitHub plugin data é incompleta | Alta | Médio | Fallback explícito: GitHub API direta (`gh api`) com lookup por repo/PR extraído do card/board; se não houver link, correlacionar por `project↔repo` mapping |
 | Contradições geram demasiado ruído | Média | Médio | Threshold configurável para alertas; LLM judge como gate |
 | Azure Blob unreadable (credenciais expiradas) | Baixa | Alto | Fallback para Supabase `transcript_segments` rows |
-| Supersession automática remove informação útil | Baixa | Médio | Human review para contradições; auto-supersede só para duplicates |
+| Supersession automática remove informação útil | Baixa | Médio | Human review para contradições; auto-supersede só para duplicates; claim antigo recebe `superseded_by=<new_claim_id>` |
 | Volume de emails muito alto (spam/auto) | Alta | Baixo | Filtro Gmail oficial v1: `newer_than:7d -from:me -category:promotions -category:social -subject:(auto OR automatic OR notification)` + allowlist por domínio (`@livingnet.com.br`, clientes mapeados) |
 
 ---
