@@ -54,6 +54,7 @@ _Atualizado: 2026-04-19 02:04 UTC (23:04 BRT)_
 | 🆕 Cron `research-consolidation` | Consolidação diária 07h BRT substituindo `dream-memory-consolidation` |
 | ✅ Smoke test manual dos crons de research | `research-trello` processed=390, `research-github`/`research-tldv` ok, `research-consolidation` sem alertas |
 | ✅ **PR #18 mergeada — batch-first research pipeline** | merge `08672fd` squash; github_client two-step (search→pulls), tldv_client cutoff always applied, cadence wired in pipeline, global cadence documented; sanity: 343 tests, smoke OK |
+| ✅ **Hotfix `8e1bc76` — gh search GET** | `gh api search/issues` precisa `-X GET` senão usa POST → 404 em todos os repos; 370 tests passing; 11 PRs processados (inclui #19) |
 | ✅ **PR #17 mergeada — Evo Wiki Research Phase 2** | merge `842852c` squash; Trello stream + circuit breaker + self-healing write-mode; 2 bloqueantes corrigidos (namespace event_key + untrack metrics); 321 testes passing |
 
 ## Memória
@@ -61,7 +62,7 @@ _Atualizado: 2026-04-19 02:04 UTC (23:04 BRT)_
 | Camada | Estado |
 |---|---|
 | Observations (claude-mem) | ✅ worker 37777 ativo |
-| Curated (topic files) | ✅ atualizado com Vault Insights + PRs #13/#14/#15/#17/#18 |
+| Curated (topic files) | ✅ atualizado com Vault Insights + PRs #13/#14/#15/#17/#18/#19 + hotfix `8e1bc76` |
 | Operational (crons) | ✅ 3 novos jobs operacionais adicionados |
 
 ## Incident Playbook
@@ -129,3 +130,13 @@ gh api graphql -f query='{ marketplacePurchases(first:5) { nodes { plan { name }
 - Sessão de implementação/documentação: 2026-04-18
 - Alterações aplicadas: merge PRs #13, #14, #15 + criação de 3 crons de research (tldv/github/consolidation)
 - Próxima consolidação: 2026-04-19 07:00 BRT
+
+## Mudanças desde Último HEARTBEAT (2026-04-19 02:50 UTC)
+
+| Mudança | Impacto |
+|---|---|
+| ✅ **PR #19 mergeada — GitHub Rich PR Events** | merge `787c10d` squash; GitHubRichClient; enriquecimento no fluxo `pr_merged`; 370 tests research passando |
+| ✅ **Bug pre-existente: vault.lint import shadowing** | `vault/lint/` package sombreava `vault/lint.py` module; ImportError corrigido com re-export via importlib em `vault/lint/__init__.py`; commit `3ae6fec` |
+| ✅ docs: MEMORY.md + livy-memory-agent.md atualizados | registro de PR #19 e fix |
+| ✅ docs: consolidation-log atualizado | session log de 2026-04-19 02:50 UTC |
+| 🟡 Test failure em `skills/meetings-tldv/` | pre-existente, não relacionado a PR #19; skill fora do escopo do repo |

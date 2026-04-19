@@ -139,6 +139,34 @@ Mergear PR #19 após fix de blockers de review e sanity completo da suíte resea
 - Validação da correção:
   - `pytest vault/tests/test_reverify_module.py -q` → **28 passed**.
 
+### Hotfix pós-merge — `research-github` (`8e1bc76`)
+
+#### Sintoma
+
+- `research_github_cron.py` processando `0` eventos, com erro `gh: Not Found (HTTP 404)` no search para todos os repositórios `living/*`.
+- Estado derivado `.research/github/state.json` mantinha `last_seen_at=null` sem avanço.
+
+#### Root cause
+
+- Em `vault/research/github_client.py`, `_search_merged_pr_summaries` chamava:
+  - `gh api search/issues -f q=...`
+- No `gh api`, ao usar `-f` sem método explícito, o request vira `POST`.
+- Endpoint `search/issues` requer `GET`; o resultado era 404, mascarando ingest e mantendo pipeline “vazio”.
+
+#### Correção aplicada
+
+- Forçar método HTTP explícito:
+  - `gh api search/issues -X GET -f q=...`
+- Commit: `8e1bc76` (`fix(research): use GET for gh search/issues queries`).
+
+#### Verificação pós-fix
+
+- `PYTHONPATH=. pytest tests/research/test_github_client.py -q` → **9 passed**
+- `PYTHONPATH=. pytest tests/research/ -q` → **370 passed**
+- Smoke real `GitHubClient(repos=["living/livy-memory-bot"])`:
+  - **11 PRs processados** (inclui PRs #17/#18/#19)
+  - 4 PRs com 404 no fetch individual (`#133/#132/#131/#42`) permanecem como edge case não bloqueante (itens antigos/inconsistentes de índice)
+
 
 ## Crosslink Pipeline (Vault Ingest)
 

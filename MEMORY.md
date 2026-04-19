@@ -100,6 +100,20 @@ Validação pós-merge:
 
 Topic file: `memory/curated/livy-memory-agent.md`
 
+### 2026-04-19 — Hotfix `research-github`: `gh api search/issues` com `-X GET`
+
+Correção aplicada no `vault/research/github_client.py` para forçar método `GET` no endpoint `search/issues`.
+Sem `-X GET`, o `gh api` mudava para `POST` ao usar `-f q=...`, retornando `404` e deixando o pipeline com `processed=0`.
+
+Validação:
+- `tests/research/test_github_client.py` → **9 passed**
+- `tests/research/` → **370 passed**
+- Smoke real com `GitHubClient` em `living/livy-memory-bot` → **11 PRs processados** (inclui PR #19)
+
+Commit: `8e1bc76`
+
+Topic file: `memory/curated/livy-memory-agent.md`
+
 ### 2026-04-19 — PR #18 mergeada: batch-first research clients + cadence wiring
 
 Merge da evolução batch-first do pipeline research com clientes reais para GitHub/TLDV e integração de cadence no loop principal.
@@ -168,4 +182,4 @@ Monitorando — não é bug, mas volume elevado.
 
 ---
 
-_Last updated: 2026-04-12_
+_Last updated: 2026-04-19_

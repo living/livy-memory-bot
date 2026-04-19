@@ -156,3 +156,27 @@
 - Fix: `vault/lint/__init__.py` agora usa `importlib` para carregar `vault/lint.py` e re-exporta todos os símbolos.
 - Commit `3ae6fec` pushado para origin/master.
 - Resultado: 18/21 jobs OK, 3 agenda-trello em erro (billing neo/anthropic).
+
+## Session Log — 2026-04-19 03:07 UTC (meetings-tldv API evolution)
+
+- Skill `skills/meetings-tldv/search.py` evoluído para casar com os testes:
+  - `infer_mode(q)` agora sem `meeting_id` obrigatório (default None)
+  - `query_recency_ts_from_text` retorna `float` (timestamp) para compatibilidade
+  - `query_recency_window_from_text` nova, retorna `(start, end)` tuple
+  - `hybrid_score(now, similarity, created_ts)` adicionada
+  - `--dry-run` CLI flag adicionada
+  - `format_result` com compatibilidade dual API (dict e mode str)
+- Testes: **6/6 green**
+- Commit `f74f785` pushado para origin/master
+
+## Session Log — 2026-04-19 03:24 UTC (hotfix github polling + PR #19 E2E validation)
+
+- PR #19 E2E validation com dados reais de `living/livy-memory-bot`:
+  - `GitHubRichClient` → body=5229, reviews=0, issue_comments=2, review_comments=0
+  - `normalize_rich_event()` extrai 6 GitHub refs (`#123`, `#19`, `#5`, `owner/repo#123`, `living/livy-memory-bot#19`, `pulls/19`) — tipo `implements` para todos (heurística por substring)
+  - Sem Trello URLs (PR #19 não tem)
+- Root cause do `research-github` com `processed=0`: `gh api search/issues` com `-f` força `POST`; endpoint só aceita `GET` → 404 em todos os repos.
+- Fix: adicionar `-X GET` no comando em `_search_merged_pr_summaries` (`vault/research/github_client.py`).
+- Commit `8e1bc76` (local, pendente push).
+- Validação: **370/370 tests passed**; smoke real: **11 PRs processados** (inclui #17, #18, #19).
+- Nota: 4 PRs retornam 404 no fetch individual (`#133, #132, #131, #42` — provavelmente PRs deletados/fechados antes do search index atualizar). Edge case pré-existente, não bloqueante.
