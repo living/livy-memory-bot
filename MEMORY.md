@@ -78,15 +78,17 @@ Análise: infra base (TLDV pipeline + Signal Cross-Curation + ChromaDB) já reso
 Gaps: Google Auth (Domain-wide Delegation), RAG multimodal (RAG-Anything para DOCX/XLSX/PDF), Identity Resolution (cruzar e-mail↔telegram↔tldv).
 Topic file: `memory/curated/projeto-super-memoria-robert.md`
 
-### 2026-04-19 — Wiki v2 produção: github FusionEngine pipeline
+### 2026-04-19 — Wiki v2 produção: github + trello + tldv no FusionEngine pipeline
 
-Commit `30a3b29` habilita o caminho wiki v2 real para github:
-- `WIKI_V2_ENABLED=true` routing github events → FusionEngine
-- `pr_to_claims()` normaliza rich GitHub payload em claims (status, approval, linkage, tag, context)
+Commit `23e6019` completa a migração wiki v2 para as 3 fontes:
+- `WIKI_V2_ENABLED=true` routing (`github`, `trello`, `tldv`) → FusionEngine
+- github: `pr_to_claims()` (status/approval/linkage/tag/context)
+- trello: `parse_trello_card()` + `card_to_claims()`
+- tldv: claim de meeting/status a partir de `fetch_meeting()`
 - `fuse()` detecta contradições e aplica supersession contra state claims existente
 - Fused claims persistidos em `state/identity-graph/state.json` (key: `claims`)
 - Blobs de claim em `memory/vault/claims/<claim_id>.md`
-- Old markdown path preservado quando flag=false (Trello + TLDV ainda não migrados)
+- Old markdown path preservado quando flag=false (compatibilidade)
 - Rollback: `gateway config.patch(features.wiki_v2.enabled=false)`
 - Topic file: `memory/curated/livy-memory-agent.md`
 

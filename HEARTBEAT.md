@@ -37,7 +37,7 @@ _Atualizado: 2026-04-19 16:12 UTC (13:12 BRT)_
 | 🟡 | Jobs legados desabilitados (openclaw-health, sonhar, signal-curation, daily-memory-save) | Manter desabilitados ou replanejar com configuração nova |
 | 🟢 | Vault insights semanal operacional | Manter monitoramento das segundas 06:30/07:00 |
 | 🟢 | Loop de research v1 (TLDV/GitHub/Trello/Consolidation) ativo | Manter observabilidade de lock, rebuild de estado e retry policy |
-| ✅ | **Wiki v2 produção — github FusionEngine pipeline ativo** | commit `30a3b29`; github rich events passam por `pr_to_claims()` + `fuse()`; claims persistidas no SSOT |
+| ✅ | **Wiki v2 produção — github + trello + tldv** | commits `30a3b29` + `23e6019`; 3 fontes no caminho `fuse()` + SSOT claims + blob |
 | ✅ | **agenda-trello-* removidos da memória-agent** | 3 jobs eram do Victor/neo e foram removidos do gateway |
 | ✅ | **PR #18 mergeada — batch-first research clients + cadence wiring** | merge `08672fd` squash; 958 inserções; 6 correções de review implementadas; 343 testes research passando |
 | ✅ | **PR #17 mergeada — Evo Wiki Research Phase 2** | merge `842852c` squash; 15 commits; 321 testes; 2 bloqueantes corrigidos (namespace event_key + untrack metrics) |
@@ -143,6 +143,6 @@ gh api graphql -f query='{ marketplacePurchases(first:5) { nodes { plan { name }
 | ✅ docs: consolidation-log atualizado | session log de 2026-04-19 02:50 UTC |
 | 🟡 Test failure em `skills/meetings-tldv/` | pre-existente, não relacionado a PR #19; skill fora do escopo do repo |
 | ✅ **WIKI_V2_ENABLED conectado ao ResearchPipeline** | commit `d81eb7e`; flag audita `wiki_v2_active` no `run_started`; TDD 4 testes passando; 443 tests research |
-| ✅ **Wiki v2 produção habilitado (github)** | commit `30a3b29`; pipeline github agora usa `pr_to_claims()` + FusionEngine; old path mantido para flag=false |
+| ✅ **Wiki v2 produção habilitado (3 fontes)** | commits `30a3b29` + `23e6019`; github/trello/tldv no FusionEngine; old path mantido para flag=false |
 | ✅ **agenda-trello-* removidos do monitoramento local** | jobs eram do Victor/neo e saíram do HEARTBEAT da memória-agent |
 | ✅ **Consolidation backfill seg-sex executado** | `.research/backfill-monfri/state.json` isolado; SSOT produção intocado; 8 eventos Trello dentro da janela |

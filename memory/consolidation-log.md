@@ -244,3 +244,21 @@
 - 7 novos testes em `tests/research/test_pipeline_wiki_v2_flag.py`
 - Suite completa: 446 research + 90 vault tests passando
 - Rollback: `gateway config.patch(features.wiki_v2.enabled=false)` via `vault/ops/rollback.py`
+
+## Session Log — 2026-04-19 17:45 UTC (migração trello+tldv para wiki v2)
+
+- Solicitação do Lincoln: "Vamos migrar trello e tldv"
+- Implementação concluída no commit `23e6019`
+- `vault/research/pipeline.py`:
+  - extração de caminho comum `_fuse_and_persist_normalized_claims`
+  - `source=trello` em wiki v2: `parse_trello_card()` + `card_to_claims()` → `fuse()` → SSOT claims + blob
+  - `source=tldv` em wiki v2: meeting summary/status claim → `fuse()` → SSOT claims + blob
+  - `run()` aplica wiki v2 para github/trello/tldv quando flag=true
+  - compatibilidade legada preservada para flag=false
+- Testes novos:
+  - `tests/research/test_pipeline_wiki_v2_trello.py` (3 cenários)
+  - `tests/research/test_pipeline_wiki_v2_tldv.py` (3 cenários)
+- Validação:
+  - `PYTHONPATH=. pytest tests/research/test_pipeline_wiki_v2_trello.py tests/research/test_pipeline_wiki_v2_tldv.py -q` → 6 passed
+  - `PYTHONPATH=. pytest tests/research/ -q` → 452 passed
+  - `PYTHONPATH=. pytest tests/vault/ -q` → 90 passed

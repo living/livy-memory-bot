@@ -151,44 +151,49 @@ Conectar o feature flag `WIKI_V2_ENABLED` ao `ResearchPipeline` para permitir ro
 
 - `d81eb7e` — `feat(research): connect WIKI_V2_ENABLED flag to ResearchPipeline`
 
-## Wiki v2 em produção (github) — 2026-04-19
+## Wiki v2 em produção (github + trello + tldv) — 2026-04-19
 
 ### Decisão
 
-Ativar Wiki v2 em produção para o source github (não apenas auditoria), conforme decisão do Lincoln.
+Expandir Wiki v2 de github para todas as fontes do research pipeline (`github`, `trello`, `tldv`) mantendo rollback e compatibilidade do caminho legado com flag=false.
 
 ### Implementação
 
 - `vault/research/pipeline.py`
-  - quando `WIKI_V2_ENABLED=true` e `source=github`:
-    - converte payload rico em claims via `pr_to_claims()`
-    - faz `fuse()` contra claims existentes em `state/identity-graph/state.json`
-    - persiste claim fused + updates de supersession no SSOT (`state["claims"]`)
-    - escreve blob canônico em `memory/vault/claims/<claim_id>.md`
-    - audita `wiki_v2_claim_written` e `wiki_v2_event_processed`
-  - quando flag=false, mantém caminho legado `_apply()` (markdown hypothesis)
+  - extraído `_fuse_and_persist_normalized_claims()` como caminho comum
+  - github (`_process_wiki_v2_github_event`):
+    - rich payload → `pr_to_claims()`
+    - `fuse()` + persistência SSOT + blob
+  - trello (`_process_wiki_v2_trello_event`):
+    - evento de card → `parse_trello_card()` + `card_to_claims()`
+    - `fuse()` + persistência SSOT + blob
+  - tldv (`_process_wiki_v2_tldv_event`):
+    - meeting payload → claim status de meeting
+    - `fuse()` + persistência SSOT + blob
+  - `run()` agora aplica wiki v2 para as três fontes quando `WIKI_V2_ENABLED=true`
+  - `WIKI_V2_ENABLED=false` preserva `_apply()` legado (markdown)
 
 ### Testes (TDD)
 
-Arquivo novo/expandido:
-- `tests/research/test_pipeline_wiki_v2_flag.py`
+Arquivos:
+- `tests/research/test_pipeline_wiki_v2_flag.py` (github)
+- `tests/research/test_pipeline_wiki_v2_trello.py` (novo)
+- `tests/research/test_pipeline_wiki_v2_tldv.py` (novo)
 
-Cobertura:
-- gating true/false/unset
-- auditoria de flag em `run_started`
+Cobertura nova (Trello/TLDV):
 - persistência de claims no SSOT em modo v2
-- ausência de escrita markdown legada em modo v2
-- supersession de claim antiga por claim nova
-- preservação do caminho antigo com flag=false
+- ausência de escrita SSOT no caminho legado com flag=false
+- supersession de claim antiga por claim mais nova
 
 Resultado:
-- `PYTHONPATH=. pytest tests/research/test_pipeline_wiki_v2_flag.py -q` → **7 passed**
-- `PYTHONPATH=. pytest tests/research/ -q` → **446 passed**
+- `PYTHONPATH=. pytest tests/research/test_pipeline_wiki_v2_trello.py tests/research/test_pipeline_wiki_v2_tldv.py -q` → **6 passed**
+- `PYTHONPATH=. pytest tests/research/ -q` → **452 passed**
 - `PYTHONPATH=. pytest tests/vault/ -q` → **90 passed**
 
-### Commit
+### Commits
 
 - `30a3b29` — `feat(research): enable wiki v2 production path for github pipeline`
+- `23e6019` — `feat(research): extend wiki v2 production to Trello and TLDV sources`
 
 ---
 
