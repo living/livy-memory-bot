@@ -117,20 +117,44 @@ class TestGitHubClientFetchEventsSince:
         assert events[0]["pr_number"] == 42  # older first
         assert events[1]["pr_number"] == 43  # newer second
 
-    def test_scopes_to_living_org_repos(self):
-        """Search query scopes to org:living repos."""
+    def test_scopes_to_repo_only_and_filters_cross_repo_search_noise(self):
+        """Search query scopes by repo and cross-repo noise is filtered by repository_url."""
         from vault.research.github_client import GitHubClient
 
-        fake_run = MagicMock(returncode=0, stdout="")
+        # Search returns one valid item and one leaked item from another repo.
+        search_result = (
+            '{"number":23,"repository_url":"https://api.github.com/repos/living/livy-memory-bot"}\n'
+            '{"number":6,"repository_url":"https://api.github.com/repos/living/delphos-svd"}'
+        )
+        full_pr = (
+            '{"number":23,"title":"ok","state":"closed",'
+            '"merged_at":"2026-04-14T10:00:00Z","created_at":"2026-04-13T09:00:00Z",'
+            '"user":{"login":"lincolnqjunior","id":445449},"merged":true,'
+            '"base":{"repo":{"full_name":"living/livy-memory-bot"}}}'
+        )
 
-        with patch("subprocess.run", return_value=fake_run) as mock_run:
-            client = GitHubClient(repos=["living/livy-memory-bot", "living/livy-bat-jobs"])
-            client.fetch_events_since(None)
-            # Check the first repo call has org:living and repo:living
+        def run_side_effect(cmd, *args, **kwargs):
+            m = MagicMock(returncode=0)
+            if "search/issues" in cmd:
+                m.stdout = search_result
+            else:
+                m.stdout = full_pr
+            return m
+
+        with patch("subprocess.run", side_effect=run_side_effect) as mock_run:
+            client = GitHubClient(repos=["living/livy-memory-bot"])
+            events = client.fetch_events_since(None)
+
+            # Verify query scope is repo-only (no org:living token).
             first_call_args = mock_run.call_args_list[0][0][0]
             q_arg = next(arg for arg in first_call_args if str(arg).startswith("q="))
-            assert "org:living" in q_arg
             assert "repo:living/livy-memory-bot" in q_arg
+            assert "org:living" not in q_arg
+
+        # Only the correctly scoped repository item should be processed.
+        assert len(events) == 1
+        assert events[0]["repo"] == "living/livy-memory-bot"
+        assert events[0]["pr_number"] == 23
 
     def test_normalize_pr_includes_all_required_fields(self):
         """Normalized event has all fields required by pipeline (from pulls endpoint)."""

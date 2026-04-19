@@ -56,7 +56,11 @@ class GitHubClient:
     def _search_merged_pr_summaries(self, repo: str, cutoff: datetime) -> list[dict[str, Any]]:
         """Return lightweight PR summaries from search (number + repository URL)."""
         date_str = cutoff.strftime("%Y-%m-%d")
-        query = f"is:pr merged:>{date_str} repo:{repo} org:living"
+        # NOTE: Do not add `org:living` here.
+        # GitHub Search API can unexpectedly widen results when `repo:` and
+        # `org:` are combined, returning PR numbers from other repositories.
+        # Keep strict repo scoping with `repo:{repo}` only.
+        query = f"is:pr merged:>{date_str} repo:{repo}"
 
         cmd = [
             "gh",
@@ -93,9 +97,25 @@ class GitHubClient:
         out: list[dict[str, Any]] = []
         for line in lines:
             try:
-                out.append(json.loads(line))
+                item = json.loads(line)
             except json.JSONDecodeError:
                 continue
+
+            # Defensive filtering: search/issues may occasionally return items
+            # from other repositories even with repo: scope. Keep only exact repo.
+            # Handle both API URL format (api.github.com/repos/) and web URL format
+            # (github.com/) — normalize to compare the owner/repo suffix.
+            repository_url = str(item.get("repository_url") or "")
+            normalized_url = (
+                repository_url
+                .replace("https://api.github.com/repos/", "")
+                .replace("https://github.com/", "")
+                .rstrip("/")
+            )
+            if normalized_url != repo:
+                continue
+
+            out.append(item)
         return out
 
     def _fetch_pr_details(self, repo: str, pr_number: int) -> dict[str, Any] | None:
