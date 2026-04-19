@@ -10,7 +10,7 @@
 
 ## 1. Visão Geral
 
-A Wiki v2 é o sistema de memória institucional da Living Consultoria construido sobre um núcleo de dados semântico multi-fonte. diferente da wiki tradicional (páginas editáveis por humanos), a Wiki v2 é um **sistema de memória curada e auto-atualizável**: agentes leem dados brutos de fontes externas, extraem утверждения (claims), cruzam por assunto/pessoa/projeto e projetam o resultado em páginas wiki com trilha de auditoria completa.
+A Wiki v2 é o sistema de memória institucional da Living Consultoria construído sobre um núcleo de dados semântico multi-fonte. Diferente da wiki tradicional (páginas editáveis por humanos), a Wiki v2 é um **sistema de memória curada e autoatualizável**: agentes leem dados brutos de fontes externas, extraem claims, cruzam por assunto/pessoa/projeto e projetam o resultado em páginas wiki com trilha de auditoria completa.
 
 **Objetivo de maturidade:** v2 completa com automação total.
 
@@ -106,9 +106,7 @@ Topic/Decision → PR | Card | Email | Meeting  (proveniência cruzada)
 EmailThread → Person    (sender | receiver)
 ```
 
-### 3.3 Evidência Bruta (Raw Evidence)
-
-### 3.4 Claim Schema (obrigatório)
+### 3.3 Claim Schema (obrigatório)
 
 Todo parser de fonte deve produzir `Claim` nesse contrato único:
 
@@ -149,6 +147,8 @@ Todo parser de fonte deve produzir `Claim` nesse contrato único:
 - **Gmail (thread):** `claim_type=action_item`, `text="Cliente abriu chamado Sev2 no sistema BAT"`, `source_ref.url=<gmail_thread_url>`
 - **Calendar (evento):** `claim_type=timeline_event`, `text="Reunião de incidente BAT com participantes X,Y,Z"`, `source_ref.source_id=<event_id>`
 
+### 3.4 Evidência Bruta (Raw Evidence)
+
 Cada peça de dado capturada de fonte externa é registrada como evidência imutável:
 
 ```json
@@ -166,7 +166,7 @@ Cada peça de dado capturada de fonte externa é registrada como evidência imut
 ```
 
 **Invariantes duras:**
-- `claim` sem `evidence_id` é rejeitado pelo núcleo
+- `claim` sem `evidence_ids` (ou `evidence_ids=[]`) é rejeitado pelo núcleo
 - `write` sem `audit_trail` é rejeitado
 - `supersession` sem motivo/version é rejeitado
 
@@ -410,6 +410,18 @@ Alerting (se contradição / nova decisão)
 | `research-calendar` | a cada 30 min (`*/30 * * * *`) | Eventos, participantes |
 | `research-consolidation` | 07h BRT | Orquestra Fusion Engine em lote, dedupe global, cross-source linker, supersession |
 
+#### Cadência atual vs cadência-alvo
+
+| Fonte | Atual (compatibilidade batch) | Alvo v2 |
+|---|---|---|
+| Trello | 6h | 20 min |
+| GitHub | 6h | 10 min |
+| TLDV | 6h | 15 min |
+| Gmail | n/a | 15 min |
+| Calendar | n/a | 30 min |
+
+> A transição de `atual` → `alvo` é gradual e controlada por feature flags + gates de custo/qualidade.
+
 ### 7.2 Cross-Source Linker
 
 Responsável por conectar entidades descubertas em uma fonte com entidades de outras fontes.
@@ -438,7 +450,7 @@ Responsável por conectar entidades descubertas em uma fonte com entidades de ou
 **Gate:** Shadow run compara saída atual vs nova; diff aprovado por Lincoln
 
 **Entregas:**
-- [ ] Memory Core reescrito com invariantes (claim sem evidence_id = rejected)
+- [ ] Memory Core reescrito com invariantes (claim sem `evidence_ids` válidos = rejected)
 - [ ] Fusion Engine v1 (reconciliação + confidence + supersession)
 - [ ] CaptureConnectors para Trello (com GitHub plugin links + horas)
 - [ ] CaptureConnectors para GitHub (PR completo com reviews/approvers)
@@ -451,7 +463,7 @@ Responsável por conectar entidades descubertas em uma fonte com entidades de ou
 **Duração estimada:** 2–3 semanas
 **Gate:** Quality of response satisfatória para queries de prueba
 
-> **⚠️ Gate explícito — OAuth Desktop App no VPS:** antes de iniciar qualquer código da Fase 2, executar teste de conexão OAuth Desktop Client no ambiente de produção (VPS). Se falhar, não prosseguir — acionar fallback Service Account Account antes de planejar desenvolvimento.
+> **⚠️ Gate explícito — OAuth Desktop App no VPS:** antes de iniciar qualquer código da Fase 2, executar teste de conexão OAuth Desktop Client no ambiente de produção (VPS). Se falhar, não prosseguir — acionar fallback Service Account antes de planejar desenvolvimento.
 
 **Entregas:**
 - [ ] OAuth Desktop Client para `lincoln@livingnet` e `livy@livingnet`
@@ -488,7 +500,7 @@ class CorruptStateError(Exception):
     pass
 
 # Em qualquer write para o Memory Core:
-if claim.evidence_id is None:
+if not claim.evidence_ids or len(claim.evidence_ids) == 0:
     raise CorruptStateError("Claim sem proveniência")
 if claim.audit_trail is None:
     raise CorruptStateError("Write sem auditoria")
@@ -500,8 +512,14 @@ if is_superseding and not claim.supersession_reason:
 
 ### 9.2 Idempotência
 
-- Chave de idempotência: `{source}:{source_id}:{content_hash}`
-- Cron jobs verificam chave antes de processar; ignoram se duplicado
+Para alinhar com a arquitetura existente e evitar ambiguidade, a Wiki v2 usa **duas chaves complementares**:
+
+1. **event_key (ingest operacional):** `source:type:id[:action_id]`
+   - usada para deduplicar eventos de captura (ex.: webhook/action/card update)
+2. **content_key (dedupe semântico):** `{source}:{source_id}:{content_hash}`
+   - usada para evitar reprocessar conteúdo idêntico quando o mesmo evento chega mais de uma vez
+
+- Cron jobs verificam ambas as chaves antes de processar
 - Retry com backoff exponencial (max 3 tentativas)
 
 ### 9.3 Shadow Run + Diff
@@ -514,16 +532,22 @@ Antes de ativar nova lógica em produção:
 
 ### 9.4 Rollback
 
-```bash
-# Rollback de feature para versão anterior (1 comando)
-openclaw config patch --json '{"features": {"wiki_v2": {"enabled": false}}}'
+```json
+{
+  "action": "config.patch",
+  "patch": {
+    "features": { "wiki_v2": { "enabled": false } }
+  }
+}
 ```
+
+> Rollback em 1 passo via **Gateway config.patch** (API/ferramenta oficial do OpenClaw).
 
 ### 9.5 Replay Determinístico
 
-- Events stroados com todas as informações necessárias para replay
+- Eventos armazenados com todas as informações necessárias para replay
 - `replay_pipeline.py --since=2026-04-19T00:00:00Z` regenera estado a partir de raw events
-- Usado para recuperação após falha catastrophica ou rebuild de ambiente
+- Usado para recuperação após falha catastrófica ou rebuild de ambiente
 
 ---
 
@@ -635,7 +659,7 @@ else:
 | claude-mem (worker :37777) | ✅ Ativo | Monitorar; não quebrar hooks existentes |
 | OpenClaw Gateway | ✅ Ativo | Manter configuração; não alterar plugins.allow sem motivo |
 | Azure Blob Storage | ✅ Configurado | `livy-tldv-jobs` já escreve; ler apenas |
-| Supabase | ✅ Ativo | Índice; não dependender para conteúdo de transcript |
+| Supabase | ✅ Ativo | Índice; não depender para conteúdo de transcript |
 | Trello API | ✅ API key disponível | TRELLO_API_KEY + TRELLO_TOKEN |
 | GitHub API | ✅ `gh` CLI autenticado | Manter token com scopes `repo`, `read:user` |
 | Google OAuth | ❌ Não configurado | Setup via Desktop Client flow para as 2 contas |
