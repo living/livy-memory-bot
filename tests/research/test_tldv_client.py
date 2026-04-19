@@ -157,9 +157,9 @@ class TestTLDVClientFetchMeetingTranscript:
         from vault.research.tldv_client import TLDVClient
 
         with patch(
-            "vault.research.tldv_client.AzureBlobClient", create=True
+            "vault.research.azure_blob_client.AzureBlobClient"
         ) as mock_az_cls, patch(
-            "vault.research.tldv_client.SupabaseTranscriptClient", create=True
+            "vault.research.supabase_transcript.SupabaseTranscriptClient"
         ) as mock_sb_cls:
             mock_az = mock_az_cls.return_value
             mock_sb = mock_sb_cls.return_value
@@ -181,9 +181,9 @@ class TestTLDVClientFetchMeetingTranscript:
         from vault.research.tldv_client import TLDVClient
 
         with patch(
-            "vault.research.tldv_client.AzureBlobClient", create=True
+            "vault.research.azure_blob_client.AzureBlobClient"
         ) as mock_az_cls, patch(
-            "vault.research.tldv_client.SupabaseTranscriptClient", create=True
+            "vault.research.supabase_transcript.SupabaseTranscriptClient"
         ) as mock_sb_cls:
             mock_az = mock_az_cls.return_value
             mock_sb = mock_sb_cls.return_value
@@ -205,9 +205,9 @@ class TestTLDVClientFetchMeetingTranscript:
         from vault.research.tldv_client import TLDVClient
 
         with patch(
-            "vault.research.tldv_client.AzureBlobClient", create=True
+            "vault.research.azure_blob_client.AzureBlobClient"
         ) as mock_az_cls, patch(
-            "vault.research.tldv_client.SupabaseTranscriptClient", create=True
+            "vault.research.supabase_transcript.SupabaseTranscriptClient"
         ) as mock_sb_cls:
             mock_az_cls.return_value.fetch_transcript.return_value = None
             mock_sb_cls.return_value.fetch_transcript.return_value = None
@@ -217,3 +217,23 @@ class TestTLDVClientFetchMeetingTranscript:
                 supabase_key="key123",
             )
             assert client.fetch_meeting_transcript("meet_abc") is None
+
+    def test_returns_none_when_meeting_id_empty(self):
+        """Empty meeting_id returns None without calling any transcript source."""
+        from vault.research.tldv_client import TLDVClient
+
+        with patch(
+            "vault.research.azure_blob_client.AzureBlobClient"
+        ) as mock_az_cls, patch(
+            "vault.research.supabase_transcript.SupabaseTranscriptClient"
+        ) as mock_sb_cls:
+            client = TLDVClient(
+                supabase_url="https://example.supabase.co",
+                supabase_key="key123",
+            )
+            assert client.fetch_meeting_transcript("") is None
+            assert client.fetch_meeting_transcript("  ") is None
+
+            # Neither client should be called for empty meeting_id
+            mock_az_cls.assert_not_called()
+            mock_sb_cls.assert_not_called()

@@ -69,28 +69,28 @@ class TestAzureBlobClientFetchTranscript:
         mock_blob_client = MagicMock()
         mock_blob_client.download_blob.return_value.readall.return_value = fake_blob_content.encode("utf-8")
 
-        with patch(
-            "vault.research.azure_blob_client.BlobServiceClient"
-        ) as mock_service_cls:
-            mock_service_cls.from_connection_string.return_value.get_blob_client.return_value = (
-                mock_blob_client
-            )
+        # Patch _load_azure_clients to return our mock classes
+        fake_blob_service_cls = MagicMock()
+        fake_blob_service_cls.from_connection_string.return_value.get_blob_client.return_value = mock_blob_client
+
+        with patch.object(client, "_load_azure_clients", return_value=(fake_blob_service_cls, (Exception,))):
             result = client.fetch_transcript("meet_abc123")
 
         assert result == fake_blob_content
 
     def test_returns_none_when_blob_not_found(self):
-        """azure.core.exceptions.ResourceNotFoundError returns None."""
+        """Azure ResourceNotFoundError returns None."""
         from vault.research.azure_blob_client import AzureBlobClient
-
-        from azure.core.exceptions import ResourceNotFoundError
 
         client = AzureBlobClient(connection_string="conn_str", container_name="transcripts")
         mock_blob_client = MagicMock()
-        mock_blob_client.download_blob.side_effect = ResourceNotFoundError("not found")
+        mock_blob_client.download_blob.side_effect = FileNotFoundError("not found")
 
-        with patch("azure.storage.blob.BlobServiceClient") as mock_service:
-            mock_service.return_value.get_blob_client.return_value = mock_blob_client
+        fake_blob_service_cls = MagicMock()
+        fake_blob_service_cls.from_connection_string.return_value.get_blob_client.return_value = mock_blob_client
+
+        # Patch _load_azure_clients with azure_exceptions tuple containing our test exception
+        with patch.object(client, "_load_azure_clients", return_value=(fake_blob_service_cls, (FileNotFoundError,))):
             result = client.fetch_transcript("meet_not_exist")
 
         assert result is None
@@ -101,8 +101,10 @@ class TestAzureBlobClientFetchTranscript:
 
         client = AzureBlobClient(connection_string="invalid_conn_str", container_name="transcripts")
 
-        with patch("azure.storage.blob.BlobServiceClient") as mock_service:
-            mock_service.side_effect = RuntimeError("connection failed")
+        fake_blob_service_cls = MagicMock()
+        fake_blob_service_cls.from_connection_string.side_effect = RuntimeError("connection failed")
+
+        with patch.object(client, "_load_azure_clients", return_value=(fake_blob_service_cls, (Exception,))):
             result = client.fetch_transcript("meet_abc123")
 
         assert result is None
@@ -114,6 +116,16 @@ class TestAzureBlobClientFetchTranscript:
         client = AzureBlobClient(connection_string="", container_name="transcripts")
         result = client.fetch_transcript("meet_abc123")
         assert result is None
+
+    def test_returns_none_when_meeting_id_empty(self):
+        """Empty meeting_id returns None without calling Azure."""
+        from vault.research.azure_blob_client import AzureBlobClient
+
+        client = AzureBlobClient(connection_string="conn_str", container_name="transcripts")
+        with patch.object(client, "_load_azure_clients") as mock_loader:
+            assert client.fetch_transcript("") is None
+            assert client.fetch_transcript("   ") is None
+            mock_loader.assert_not_called()
 
     def test_passes_correct_container_to_blob_service(self):
         """BlobServiceClient is initialized with correct container."""
@@ -127,18 +139,16 @@ class TestAzureBlobClientFetchTranscript:
         mock_blob_client = MagicMock()
         mock_blob_client.download_blob.return_value.readall.return_value = b'{"x":1}'
 
-        with patch(
-            "vault.research.azure_blob_client.BlobServiceClient"
-        ) as mock_service_cls:
-            mock_service_cls.from_connection_string.return_value.get_blob_client.return_value = (
-                mock_blob_client
-            )
+        fake_blob_service_cls = MagicMock()
+        fake_blob_service_cls.from_connection_string.return_value.get_blob_client.return_value = mock_blob_client
+
+        with patch.object(client, "_load_azure_clients", return_value=(fake_blob_service_cls, (Exception,))):
             client.fetch_transcript("meet_abc")
 
         # Verify from_connection_string was called with the connection string
-        mock_service_cls.from_connection_string.assert_called_once_with("conn_str")
+        fake_blob_service_cls.from_connection_string.assert_called_once_with("conn_str")
         # Verify get_blob_client called with correct container and blob path
-        mock_service_cls.from_connection_string.return_value.get_blob_client.assert_called_once_with(
+        fake_blob_service_cls.from_connection_string.return_value.get_blob_client.assert_called_once_with(
             container="my-transcripts",
             blob="meetings/meet_abc.transcript.json",
         )

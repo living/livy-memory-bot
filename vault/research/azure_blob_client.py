@@ -1,13 +1,17 @@
-"""Azure Blob transcript loader for TLDV meetings."""
+"""Azure Blob transcript loader for TLDV meetings.
+
+This module provides the legacy `AzureBlobClient` class API used by
+`tldv_client.py` and existing tests. For new segment-oriented code,
+prefer `vault.capture.azure_blob_client.load_transcript_segments`.
+"""
 from __future__ import annotations
 
 import logging
 import os
 
-from azure.core.exceptions import ResourceNotFoundError
-from azure.storage.blob import BlobServiceClient
-
 logger = logging.getLogger(__name__)
+
+DEFAULT_CONTAINER_NAME = "transcripts"
 
 
 class AzureBlobClient:
@@ -32,7 +36,14 @@ class AzureBlobClient:
         return f"meetings/{clean_id}.transcript.json"
 
     def fetch_transcript(self, meeting_id: str) -> str | None:
+        """Download blob content and return raw text, or None if unavailable."""
         if not self._connection_string:
+            return None
+
+        try:
+            from azure.storage.blob import BlobServiceClient
+            from azure.core.exceptions import ResourceNotFoundError, AzureError
+        except ImportError:
             return None
 
         blob_path = self._build_blob_path(meeting_id)
@@ -46,6 +57,10 @@ class AzureBlobClient:
             return str(content)
         except ResourceNotFoundError:
             return None
-        except Exception as exc:
-            logger.warning("azure_blob_transcript_fetch_failed meeting_id=%s err=%s", meeting_id, exc)
+        except AzureError as exc:
+            logger.warning(
+                "azure_blob_transcript_fetch_failed meeting_id=%s err=%s",
+                meeting_id,
+                exc,
+            )
             return None

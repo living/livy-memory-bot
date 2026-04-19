@@ -11,8 +11,6 @@ Coverage:
 """
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 
 class TestSupabaseTranscriptClient:
     def test_returns_whisper_transcript_when_present(self):

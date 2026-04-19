@@ -56,7 +56,7 @@ class SupabaseTranscriptClient:
                 return None
 
             return self._extract_transcript(rows[0])
-        except Exception as exc:
+        except requests.RequestException as exc:
             logger.warning("supabase_transcript_fetch_failed meeting_id=%s err=%s", meeting_id, exc)
             return None
 

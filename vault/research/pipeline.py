@@ -27,7 +27,7 @@ from typing import Any
 
 from vault.research.event_key import build_event_key
 from vault.research.identity_resolver import resolve_identity
-from vault.research.state_store import DEFAULT_STATE, load_state, save_state, upsert_processed_event_key
+from vault.research.state_store import DEFAULT_STATE, load_state, save_state, upsert_processed_event_key, upsert_processed_content_key
 from vault.research.github_client import GitHubClient
 from vault.research.github_rich_client import GitHubRichClient, extract_github_refs, extract_trello_urls
 from vault.research.trello_client import TrelloClient
@@ -147,12 +147,20 @@ class ResearchPipeline:
         self.state = load_state(self.state_path)
         self.last_seen_at = self._parse_iso(self.state.get("last_seen_at", {}).get(self.source))
 
-        entries = self.state.get("processed_event_keys", {}).get(self.source, [])
+        event_entries = self.state.get("processed_event_keys", {}).get(self.source, [])
         self.processed_event_keys = {
             item.get("key")
-            for item in entries
+            for item in event_entries
             if isinstance(item, dict) and isinstance(item.get("key"), str)
         }
+
+        content_entries = self.state.get("processed_content_keys", {}).get(self.source, [])
+        self.processed_content_keys = {
+            item.get("key")
+            for item in content_entries
+            if isinstance(item, dict) and isinstance(item.get("key"), str)
+        }
+
 
     @staticmethod
     def _parse_iso(iso_value: str | None) -> datetime | None:
@@ -298,8 +306,30 @@ class ResearchPipeline:
             )
             return {"action": "create_page", "path": base_path, "content": content, "entity_type": "event"}
 
+    def _compute_content_hash(self, content: str) -> str:
+        """Compute deterministic SHA256 hex digest for content."""
+        return hashlib.sha256(content.encode("utf-8")).hexdigest()
+
+    def _build_content_key(self, event: dict[str, Any], payload: dict[str, Any] | None = None) -> str:
+        """Build semantic content key: {source}:{source_id}:{content_hash}."""
+        source_id = str(
+            event.get("pr_number")
+            or event.get("meeting_id")
+            or event.get("card_id")
+            or event.get("id")
+            or "unknown"
+        )
+
+        base_content: dict[str, Any] = payload if isinstance(payload, dict) else event
+        canonical = json.dumps(base_content, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+        content_hash = self._compute_content_hash(canonical)
+        return f"{self.source}:{source_id}:{content_hash}"
+
     def _is_duplicate(self, event: dict[str, Any]) -> bool:
         return self._calculate_event_key(event) in self.processed_event_keys
+
+    def _is_content_duplicate(self, event: dict[str, Any], payload: dict[str, Any] | None = None) -> bool:
+        return self._build_content_key(event, payload) in self.processed_content_keys
 
     def _build_github_hypothesis(self, event: dict[str, Any]) -> dict[str, Any]:
         """Build a hypothesis for a rich GitHub PR event with crosslink relations."""
@@ -467,6 +497,14 @@ class ResearchPipeline:
         upsert_processed_event_key(self.source, event_key, event_at, self.state_path)
         self.processed_event_keys.add(event_key)
 
+    def _persist_content_key(self, event: dict[str, Any], payload: dict[str, Any] | None = None) -> str:
+        """Compute and persist content_key. Returns the computed key."""
+        content_key = self._build_content_key(event, payload)
+        event_at = self._event_at(event)
+        upsert_processed_content_key(self.source, content_key, event_at, self.state_path)
+        self.processed_content_keys.add(content_key)
+        return content_key
+
     def _advance_last_seen_at(self, event_at: datetime) -> None:
         state = load_state(self.state_path)
         current = self._parse_iso(state.get("last_seen_at", {}).get(self.source))
@@ -509,6 +547,7 @@ class ResearchPipeline:
             "version": ssot.get("version", 1),
             "last_seen_at": ssot.get("last_seen_at", {}).get(self.source),
             "processed_event_keys": ssot.get("processed_event_keys", {}).get(self.source, []),
+            "processed_content_keys": ssot.get("processed_content_keys", {}).get(self.source, []),
         }
         cache_path = self.research_dir / "state.json"
         cache_path.write_text(json.dumps(cache, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -549,6 +588,17 @@ class ResearchPipeline:
                 payload = event  # Trello events are already normalized
 
             _ = self._build_context(payload)
+
+            if self._is_content_duplicate(event, payload):
+                skipped += 1
+                self._log_audit(
+                    "event_skipped_duplicate_content",
+                    {
+                        "event_key": self._calculate_event_key(event),
+                        "content_key": self._build_content_key(event, payload),
+                    },
+                )
+                continue
 
             # Step 6 resolve — Trello-specific identity extraction
             identities: list[dict[str, Any]] = []
@@ -615,8 +665,15 @@ class ResearchPipeline:
 
             # Step 10/11
             self._persist_event_key(event)
+            content_key = self._persist_content_key(event, payload)
             self._advance_last_seen_at(self._event_at(event))
-            self._log_audit("event_processed", {"event_key": self._calculate_event_key(event)})
+            self._log_audit(
+                "event_processed",
+                {
+                    "event_key": self._calculate_event_key(event),
+                    "content_key": content_key,
+                },
+            )
             processed += 1
 
         # self-healing MVP (read-only evidence)
