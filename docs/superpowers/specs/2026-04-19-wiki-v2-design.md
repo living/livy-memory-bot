@@ -511,6 +511,40 @@ TLDV_JWT_TOKEN=<token>
 | `connectors/trello.py` | Parcial | Adaptar extração de GitHub links e horas |
 | `connectors/github.py` | Parcial | Verificar cobertura de PR reviews/approvers |
 
+### 10.4 Política de Roteamento de Modelos (OmniRouter)
+
+**Decisão oficial:**
+- Tarefas com raciocínio, síntese complexa, reconciliação de fontes e decisões ambíguas usam **`omniroute/PremiumFirst`**.
+- Tarefas simples, frequentes e operacionais usam **`omniroute/fastest`**.
+
+#### Classificação operacional
+
+| Classe de tarefa | Modelo padrão | Exemplos |
+|---|---|---|
+| **Complexa (reasoning-heavy)** | `omniroute/PremiumFirst` | detecção de contradições, fusão multi-fonte, decisão de supersession, sumarização executiva com trade-offs, revisão de spec/arquitetura |
+| **Simples (throughput-heavy)** | `omniroute/fastest` | polling de APIs, normalização mecânica, dedupe por hash, atualização de estado derivado, notificações padrão |
+
+#### Regra de execução no pipeline
+
+```text
+if task.requires_reasoning == true:
+    model = "omniroute/PremiumFirst"
+else:
+    model = "omniroute/fastest"
+```
+
+#### Aplicação recomendada por job
+
+- `research-consolidation`: **PremiumFirst** (fusão, contradição, priorização)
+- `research-github|trello|tldv|gmail|calendar`: **fastest** no ingest/normalize; **PremiumFirst** apenas no estágio de síntese inferencial
+- Alertas e mensagens padronizadas: **fastest**
+
+#### Guardrails de custo/qualidade
+
+- Evitar PremiumFirst para etapas puramente ETL.
+- Promover para PremiumFirst apenas quando houver ambiguidade semântica ou decisão irreversível.
+- Registrar no `audit_trail` o modelo aplicado por etapa crítica (`model_used`).
+
 ---
 
 ## 11. Critérios de Sucesso por Fase
