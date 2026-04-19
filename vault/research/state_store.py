@@ -4,6 +4,9 @@ from __future__ import annotations
 
 import copy
 import json
+import os
+import tempfile
+import time
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Any
@@ -64,7 +67,25 @@ def load_state(state_path: str | Path = DEFAULT_STATE_PATH) -> dict[str, Any]:
     path = Path(state_path)
     if not path.exists():
         save_state(copy.deepcopy(DEFAULT_STATE), path)
-    raw = json.loads(path.read_text())
+
+    # Defensive read: other source pipelines can write SSOT at the same time.
+    # Retry briefly to avoid transient JSONDecodeError while a writer is mid-flush.
+    last_error: json.JSONDecodeError | None = None
+    raw: dict[str, Any] | None = None
+    for _ in range(3):
+        try:
+            raw = json.loads(path.read_text())
+            break
+        except json.JSONDecodeError as exc:
+            last_error = exc
+            time.sleep(0.02)
+
+    if raw is None:
+        raise json.JSONDecodeError(
+            f"Failed to parse state file after retries: {path}",
+            doc=(path.read_text() if path.exists() else ""),
+            pos=(last_error.pos if last_error else 0),
+        )
 
     # Normalize: ensure all required top-level keys exist.
     if "processed_event_keys" not in raw:
@@ -91,7 +112,20 @@ def load_state(state_path: str | Path = DEFAULT_STATE_PATH) -> dict[str, Any]:
 def save_state(state_dict: dict[str, Any], state_path: str | Path = DEFAULT_STATE_PATH) -> None:
     path = Path(state_path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(state_dict, indent=2, ensure_ascii=False))
+
+    payload = json.dumps(state_dict, indent=2, ensure_ascii=False)
+
+    # Atomic write to avoid exposing partially-written JSON to concurrent readers.
+    fd, tmp_path = tempfile.mkstemp(prefix=f"{path.name}.", suffix=".tmp", dir=str(path.parent))
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as tmp_file:
+            tmp_file.write(payload)
+            tmp_file.flush()
+            os.fsync(tmp_file.fileno())
+        os.replace(tmp_path, path)
+    finally:
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)
 
 
 # ---------------------------------------------------------------------------
