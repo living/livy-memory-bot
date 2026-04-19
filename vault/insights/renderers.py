@@ -110,9 +110,14 @@ def render_group_html(bundle: InsightsBundle) -> str:
     ) or "<li>Sem contradições relevantes.</li>"
 
     alerts = "".join(
-        f"<li class=\"alert { _safe(a.level) }\">{_safe(a.message)}</li>"
+        f"<li class=\"alert {_safe(a.level)}\">{_safe(a.message)}</li>"
         for a in bundle.alerts[:12]
     ) or "<li class=\"alert ok\">Sem alertas.</li>"
+
+    new_items_html = "".join(
+        f"<li>{_safe(src)}: {count}</li>"
+        for src, count in sorted(bundle.new_this_week.items())
+    ) or "<li>Sem novos eventos.</li>"
 
     generated_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
 
@@ -181,7 +186,7 @@ def render_group_html(bundle: InsightsBundle) -> str:
       <section class=\"card\">
         <h3>Novos eventos (semana)</h3>
         <ul>
-          {''.join(f'<li>{_safe(src)}: {count}</li>' for src, count in sorted(bundle.new_this_week.items())) or '<li>Sem novos eventos.</li>'}
+          {new_items_html}
         </ul>
       </section>
 
