@@ -111,7 +111,7 @@ class TestTrelloPipelineEventKey:
         ev = _make_trello_event("trello:card_created", action_id="action_abc123", card_id="card_x", list_id="list_y")
         # The pipeline uses build_trello_event_key internally
         key = pipeline._calculate_event_key(ev)
-        assert key == "action_abc123"
+        assert key == "trello:action_abc123"
 
     def test_event_key_for_list_moved_uses_target_list_when_present(self, tmp_state_file, tmp_pipeline_dir):
         from vault.research.pipeline import ResearchPipeline
@@ -140,7 +140,7 @@ class TestTrelloPipelineEventKey:
                 "processed_event_keys": {
                     "github": [],
                     "tldv": [],
-                    "trello": [{"key": "action_dup123", "event_at": "2026-04-18T09:00:00Z"}],
+                    "trello": [{"key": "trello:action_dup123", "event_at": "2026-04-18T09:00:00Z"}],
                 },
                 "last_seen_at": {"github": None, "tldv": None, "trello": "2026-04-18T10:00:00Z"},
                 "version": 1,
@@ -153,6 +153,7 @@ class TestTrelloPipelineEventKey:
             research_dir=tmp_pipeline_dir,
         )
         ev = _make_trello_event("trello:card_created", action_id="action_dup123")
+        # key is now namespaced as trello:action_dup123
         assert pipeline._is_duplicate(ev) is True
 
 
@@ -316,7 +317,7 @@ class TestTrelloPipelineRun:
                 "processed_event_keys": {
                     "github": [],
                     "tldv": [],
-                    "trello": [{"key": "act_dup", "event_at": "2026-04-18T14:00:00Z"}],
+                    "trello": [{"key": "trello:act_dup", "event_at": "2026-04-18T14:00:00Z"}],
                 },
                 "last_seen_at": {"github": None, "tldv": None, "trello": "2026-04-18T14:00:00Z"},
                 "version": 1,
@@ -452,7 +453,7 @@ class TestTrelloStatePersistence:
 
         st = load_state(tmp_state_file)
         keys = [e["key"] for e in st["processed_event_keys"].get("trello", [])]
-        assert "act_persist1" in keys
+        assert "trello:act_persist1" in keys
 
     @patch("vault.research.pipeline.TrelloClient")
     def test_advance_last_seen_at_is_updated(self, mock_trello_cls, tmp_state_file, tmp_pipeline_dir):

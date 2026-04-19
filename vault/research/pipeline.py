@@ -74,7 +74,7 @@ def build_trello_event_key(event: dict[str, Any]) -> str:
 
     # 1. action_id if present and non-empty/non-whitespace
     if action_id and action_id.strip():
-        return action_id
+        return f"trello:{action_id}"
 
     # 2. list_id + updated_at_ts for card_created/card_updated
     if event_type in ("trello:card_created", "trello:card_updated"):
