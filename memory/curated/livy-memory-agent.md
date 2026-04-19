@@ -105,6 +105,41 @@ Aprovar e mergear PR #18 após implementar feedback de review e validar suíte d
 
 - Evolução de ingest de texto de PR (body/comments/reviews) fica para PR seguinte com feature flag e budget guardrails; não expandir escopo no PR de hardening.
 
+
+
+## PR #19 — GitHub Rich PR Events (merge 2026-04-19)
+
+### Decisão
+
+Mergear PR #19 após fix de blockers de review e sanity completo da suíte research.
+
+### O que entrou no merge
+
+- `GitHubRichClient` (`vault/research/github_rich_client.py`) para enriquecimento de PR com:
+  - body, labels, milestone, assignees, requested_reviewers
+  - reviews, issue comments, review comments
+  - crossReferences via GraphQL
+- Integração no `ResearchPipeline` para caminho GitHub:
+  - enriquecimento rico acionado no fluxo normal (`pr_merged` com `pr_number` + `repo`)
+  - `_build_github_hypothesis()` protegido por presença de payload rico real
+- Helpers de extração desacoplados para funções de módulo (`extract_trello_urls`, `extract_github_refs`).
+- Design spec adicionada em `docs/superpowers/specs/2026-04-19-github-rich-pr-events-design.md`.
+
+### Verificação operacional pós-merge
+
+- PR #19: `MERGED` em `master` (commit `787c10d`).
+- Sanity checks:
+  - `PYTHONPATH=. pytest tests/research/ -q` → **370 passed**.
+
+### Bug pre-existente detectado durante E2E
+
+- `vault/lint/` (package) sombreava `vault/lint.py` (module), quebrando imports `from vault.lint import ...`.
+- Sintoma: `ImportError` em `vault/tests/test_reverify_module.py` durante coleção da suíte completa.
+- Correção em `master`: commit `3ae6fec` (`vault/lint/__init__.py` re-exporta símbolos do módulo legado via `importlib`).
+- Validação da correção:
+  - `pytest vault/tests/test_reverify_module.py -q` → **28 passed**.
+
+
 ## Crosslink Pipeline (Vault Ingest)
 
 Pipeline de enriquecimento de grafo que conecta PRs a projects e persons via GitHub API.

@@ -141,3 +141,18 @@
   - Smoke de imports (`run_research_trello`, `run_research_github`, `run_research_tldv`, `run_research_consolidation`) → OK.
   - Smoke de pipeline/cadence (`ResearchPipeline(...).cadence_state_path`) → OK.
 - Resultado: sem correções adicionais necessárias após merge/sync; estado operacional consistente com o que foi revisado na PR.
+
+## Session Log — 2026-04-19 02:50 UTC (PR #19 merge + vault.lint fix)
+
+- PR #19 (`feature/github-rich-pr-events` → `master`) **mergeada via squash**.
+- Merge commit: `787c10d` (squash, PR #19).
+- Revisão de código Lincoln encontrou 2 blocking issues:
+  1. Rich enrichment nunca disparava no fluxo normal (github events não satisfaziam condição "rich")
+  2. `_build_github_hypothesis` chamado com payload vazio em path não-rich
+- Lincoln aplicou fixes no commit `3890e6f`.
+- Sanity check pós-merge:
+  - `PYTHONPATH=. pytest tests/research/ -q` → **370 passed**.
+- **Bug pre-existente descoberto durante sanity:** `vault/lint/` (package directory) coexistia com `vault/lint.py` (module file). Python resolvia `import vault.lint` ao package (vazio), não ao module. Causava `ImportError` para `is_stale`, `detect_stale_claims`, `detect_orphans`, `detect_coverage_gaps` e `VAULT_ROOT`.
+- Fix: `vault/lint/__init__.py` agora usa `importlib` para carregar `vault/lint.py` e re-exporta todos os símbolos.
+- Commit `3ae6fec` pushado para origin/master.
+- Resultado: 18/21 jobs OK, 3 agenda-trello em erro (billing neo/anthropic).
