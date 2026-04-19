@@ -10,7 +10,7 @@ Formula:
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 
 from vault.memory_core.models import Claim, Source
 
@@ -94,7 +94,7 @@ def compute_confidence(
     # Convergence
     if other_sources:
         convergence = min(
-            len(other_sources) * _CONVERGENCE_BONUS_PER_SOURCE,
+            len(set(other_sources)) * _CONVERGENCE_BONUS_PER_SOURCE,
             _CONVERGENCE_MAX,
         )
         score += convergence

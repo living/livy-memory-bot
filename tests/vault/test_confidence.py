@@ -109,6 +109,15 @@ class TestConfidenceScoring:
         # base(0.5) + source(0.2) + convergence(+0.1) = 0.8
         assert score == pytest.approx(0.8)
 
+    def test_convergence_distinct_sources_only(self):
+        """Convergence must count distinct sources only (duplicates count once)."""
+        from vault.fusion_engine.confidence import compute_confidence
+        claim = make_claim(source="github", days_ago=60)
+        other_sources = ["github", "github"]
+        score = compute_confidence(claim, contradicting_claim=None, other_sources=other_sources)
+        # base(0.5) + source(0.2) + convergence(+0.1 for distinct github only) = 0.8
+        assert score == pytest.approx(0.8)
+
     def test_convergence_max_3_sources(self):
         """Convergence caps at +0.3 even with more sources."""
         from vault.fusion_engine.confidence import compute_confidence
