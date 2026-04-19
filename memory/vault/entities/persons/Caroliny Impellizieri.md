@@ -21,11 +21,11 @@ draft: false
 # Caroliny Impellizieri
 ## Projetos
 
-- [[Daily Operações B3]] (3 reuniões)
+-  (3 reuniões)
 
 ## Reuniões
 
-- [[2026-03-30 Daily Operações - Infra - Suporte B3]]
-- [[2026-03-23 Daily Operações - Infra - Suporte B3]]
-- [[2026-03-18 Daily Operações - Infra - Suporte B3]]
+- 
+- 
+- 
 

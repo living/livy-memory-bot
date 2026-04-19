@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Any
 
 
-GITHUB_PATTERN = re.compile(r"https?://github\.com/[^\s)\]}]+")
+GITHUB_PATTERN = re.compile(r"https?://github\.com/[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+(?:/[^\s)\]}>\"']+)?")
 HOURS_PATTERN = re.compile(r"(?:hours?_logged|horas?)\s*[:=]\s*(\d+(?:[.,]\d+)?)", re.IGNORECASE)
 
 

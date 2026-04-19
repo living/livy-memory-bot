@@ -1,0 +1,4 @@
+{"ts": "2026-04-19T13:42:40.474055Z", "claim": "Any claim", "sources": ["https://example.com"], "context": {}, "passed": false, "skipped": true, "supporting_contexts": [], "confidence": 0.0}
+{"ts": "2026-04-19T13:42:40.475193Z", "claim": "test", "sources": ["https://docs.openclaw.com", "https://openclaw.ai/docs", "https://github.com/openclaw/openclaw"], "context": {}, "passed": false, "skipped": true, "supporting_contexts": [], "confidence": 0.0}
+{"ts": "2026-04-19T13:45:40.588756Z", "claim": "Any claim", "sources": ["https://example.com"], "context": {}, "passed": false, "skipped": true, "supporting_contexts": [], "confidence": 0.0}
+{"ts": "2026-04-19T13:45:40.590252Z", "claim": "test", "sources": ["https://docs.openclaw.com", "https://openclaw.ai/docs", "https://github.com/openclaw/openclaw"], "context": {}, "passed": false, "skipped": true, "supporting_contexts": [], "confidence": 0.0}

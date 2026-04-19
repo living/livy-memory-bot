@@ -24,13 +24,13 @@ draft: false
 **Email:** sfraga@livingnet.com.br
 ## Projetos
 
-- [[Daily Operações B3]] (3 reuniões)
-- [[Nelway]] (1 reuniões)
+-  (3 reuniões)
+-  (1 reuniões)
 
 ## Reuniões
 
-- [[2026-03-30 Daily Operações - Infra - Suporte B3]]
-- [[2026-03-23 Daily Operações - Infra - Suporte B3]]
-- [[2026-03-18 Processo NW + Roadmap Futuro]]
-- [[2026-03-18 Daily Operações - Infra - Suporte B3]]
+- 
+- 
+- 
+- 
 

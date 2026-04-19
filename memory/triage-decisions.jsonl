@@ -1,0 +1,4 @@
+{"timestamp": "2026-04-19T13:42:40.552218Z", "action": "route_to_triage", "signal_id": "sig-2026-0420-001", "tier": "A", "routed": true, "destination": "mattermost", "webhook_status": "ok"}
+{"timestamp": "2026-04-19T13:42:40.553490Z", "action": "route_to_triage", "signal_id": "sig-2026-0420-001", "tier": "C", "routed": false, "destination": "mattermost", "skipped_reason": "tier_c_deferred", "webhook_status": "skipped"}
+{"timestamp": "2026-04-19T13:45:40.690268Z", "action": "route_to_triage", "signal_id": "sig-2026-0420-001", "tier": "A", "routed": true, "destination": "mattermost", "webhook_status": "ok"}
+{"timestamp": "2026-04-19T13:45:40.691388Z", "action": "route_to_triage", "signal_id": "sig-2026-0420-001", "tier": "C", "routed": false, "destination": "mattermost", "skipped_reason": "tier_c_deferred", "webhook_status": "skipped"}
