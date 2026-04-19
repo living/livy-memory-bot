@@ -12,6 +12,8 @@ from typing import Any
 
 import requests
 
+from vault.research.trello_parsers import ParsedTrelloCard, parse_trello_card
+
 logger = logging.getLogger(__name__)
 
 
@@ -109,6 +111,65 @@ class TrelloClient:
 
         actions = response.json()
         return [self.normalize_action(action) for action in actions]
+
+    def get_normalized_cards(self, last_seen_at: str | None = None) -> list[ParsedTrelloCard]:
+        """Fetch and normalize cards from configured boards.
+
+        Args:
+            last_seen_at: ISO timestamp string; when provided, returns only cards
+                with dateLastActivity >= last_seen_at.
+
+        Returns:
+            Parsed Trello cards enriched with GitHub links and hours metadata.
+        """
+        normalized_cards: list[ParsedTrelloCard] = []
+
+        for board_id in self.board_ids:
+            url = f"{TRELLO_API_BASE}/boards/{board_id}/cards"
+            params: dict[str, Any] = {
+                "key": self.api_key,
+                "token": self.token,
+                "fields": "id,name,url,idBoard,desc,labels,due,dateLastActivity,idList",
+            }
+
+            response = requests.get(url, params=params, timeout=30)
+            if response.status_code != 200:
+                raise TrelloAPIError(board_id, response.status_code, response.text)
+
+            cards = response.json()
+            for card in cards:
+                if last_seen_at:
+                    last_activity = card.get("dateLastActivity")
+                    if not last_activity:
+                        continue
+                    card_dt = datetime.fromisoformat(last_activity.replace("Z", "+00:00"))
+                    threshold_dt = datetime.fromisoformat(last_seen_at.replace("Z", "+00:00"))
+                    if card_dt < threshold_dt:
+                        continue
+
+                list_name = self._fetch_list_name(card.get("idList", ""))
+                normalized_cards.append(parse_trello_card(card, list_name))
+
+        return normalized_cards
+
+    def _fetch_list_name(self, list_id: str) -> str:
+        """Fetch Trello list name from list id."""
+        if not list_id:
+            return "unknown"
+
+        url = f"{TRELLO_API_BASE}/lists/{list_id}"
+        params = {
+            "key": self.api_key,
+            "token": self.token,
+            "fields": "name",
+        }
+        response = requests.get(url, params=params, timeout=30)
+
+        if response.status_code != 200:
+            logger.warning("Failed to fetch Trello list name for %s", list_id)
+            return "unknown"
+
+        return response.json().get("name", "unknown")
 
     def normalize_action(self, action: dict[str, Any]) -> dict[str, Any]:
         """Convert a Trello action dict into the internal event format.
