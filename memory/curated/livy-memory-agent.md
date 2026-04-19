@@ -162,6 +162,7 @@ Pipeline de pesquisa evolutiva que substitui o loop `dream-memory-consolidation`
 |---|---|---|
 | `88e37467` | `*/15 * * * *` BRT | `research_tldv_cron.py` |
 | `b1b496f8` | `*/10 * * * *` BRT | `research_github_cron.py` |
+| `49d1d21e` | `*/20 * * * *` BRT | `research_trello_cron.py` |
 | `2664597b` | `0 7 * * *` BRT | `research_consolidation_cron.py` (substitui `dream-memory-consolidation`) |
 
 ### Self-Healing MVP

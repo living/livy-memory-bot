@@ -1,0 +1,25 @@
+{
+  "mode": "monitoring",
+  "paused_sources": [],
+  "apply_count_by_source": {
+    "github": 45,
+    "tldv": 9,
+    "trello": 9
+  },
+  "rollback_count_by_source": {},
+  "revert_streak_by_source": {},
+  "error_streak_by_source": {},
+  "availability_error_by_source": {},
+  "recent_run_outcomes_by_source": {},
+  "review_queue_size": 0,
+  "last_transition_at": null,
+  "reason": "",
+  "applied": 14,
+  "queued": 0,
+  "dropped": 0,
+  "skipped": 28,
+  "dry_run": 0,
+  "last_applied_at": "2026-04-19T00:07:10.182936+00:00",
+  "last_queued_at": null,
+  "last_dropped_at": null
+}

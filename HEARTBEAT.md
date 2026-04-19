@@ -1,8 +1,8 @@
 # HEARTBEAT — Livy Memory Agent
 
-_Atualizado: 2026-04-18 18:08 UTC (15:08 BRT)_
+_Atualizado: 2026-04-19 00:01 UTC (21:01 BRT)_
 
-## Jobs Ativos — 20 crons
+## Jobs Ativos — 21 crons
 
 | Job | Schedule (BRT) | Status | Erros Consec. | Nota |
 |---|---|---|---|---|
@@ -17,6 +17,7 @@ _Atualizado: 2026-04-18 18:08 UTC (15:08 BRT)_
 | **tldv-archive-videos** | 03h | ✅ ok | 0 | |
 | **research-tldv** | intervalo configurável (`RESEARCH_TLDV_INTERVAL_MIN`) | ✅ ok | 0 | lock + rebuild de estado derivado |
 | **research-github** | intervalo configurável (`RESEARCH_GITHUB_INTERVAL_MIN`) | ✅ ok | 0 | lock + rebuild de estado derivado |
+| **research-trello** | intervalo configurável (`RESEARCH_TRELLO_INTERVAL_MIN`) | ✅ ok | 0 | lock + rebuild de estado derivado |
 | **research-consolidation** | 07h | ✅ ok | 0 | substitui loop dream-memory-consolidation |
 | **vault-crosslink** | 01h | ✅ ok | 0 | 729 edges, 31 PR authors |
 | **vault-ingest** | 10h,14h,20h | ✅ ok | 0 | delivery telegram ativo |
@@ -27,7 +28,7 @@ _Atualizado: 2026-04-18 18:08 UTC (15:08 BRT)_
 | **agenda-trello-1230** | 12:30 | 🔴 error | 2 | billing provider/model |
 | **agenda-trello-1700** | 17h | 🔴 error | 3 | billing provider/model |
 
-**Resumo:** 17/20 ok, 3/20 em error
+**Resumo:** 18/21 ok, 3/21 em error
 
 ## Alertas
 
@@ -36,7 +37,7 @@ _Atualizado: 2026-04-18 18:08 UTC (15:08 BRT)_
 | 🔴 CRÍTICO | `agenda-trello-*` com falha recorrente por billing (neo/anthropic) | Trocar model para provider ativo (ex: fastest/copoly) ou reativar billing |
 | 🟡 | Jobs legados desabilitados (openclaw-health, sonhar, signal-curation, daily-memory-save) | Manter desabilitados ou replanejar com configuração nova |
 | 🟢 | Vault insights semanal operacional | Manter monitoramento das segundas 06:30/07:00 |
-| 🟢 | Loop de research v1 (TLDV/GitHub/Consolidation) ativo | Manter observabilidade de lock, rebuild de estado e retry policy |
+| 🟢 | Loop de research v1 (TLDV/GitHub/Trello/Consolidation) ativo | Manter observabilidade de lock, rebuild de estado e retry policy |
 
 ## Mudanças desde Último HEARTBEAT
 
@@ -47,9 +48,9 @@ _Atualizado: 2026-04-18 18:08 UTC (15:08 BRT)_
 | ✅ PR #15 mergeada (`6ea8005`) — fallback `TELEGRAM_TOKEN` | Compatibilidade com ambiente de produção atual |
 | 🆕 Cron `vault-insights-weekly-validate` | Validação preventiva semanal antes da geração |
 | 🆕 Cron `vault-insights-weekly-generate` | Geração + envio semanal para `7426291192` |
-| 🆕 Crons `research-tldv` e `research-github` | Polling por fonte com lock distribuído e rebuild de estado derivado |
+| 🆕 Crons `research-tldv`, `research-github` e `research-trello` | Polling por fonte com lock distribuído e rebuild de estado derivado |
 | 🆕 Cron `research-consolidation` | Consolidação diária 07h BRT substituindo `dream-memory-consolidation` |
-| ✅ Smoke test manual dos crons de research | Execução inicial com lock/release e sem conflito de concorrência |
+| ✅ Smoke test manual dos crons de research | `research-trello` processed=390, `research-github`/`research-tldv` ok, `research-consolidation` sem alertas |
 
 ## Memória
 
@@ -57,7 +58,7 @@ _Atualizado: 2026-04-18 18:08 UTC (15:08 BRT)_
 |---|---|
 | Observations (claude-mem) | ✅ worker 37777 ativo |
 | Curated (topic files) | ✅ atualizado com Vault Insights + PRs #13/#14/#15 |
-| Operational (crons) | ✅ 2 novos jobs operacionais adicionados |
+| Operational (crons) | ✅ 3 novos jobs operacionais adicionados |
 
 ## Incident Playbook
 
@@ -75,7 +76,7 @@ openclaw cron list | grep research-
 
 ```bash
 # Conferir SSOT e caches derivados
-ls -la state/identity-graph/state.json .research/tldv/state.json .research/github/state.json
+ls -la state/identity-graph/state.json .research/tldv/state.json .research/github/state.json .research/trello/state.json
 ```
 
 **Mitigação imediata:**
