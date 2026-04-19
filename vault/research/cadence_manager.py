@@ -1,7 +1,16 @@
 """Cadence state manager for research pipeline.
 
-Persists per-source interval preference to state/identity-graph/cadence.json.
-Hard floor: 4h. Escalation: 6h when budget exceeded.
+Design: GLOBAL cadence (not per-source). The cadence state in
+state/identity-graph/cadence.json applies uniformly to all research sources.
+A single budget warning from any source escalates the cadence for all sources;
+likewise, a single source recovering does not reduce cadence until all sources
+have reported enough healthy runs.
+
+This is a deliberate simplification. If per-source cadence is needed in the
+future, the state schema should be migrated to:
+  {"github": {"interval_hours": 4, ...}, "tldv": {...}, "trello": {...}}
+
+Hard floor: 4h. Escalation: 6h when 3 consecutive budget warnings accumulate.
 
 Cadence state schema:
 {

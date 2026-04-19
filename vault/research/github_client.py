@@ -1,13 +1,18 @@
 """GitHub polling client for research pipeline.
 
-Uses gh api search to fetch merged PRs in scoped repositories.
+Uses gh api search to get PR URLs, then resolves full PR details via
+repos/{owner}/{repo}/pulls/{number} to guarantee merged_at, merged,
+repository.full_name, and author are available for normalization.
 """
 from __future__ import annotations
 
 import json
+import logging
 import subprocess
 from datetime import datetime, timedelta, timezone
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 DEFAULT_LOOKBACK_DAYS = 7
 DEFAULT_REPOS_SCOPE = [
@@ -31,9 +36,14 @@ class GitHubClient:
         events: list[dict[str, Any]] = []
 
         for repo in self.repos:
-            raw_prs = self._fetch_merged_prs(repo, cutoff)
-            for pr in raw_prs:
-                events.append(self._normalize_pr(pr))
+            pr_summaries = self._search_merged_pr_summaries(repo, cutoff)
+            for summary in pr_summaries:
+                pr_number = summary.get("number")
+                if pr_number is None:
+                    continue
+                full_pr = self._fetch_pr_details(repo, pr_number)
+                if full_pr:
+                    events.append(self._normalize_pr(full_pr))
 
         events.sort(key=lambda e: e.get("merged_at") or "")
         return events
@@ -43,7 +53,8 @@ class GitHubClient:
             return datetime.fromisoformat(last_seen_at.replace("Z", "+00:00"))
         return datetime.now(timezone.utc) - timedelta(days=self.lookback_days)
 
-    def _fetch_merged_prs(self, repo: str, cutoff: datetime) -> list[dict[str, Any]]:
+    def _search_merged_pr_summaries(self, repo: str, cutoff: datetime) -> list[dict[str, Any]]:
+        """Return lightweight PR summaries from search (number + repository URL)."""
         date_str = cutoff.strftime("%Y-%m-%d")
         query = f"is:pr merged:>{date_str} repo:{repo} org:living"
 
@@ -54,15 +65,26 @@ class GitHubClient:
             "-f",
             f"q={query}",
             "--jq",
-            ".items[]",
+            ".items[] | {number, repository_url}",
         ]
 
         try:
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
-        except Exception:
+        except Exception as exc:
+            logger.warning(
+                "source=github repo=%s query=search exception=%s",
+                repo,
+                exc,
+            )
             return []
 
         if result.returncode != 0:
+            logger.warning(
+                "source=github repo=%s query=search returncode=%s stderr=%s",
+                repo,
+                result.returncode,
+                result.stderr[:200],
+            )
             return []
 
         lines = [line.strip() for line in result.stdout.splitlines() if line.strip()]
@@ -74,8 +96,45 @@ class GitHubClient:
                 continue
         return out
 
+    def _fetch_pr_details(self, repo: str, pr_number: int) -> dict[str, Any] | None:
+        """Resolve full PR details from repos/{owner}/{repo}/pulls/{number}.
+
+        Returns None on failure (caller logs and skips the PR).
+        """
+        cmd = ["gh", "api", f"repos/{repo}/pulls/{pr_number}", "--jq", "."]
+        try:
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+        except Exception as exc:
+            logger.warning(
+                "source=github repo=%s pr_number=%s query=pulls exception=%s",
+                repo,
+                pr_number,
+                exc,
+            )
+            return None
+
+        if result.returncode != 0:
+            logger.warning(
+                "source=github repo=%s pr_number=%s query=pulls returncode=%s stderr=%s",
+                repo,
+                pr_number,
+                result.returncode,
+                result.stderr[:200],
+            )
+            return None
+
+        try:
+            return json.loads(result.stdout)
+        except json.JSONDecodeError:
+            logger.warning(
+                "source=github repo=%s pr_number=%s query=pulls parse_error",
+                repo,
+                pr_number,
+            )
+            return None
+
     def _normalize_pr(self, pr: dict[str, Any]) -> dict[str, Any]:
-        repo = (pr.get("repository") or {}).get("full_name", "")
+        repo = pr.get("base", {}).get("repo", {}).get("full_name", "")
         pr_number = pr.get("number")
         event_id = f"{repo}#{pr_number}" if repo and pr_number is not None else str(pr_number)
 

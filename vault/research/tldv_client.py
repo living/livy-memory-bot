@@ -4,11 +4,14 @@ Uses Supabase REST to fetch meetings updated within lookback window.
 """
 from __future__ import annotations
 
+import logging
 import os
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import requests
+
+logger = logging.getLogger(__name__)
 
 DEFAULT_LOOKBACK_DAYS = 7
 
@@ -39,8 +42,9 @@ class TLDVClient:
             "limit": 100,
         }
 
-        if last_seen_at:
-            params["updated_at"] = f"gte.{cutoff.isoformat()}"
+        # Always apply temporal filter (including first-run lookback) to avoid
+        # arbitrary windows and state drift.
+        params["updated_at"] = f"gte.{cutoff.isoformat()}"
 
         try:
             resp = requests.get(
@@ -50,10 +54,20 @@ class TLDVClient:
                 timeout=30,
             )
             if resp.status_code != 200:
+                logger.warning(
+                    "source=tldv status_code=%s url=%s",
+                    resp.status_code,
+                    self.supabase_url,
+                )
                 return []
             rows = resp.json() or []
             return [self._normalize_meeting(row) for row in rows]
-        except Exception:
+        except Exception as exc:
+            logger.warning(
+                "source=tldv exception=%s url=%s",
+                exc,
+                self.supabase_url,
+            )
             return []
 
     def fetch_meeting(self, meeting_id: str) -> dict[str, Any]:

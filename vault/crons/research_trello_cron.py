@@ -33,7 +33,7 @@ def main() -> None:
         # Actual schedule is governed by OpenClaw cron (id: 49d1d21e-9bad-4e20-a638-196dcf29f37e).
         interval_min = int(os.environ.get("RESEARCH_TRELLO_INTERVAL_MIN", "360"))  # 6h
     except ValueError:
-        interval_min = 20
+        interval_min = 360
         logger.warning(
             "RESEARCH_TRELLO_INTERVAL_MIN=%r is not a valid integer; falling back to %d",
             os.environ.get("RESEARCH_TRELLO_INTERVAL_MIN"),

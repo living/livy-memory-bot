@@ -31,6 +31,7 @@ from vault.research.state_store import DEFAULT_STATE, load_state, save_state, up
 from vault.research.github_client import GitHubClient
 from vault.research.trello_client import TrelloClient
 from vault.research.tldv_client import TLDVClient
+from vault.research.cadence_manager import record_budget_warning, record_healthy_run
 
 
 def _hash16(s: str) -> str:
@@ -140,6 +141,7 @@ class ResearchPipeline:
 
         self.audit_path = self.research_dir / "audit.log"
         self.self_healing_path = self.research_dir / "self_healing_evidence.jsonl"
+        self.cadence_state_path = Path("state/identity-graph/cadence.json")
 
         self.state = load_state(self.state_path)
         self.last_seen_at = self._parse_iso(self.state.get("last_seen_at", {}).get(self.source))
@@ -528,6 +530,13 @@ class ResearchPipeline:
 
         # self-healing MVP (read-only evidence)
         self._apply_self_healing([])
+
+        # Cadence integration (global): use API/event volume as budget-pressure
+        # signal for now; high-volume runs push cadence to safer interval.
+        if len(events) >= 100:
+            record_budget_warning(self.cadence_state_path)
+        else:
+            record_healthy_run(self.cadence_state_path)
 
         self._rebuild_source_cache_from_ssot()
         self._log_audit("run_finished", {"events_processed": processed, "events_skipped": skipped})

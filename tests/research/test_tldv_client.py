@@ -90,8 +90,8 @@ class TestTLDVClientFetchEventsSince:
         assert "updated_at" in params
         assert params["updated_at"].startswith("gte.")
 
-    def test_no_last_seen_skips_updated_at_filter(self):
-        """If no last_seen_at, client does full lookback fetch without explicit updated_at filter."""
+    def test_no_last_seen_applies_updated_at_lookback_filter(self):
+        """If no last_seen_at, client still applies updated_at gte from default lookback."""
         from vault.research.tldv_client import TLDVClient
 
         fake_response = MagicMock(status_code=200)
@@ -106,7 +106,8 @@ class TestTLDVClientFetchEventsSince:
 
         kwargs = mock_get.call_args.kwargs
         params = kwargs["params"]
-        assert "updated_at" not in params
+        assert "updated_at" in params
+        assert params["updated_at"].startswith("gte.")
 
 
 class TestTLDVClientFetchMeeting:

@@ -11,20 +11,28 @@ import pytest
 
 class TestGitHubClientFetchEventsSince:
     def test_returns_normalized_pr_merged_events(self):
-        """fetch_events_since returns github:pr_merged events from gh api search."""
+        """fetch_events_since returns github:pr_merged events resolved via pulls endpoint."""
         from vault.research.github_client import GitHubClient
 
-        fake_pr_json = (
+        # Step 1: search returns lightweight {number, repository_url}
+        search_result = '{"number":42,"repository_url":"https://github.com/living/livy-memory-bot"}'
+        # Step 2: pulls returns full PR data
+        full_pr = (
             '{"number":42,"title":"fix: pipeline","state":"closed",'
             '"merged_at":"2026-04-14T10:00:00Z","created_at":"2026-04-13T09:00:00Z",'
             '"user":{"login":"lincolnqjunior","id":445449},"merged":true,'
-            '"repository":{"full_name":"living/livy-memory-bot"}}\n'
+            '"base":{"repo":{"full_name":"living/livy-memory-bot"}}}'
         )
 
-        fake_run = MagicMock(returncode=0, stdout=fake_pr_json)
+        def run_side_effect(cmd, *args, **kwargs):
+            m = MagicMock(returncode=0)
+            if "search/issues" in cmd:
+                m.stdout = search_result
+            else:
+                m.stdout = full_pr
+            return m
 
-        with patch("subprocess.run", return_value=fake_run):
-            # Scope to single repo so mock returns exactly 1 event
+        with patch("subprocess.run", side_effect=run_side_effect):
             client = GitHubClient(repos=["living/livy-memory-bot"])
             events = client.fetch_events_since("2026-04-13T00:00:00Z")
 
@@ -75,21 +83,33 @@ class TestGitHubClientFetchEventsSince:
         """Events are sorted by merged_at ascending."""
         from vault.research.github_client import GitHubClient
 
-        newer = (
+        newer_summary = '{"number":43,"repository_url":"https://github.com/living/livy-memory-bot"}'
+        older_summary = '{"number":42,"repository_url":"https://github.com/living/livy-memory-bot"}'
+        newer_pr = (
             '{"number":43,"title":"newer PR","state":"closed","merged_at":"2026-04-15T10:00:00Z",'
             '"created_at":"2026-04-14T09:00:00Z","user":{"login":"lincolnq","id":1},"merged":true,'
-            '"repository":{"full_name":"living/livy-memory-bot"}}\n'
+            '"base":{"repo":{"full_name":"living/livy-memory-bot"}}}'
         )
-        older = (
+        older_pr = (
             '{"number":42,"title":"older PR","state":"closed","merged_at":"2026-04-13T10:00:00Z",'
             '"created_at":"2026-04-12T09:00:00Z","user":{"login":"lincolnq","id":1},"merged":true,'
-            '"repository":{"full_name":"living/livy-memory-bot"}}\n'
+            '"base":{"repo":{"full_name":"living/livy-memory-bot"}}}'
         )
 
-        fake_run = MagicMock(returncode=0, stdout=newer + older)
+        def run_side_effect(cmd, *args, **kwargs):
+            m = MagicMock(returncode=0)
+            if "search/issues" in cmd:
+                # Return both summaries (newer first in stdout)
+                m.stdout = newer_summary + "\n" + older_summary
+            else:
+                # Return full PR based on number in URL
+                if "43" in str(cmd):
+                    m.stdout = newer_pr
+                else:
+                    m.stdout = older_pr
+            return m
 
-        with patch("subprocess.run", return_value=fake_run):
-            # Scope to single repo to avoid duplication
+        with patch("subprocess.run", side_effect=run_side_effect):
             client = GitHubClient(repos=["living/livy-memory-bot"])
             events = client.fetch_events_since("2026-04-12T00:00:00Z")
 
@@ -113,19 +133,26 @@ class TestGitHubClientFetchEventsSince:
             assert "repo:living/livy-memory-bot" in q_arg
 
     def test_normalize_pr_includes_all_required_fields(self):
-        """Normalized event has all fields required by pipeline."""
+        """Normalized event has all fields required by pipeline (from pulls endpoint)."""
         from vault.research.github_client import GitHubClient
 
-        fake_pr_json = (
+        search_result = '{"number":99,"repository_url":"https://github.com/living/livy-tldv-jobs"}'
+        full_pr = (
             '{"number":99,"title":"feat: everything","state":"closed",'
             '"merged_at":"2026-04-14T08:00:00Z","created_at":"2026-04-13T07:00:00Z",'
             '"user":{"login":"dev","id":999},"merged":true,'
-            '"repository":{"full_name":"living/livy-tldv-jobs"}}\n'
+            '"base":{"repo":{"full_name":"living/livy-tldv-jobs"}}}'
         )
 
-        fake_run = MagicMock(returncode=0, stdout=fake_pr_json)
+        def run_side_effect(cmd, *args, **kwargs):
+            m = MagicMock(returncode=0)
+            if "search/issues" in cmd:
+                m.stdout = search_result
+            else:
+                m.stdout = full_pr
+            return m
 
-        with patch("subprocess.run", return_value=fake_run):
+        with patch("subprocess.run", side_effect=run_side_effect):
             client = GitHubClient(repos=["living/livy-tldv-jobs"])
             events = client.fetch_events_since(None)
 
