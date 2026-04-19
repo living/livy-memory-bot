@@ -19,6 +19,39 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 
+def extract_trello_urls(text: str) -> list[str]:
+    """Extract Trello URLs from arbitrary text."""
+    if not text:
+        return []
+    raw = re.findall(r"(?:https?://)?trello\.com/[cb]/[A-Za-z0-9]+", text)
+    out: list[str] = []
+    for url in raw:
+        if not url.startswith("http"):
+            url = f"https://{url}"
+        out.append(url)
+    # preserve order, dedupe
+    return list(dict.fromkeys(out))
+
+
+def extract_github_refs(text: str) -> list[str]:
+    """Extract GitHub issue/PR refs from text (#123, owner/repo#123, URLs)."""
+    if not text:
+        return []
+    refs: list[str] = []
+    refs.extend(re.findall(r"#[0-9]+", text))
+    refs.extend(re.findall(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+#[0-9]+", text))
+
+    for owner, repo, kind, num in re.findall(
+        r"https?://github\.com/([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+)/(issues|pull)/([0-9]+)",
+        text,
+    ):
+        refs.append(f"{owner}/{repo}#{num}")
+        suffix = kind if kind.endswith("s") else f"{kind}s"
+        refs.append(f"{suffix}/{num}")
+
+    return list(dict.fromkeys(refs))
+
+
 class GitHubRichClient:
     """Client for fetching rich GitHub PR data via gh CLI."""
 
@@ -238,32 +271,9 @@ class GitHubRichClient:
         return out
 
     def _extract_trello_urls(self, text: str) -> list[str]:
-        """Extract Trello URLs from arbitrary text."""
-        if not text:
-            return []
-        raw = re.findall(r"(?:https?://)?trello\.com/[cb]/[A-Za-z0-9]+", text)
-        out: list[str] = []
-        for url in raw:
-            if not url.startswith("http"):
-                url = f"https://{url}"
-            out.append(url)
-        # preserve order, dedupe
-        return list(dict.fromkeys(out))
+        """Backward-compatible wrapper around module-level extractor."""
+        return extract_trello_urls(text)
 
     def _extract_github_refs(self, text: str) -> list[str]:
-        """Extract GitHub issue/PR refs from text (#123, owner/repo#123, URLs)."""
-        if not text:
-            return []
-        refs: list[str] = []
-        refs.extend(re.findall(r"#[0-9]+", text))
-        refs.extend(re.findall(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+#[0-9]+", text))
-
-        for owner, repo, kind, num in re.findall(
-            r"https?://github\.com/([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+)/(issues|pull)/([0-9]+)",
-            text,
-        ):
-            refs.append(f"{owner}/{repo}#{num}")
-            suffix = kind if kind.endswith("s") else f"{kind}s"
-            refs.append(f"{suffix}/{num}")
-
-        return list(dict.fromkeys(refs))
+        """Backward-compatible wrapper around module-level extractor."""
+        return extract_github_refs(text)

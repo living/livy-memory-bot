@@ -58,11 +58,26 @@ def _make_rich_github_event(pr_number: int, body: str = "Fixes #99") -> dict:
     }
 
 
+def _make_light_github_event(pr_number: int) -> dict:
+    return {
+        "source": "github",
+        "event_type": "github:pr_merged",
+        "id": f"living/livy-memory-bot#{pr_number}",
+        "pr_number": pr_number,
+        "repo": "living/livy-memory-bot",
+        "title": f"PR #{pr_number}",
+        "merged": True,
+        "merged_at": "2026-04-14T10:00:00Z",
+        "created_at": "2026-04-13T09:00:00Z",
+        "author": {"login": "lincolnq", "id": 445449},
+    }
+
+
 class TestGitHubRichPipelineIntegration:
     """Tests for pipeline using GitHubRichClient for enrichment."""
 
     def test_pipeline_uses_rich_client_for_enrichment(self, tmp_state_file, tmp_pipeline_dir):
-        """Pipeline calls GitHubRichClient.fetch_rich_pr for each github event."""
+        """Pipeline calls GitHubRichClient.normalize_rich_event for github events."""
         from vault.research.pipeline import ResearchPipeline
 
         rich_client_mock = MagicMock()
@@ -73,7 +88,7 @@ class TestGitHubRichPipelineIntegration:
 
             mock_light_client = MagicMock()
             mock_light_client.fetch_events_since.return_value = [
-                _make_rich_github_event(42),
+                _make_light_github_event(42),
             ]
             mock_light_client.fetch_pr.return_value = {"number": 42, "author": {"login": "lincolnq"}}
             mock_light.return_value = mock_light_client
@@ -85,8 +100,8 @@ class TestGitHubRichPipelineIntegration:
             )
             pipeline.run()
 
-        # Verify rich client was called with the PR number
-        rich_client_mock.normalize_rich_event.assert_called()
+        # Verify rich client was called with PR number + repo from lightweight event path
+        rich_client_mock.normalize_rich_event.assert_called_once_with(42, "living/livy-memory-bot")
 
     def test_rich_payload_reaches_context_builder(self, tmp_state_file, tmp_pipeline_dir):
         """Rich payload flows through _build_context for enrichment."""
@@ -116,8 +131,10 @@ class TestGitHubRichPipelineIntegration:
                 pipeline.run()
                 # Context was called with the rich payload
                 calls = [c for c in mock_ctx.call_args_list]
-                # At least one call should have been made
-                assert len(calls) >= 0  # structural check
+                assert len(calls) >= 1
+                payloads = [call.args[0] for call in calls if call.args]
+                assert any(isinstance(p, dict) and p.get("event_type") == "github:pr_rich" for p in payloads)
+                assert any(isinstance(p, dict) and p.get("body") == rich_event["body"] for p in payloads)
 
     def test_crosslink_hypotheses_include_github_relations(self, tmp_state_file, tmp_pipeline_dir):
         """_build_github_hypothesis emits crosslink hypotheses for Trello and GitHub refs."""

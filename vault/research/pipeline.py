@@ -29,7 +29,7 @@ from vault.research.event_key import build_event_key
 from vault.research.identity_resolver import resolve_identity
 from vault.research.state_store import DEFAULT_STATE, load_state, save_state, upsert_processed_event_key
 from vault.research.github_client import GitHubClient
-from vault.research.github_rich_client import GitHubRichClient
+from vault.research.github_rich_client import GitHubRichClient, extract_github_refs, extract_trello_urls
 from vault.research.trello_client import TrelloClient
 from vault.research.tldv_client import TLDVClient
 from vault.research.cadence_manager import record_budget_warning, record_healthy_run
@@ -314,12 +314,11 @@ class ResearchPipeline:
                 if isinstance(item, dict):
                     text_parts.append(str(item.get("body") or ""))
 
-        extractor = GitHubRichClient()
         trello_urls: list[str] = []
         github_refs: list[str] = []
         for text in text_parts:
-            trello_urls.extend(extractor._extract_trello_urls(text))
-            github_refs.extend(extractor._extract_github_refs(text))
+            trello_urls.extend(extract_trello_urls(text))
+            github_refs.extend(extract_github_refs(text))
 
         # Dedupe while preserving order.
         trello_urls = list(dict.fromkeys(trello_urls))
@@ -543,11 +542,9 @@ class ResearchPipeline:
             elif self.source == "github":
                 pr_number = event.get("pr_number")
                 payload = client.fetch_pr(pr_number) if pr_number is not None else event
-                event_type = event.get("event_type") or event.get("type")
-                if event_type in {"github:pr_rich", "pr_rich"} and pr_number is not None:
-                    repo = event.get("repo") or payload.get("repo") or ""
-                    if repo:
-                        payload = rich_client.normalize_rich_event(pr_number, repo)
+                repo = event.get("repo") or (payload.get("repo") if isinstance(payload, dict) else "") or ""
+                if pr_number is not None and repo:
+                    payload = rich_client.normalize_rich_event(pr_number, repo)
             else:
                 payload = event  # Trello events are already normalized
 
@@ -583,7 +580,26 @@ class ResearchPipeline:
             if self.source == "trello":
                 hypothesis = self._build_trello_hypothesis(event)
             elif self.source == "github":
-                hypothesis = self._build_github_hypothesis(payload if isinstance(payload, dict) else event)
+                github_payload = payload if isinstance(payload, dict) else {}
+                has_rich_data = any(
+                    bool(github_payload.get(field))
+                    for field in ("body", "reviews", "issue_comments", "review_comments", "linked_issues")
+                )
+                if has_rich_data:
+                    hypothesis = self._build_github_hypothesis(github_payload)
+                else:
+                    hypothesis = {
+                        "action": "create_page",
+                        "path": str(self.research_dir / f"evidence-{self._calculate_event_key(event).replace(':', '-')}.md"),
+                        "content": (
+                            "# Evidence\n\n"
+                            f"source={self.source}\n"
+                            f"event_key={self._calculate_event_key(event)}\n"
+                            "note=github event without rich payload; skipped github hypothesis build\n"
+                        ),
+                        "entity_type": "event",
+                        "skip_apply": True,
+                    }
             else:
                 hypothesis = {
                     "action": "create_page",
