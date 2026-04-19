@@ -16,6 +16,19 @@
 
 ---
 
+## Regra de Execução Obrigatória (TDD)
+
+Para **toda tarefa deste plano**, seguir obrigatoriamente a sequência:
+1. **RED** — escrever teste que falha
+2. **RED-CHECK** — rodar teste e confirmar falha esperada
+3. **GREEN** — implementar mínimo para passar
+4. **GREEN-CHECK** — rodar teste e confirmar PASS
+5. **REFACTOR + COMMIT** — limpeza mínima + commit
+
+> Se o snippet de uma tarefa mostrar código antes de teste, reinterpretar a execução nessa ordem acima (TDD estrito). Não pular RED/RED-CHECK.
+
+---
+
 ## Fase 1 — Fundação do Núcleo (Governança + Azure-first)
 
 ### Tarefa 1: Memory Core — Schema e Invariantes
@@ -234,6 +247,7 @@ def test_claim_without_evidence_ids_raises():
             evidence_ids=[],  # empty — should raise
             author="lincoln@livingnet.com.br",
             event_timestamp="2026-04-19T12:00:00Z",
+            privacy_level="internal",
         )
 
 
@@ -275,6 +289,7 @@ def test_valid_claim_passes():
         evidence_ids=["ev-1"],
         author="lincoln@livingnet.com.br",
         event_timestamp="2026-04-19T12:00:00Z",
+        privacy_level="internal",
     )
     assert claim.claim_id is not None
     assert claim.confidence == 0.0
@@ -412,6 +427,7 @@ Policy:
 - superseded claim is NOT deleted (preserves audit trail)
 - superseded_by can only be set once
 """
+from datetime import datetime
 from vault.memory_core.models import Claim
 
 
@@ -923,9 +939,10 @@ from vault.research.trello_client import TrelloClient
 
 
 def test_trello_client_initialization():
-    client = TrelloClient()
-    assert client.username == "lincoln250"
-    assert client.base_url == "https://api.trello.com/1"
+    client = TrelloClient(api_key="k", token="t", board_ids=["b1"])
+    assert client.api_key == "k"
+    assert client.token == "t"
+    assert client.board_ids == ["b1"]
 
 
 def test_parse_trello_card_extracts_github_links():
@@ -1082,8 +1099,10 @@ git commit -m "feat: GitHub client com reviews, approvers e claim parser"
 
 **Files:**
 - Create: `vault/capture/azure_blob_client.py`
+- Create: `vault/research/supabase_transcript.py`
 - Modify: `vault/research/tldv_client.py` (integrar leitura do Azure)
 - Create: `tests/vault/test_azure_blob_client.py`
+- Create: `tests/vault/test_supabase_transcript.py`
 
 ---
 
@@ -1498,17 +1517,14 @@ def rollback_wiki_v2() -> dict[str, Any]:
     Returns:
         dict com {success, message}
     """
-    payload = {
-        "action": "config.patch",
-        "patch": {"features": {"wiki_v2": {"enabled": False}}},
-    }
+    patch = {"features": {"wiki_v2": {"enabled": False}}}
 
     # Validação: simula o que seria enviado (não executa gateway diretamente)
-    # A execução real é feita via tool call `gateway(action="config.patch", raw=json.dumps(payload), note="Rollback wiki_v2")`
+    # A execução real é feita via tool call `gateway(action="config.patch", raw=json.dumps(patch), note="Rollback wiki_v2")`
     return {
         "success": True,
-        "payload": payload,
-        "note": "Execute via gateway tool: gateway(action='config.patch', raw=json.dumps(payload))",
+        "patch": patch,
+        "note": "Execute via gateway tool: gateway(action='config.patch', raw=json.dumps(patch), note='Rollback wiki_v2')",
     }
 
 
@@ -1530,6 +1546,7 @@ Expected: `OK`
 ```bash
 git add vault/ops/ tests/vault/test_shadow_run.py
 git commit -m "feat: shadow run + rollback operacional"
+```
 
 ---
 
@@ -1748,4 +1765,4 @@ Após implementar todas as tarefas:
 
 ---
 
-_Last updated: 2026-04-19 12:15 UTC_
+_Last updated: 2026-04-19 13:10 UTC_
