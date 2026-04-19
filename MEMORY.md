@@ -89,6 +89,17 @@ Decisão: substituir a consolidação legada por um loop de research v1 composto
 SSOT permanece em `state/identity-graph/state.json`; arquivos `.research/<source>/state.json` são cache derivado e descartável.
 Impacto: consolidação diária passa a refletir pipeline research v1 com lock distribuído, retry policy e rebuild determinístico do estado por fonte.
 
+### 2026-04-19 — PR #19 mergeada: GitHub Rich PR Events + fix de import shadowing
+
+Merge do suporte a eventos ricos de PR GitHub (body/reviews/comments/crosslinks) no pipeline research, com correções de review para acionar enriquecimento no fluxo normal (`pr_merged`) e evitar hipótese com payload vazio.
+
+Validação pós-merge:
+- `tests/research/` passando completo: **370 tests**.
+- Durante E2E, bug preexistente detectado e corrigido em `master`: `vault/lint/` (package) sombreava `vault/lint.py` (module), quebrando `from vault.lint import ...`.
+- Fix aplicado em `vault/lint/__init__.py` com re-export explícito via `importlib` (commit `3ae6fec`).
+
+Topic file: `memory/curated/livy-memory-agent.md`
+
 ### 2026-04-19 — PR #18 mergeada: batch-first research clients + cadence wiring
 
 Merge da evolução batch-first do pipeline research com clientes reais para GitHub/TLDV e integração de cadence no loop principal.
