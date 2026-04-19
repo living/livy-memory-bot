@@ -12,32 +12,19 @@ Gera dois resumos distintos: pessoal (Lincoln) e grupo Living (HTML).
 
 ### Primary: SSOT claims
 ```python
+from vault.research.state_store import load_state
 state = load_state("state/identity-graph/state.json")
 claims = state.get("claims", [])
 ```
 
-Formato de cada claim:
-```json
-{
-  "claim_id": "uuid",
-  "entity_type": "pull_request | meeting | card | ...",
-  "entity_id": "living/repo#42 | meeting_id | card_id",
-  "claim_type": "status | timeline_event | decision | ...",
-  "text": "PR #42: fix bug no parser",
-  "source": "github | tldv | trello",
-  "confidence": 0.85,
-  "superseded_by": null | "claim_id",
-  "supersession_reason": null | "superseded by newer claim",
-  "event_timestamp": "2026-04-19T...",
-  ...
-}
-```
+Schema canônico de claim: `vault/memory_core/models.py` (`Claim`, `SourceRef`, `AuditTrail`).
+Evitar duplicar schema parcial no código de extração.
 
 ### Fallback: markdown blobs
 ```python
 blobs = glob("memory/vault/claims/*.md")
 ```
-Usado apenas quando `len(claims) == 0`.
+Usado quando SSOT não cobre adequadamente a janela semanal (fallback por cobertura temporal, não só count).
 
 ---
 
@@ -99,49 +86,27 @@ Ativos:  427  |  Superseded: 3
 
 ### 3.2 Resumo Grupo Living (Telegram group — HTML autocontido)
 
-**Formato:** `text/html` com CSS inline (sem external deps).
+**Formato:** HTML completo autocontido (ficheiro `.html` anexo ao Telegram).
+
+O ficheiro é gerado como `living-insights-YYYY-MM-DD.html` e enviado como documento Telegram
+(`sendDocument` / `send` com `asDocument=True`). O utilizador abre no browser.
+Sem restrições de parse_mode — HTML/CSS/SVG completo é permitido em anexo.
 
 **Estrutura:**
-```
-┌─────────────────────────────────────┐
-│ 🧠 Living Insights  |  14-19 Apr   │
-├─────────────────────────────────────┤
-│ ATIVIDADE POR FONTE                 │
-│ [grafico barras: github/tldv/trello]│
-├─────────────────────────────────────┤
-│ NOVOS EVENTOS                       │
-│ • PR #19 — GitHub Rich PR Events    │
-│ • 8 meetings processados           │
-│ • 12 cards atualizados              │
-├─────────────────────────────────────┤
-│ SUPERSESSIONS                       │
-│ (lista de claims superseded)        │
-├─────────────────────────────────────┤
-│ ALERTAS                             │
-│ (se há anomalies)                  │
-└─────────────────────────────────────┘
-```
+- Barra superior com título + data
+- Gráfico de barras por fonte (SVG com CSS real)
+- Secção novos eventos
+- Secção supersessions
+- Secção alertas
+- Footer com timestamp de geração
 
-**Gráficos:** SVG inline (sem JS, sem bibliotecas externas).
-Exemplo — barras horizontais em SVG:
-```svg
-<svg viewBox="0 0 300 80" style="font-family:sans-serif;font-size:12px">
-  <rect x="0"   y="10" width="200" height="16" fill="#4a90d9"/>
-  <text x="205" y="22">GitHub: 33</text>
-  <rect x="0"   y="35" width="40"  height="16" fill="#50c878"/>
-  <text x="45"  y="47">TLDV: 7</text>
-  <rect x="0"   y="60" width="180" height="16" fill="#f5a623"/>
-  <text x="185" y="72">Trello: 390</text>
-</svg>
-```
-
-**CSS inline** (`style="..."` em cada tag, sem `<style>` block).
+**CSS:** `<style>` block normal dentro do HTML (sem restrições em anexo).
 
 ---
 
 ## 4. Pipeline de extracção
 
-### `vault/ops/insights/claim_inspector.py`
+### `vault/insights/claim_inspector.py`
 
 ```python
 def extract_insights(claims: list[dict]) -> InsightsBundle:
@@ -164,7 +129,7 @@ def extract_insights(claims: list[dict]) -> InsightsBundle:
     )
 ```
 
-### `vault/ops/insights/renderers.py`
+### `vault/insights/renderers.py`
 
 ```python
 def render_personal(bundle: InsightsBundle) -> str:
@@ -180,12 +145,12 @@ def render_group_html(bundle: InsightsBundle) -> str:
 
 | Ficheiro | Mudanca |
 |---|---|
+| `vault/insights/claim_inspector.py` | **NOVO** — extraccao de insights (em `vault/insights/` junto de `envia_resumo.py`) |
+| `vault/insights/renderers.py` | **NOVO** — personal text + group HTML renderers |
+| `vault/insights/__init__.py` | **NOVO** — modulo init |
 | `vault/crons/vault_insights_weekly_generate.py` | Rewrite: claims-first + dual renderer |
-| `vault/ops/insights/claim_inspector.py` | **NOVO** — extraccao de insights |
-| `vault/ops/insights/renderers.py` | **NOVO** — personal + group_html renderers |
-| `vault/ops/insights/__init__.py` | **NOVO** — modulo init |
-| `tests/ops/insights/test_claim_inspector.py` | **NOVO** — testes |
-| `tests/ops/insights/test_renderers.py` | **NOVO** — testes |
+| `vault/tests/test_claim_inspector.py` | **NOVO** — testes |
+| `vault/tests/test_renderers.py` | **NOVO** — testes |
 | `HEARTBEAT.md` | Actualizar after deploy |
 
 ---
@@ -194,28 +159,32 @@ def render_group_html(bundle: InsightsBundle) -> str:
 
 ### Lincoln (pessoal)
 - **Canal:** Telegram direct (`7426291192`)
-- **Tipo:** texto estructurado
+- **Tipo:** texto estructurado com emoji (Markdown)
 - **Mesmo mecanismo dedupe** existente em `envia_resumo.py`
 
 ### Grupo Living
 - **Canal:** Telegram group (`-5158607302`)
-- **Tipo:** `text/html`
+- **Tipo:** documento HTML (anexo `living-insights-YYYY-MM-DD.html`)
 - **Sem dedupe** (group quer ver sempre o resumo)
+- **Envio:** `sendDocument` / `send(..., asDocument=True)`
 
 ---
 
 ## 7. Criterios de aceite
 
 - [ ] `vault_insights_weekly_generate` le `state["claims"]` sem errors
-- [ ] Fallback para markdown funciona quando SSOT vazio
-- [ ] Resumo pessoal renderiza < 2000 caracteres (limite Telegram)
-- [ ] HTML grupo renderiza correctamente no Telegram (CSS inline + SVG)
+- [ ] Fallback para markdown funciona quando SSOT não tem dados no range da semana
+- [ ] Resumo pessoal renderiza < 4096 caracteres (limite Telegram direct)
+- [ ] HTML grupo gerado como ficheiro `.html` com CSS+SVG completo
+- [ ] Ficheiro HTML enviado como documento Telegram ao grupo Living
 - [ ] Supersessions aparecem em ambas as versões
 - [ ] Testes cobrem `claim_inspector` e ambos renderers
 - [ ] Cron existing `vault-insights-weekly-generate` continua a funcionar
 
 ---
 
-## 8. Dependencias
+## 8. Runtime & Dependencias
 
-Nenhuma nova library. Grafico em SVG puro (stdlib). Parsing de datas com `datetime.fromisoformat()`.
+- Cron segue padrão do repo com bootstrap `sys.path.insert(0, str(Path(__file__).resolve().parents[2]))`
+- Carregamento de env via `load_env()` (`~/.openclaw/.env`) igual aos crons operacionais
+- Nenhuma nova library. Gráfico em SVG no HTML (arquivo anexo). Parsing de datas com `datetime.fromisoformat()`.
