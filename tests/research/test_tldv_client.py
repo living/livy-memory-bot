@@ -149,3 +149,71 @@ class TestTLDVClientFetchMeeting:
                 supabase_key="key123",
             )
             assert client.fetch_meeting("nope") == {}
+
+
+class TestTLDVClientFetchMeetingTranscript:
+    def test_prefers_azure_blob_transcript_when_available(self):
+        """fetch_meeting_transcript should return Azure blob text first."""
+        from vault.research.tldv_client import TLDVClient
+
+        with patch(
+            "vault.research.tldv_client.AzureBlobClient", create=True
+        ) as mock_az_cls, patch(
+            "vault.research.tldv_client.SupabaseTranscriptClient", create=True
+        ) as mock_sb_cls:
+            mock_az = mock_az_cls.return_value
+            mock_sb = mock_sb_cls.return_value
+            mock_az.fetch_transcript.return_value = "blob transcript"
+            mock_sb.fetch_transcript.return_value = "supabase transcript"
+
+            client = TLDVClient(
+                supabase_url="https://example.supabase.co",
+                supabase_key="key123",
+            )
+            transcript = client.fetch_meeting_transcript("meet_abc")
+
+        assert transcript == "blob transcript"
+        mock_az.fetch_transcript.assert_called_once_with("meet_abc")
+        mock_sb.fetch_transcript.assert_not_called()
+
+    def test_falls_back_to_supabase_when_blob_missing(self):
+        """If Azure returns None, fallback to Supabase transcript client."""
+        from vault.research.tldv_client import TLDVClient
+
+        with patch(
+            "vault.research.tldv_client.AzureBlobClient", create=True
+        ) as mock_az_cls, patch(
+            "vault.research.tldv_client.SupabaseTranscriptClient", create=True
+        ) as mock_sb_cls:
+            mock_az = mock_az_cls.return_value
+            mock_sb = mock_sb_cls.return_value
+            mock_az.fetch_transcript.return_value = None
+            mock_sb.fetch_transcript.return_value = "supabase transcript"
+
+            client = TLDVClient(
+                supabase_url="https://example.supabase.co",
+                supabase_key="key123",
+            )
+            transcript = client.fetch_meeting_transcript("meet_abc")
+
+        assert transcript == "supabase transcript"
+        mock_az.fetch_transcript.assert_called_once_with("meet_abc")
+        mock_sb.fetch_transcript.assert_called_once_with("meet_abc")
+
+    def test_returns_none_when_both_sources_unavailable(self):
+        """If Azure and Supabase fail, returns None."""
+        from vault.research.tldv_client import TLDVClient
+
+        with patch(
+            "vault.research.tldv_client.AzureBlobClient", create=True
+        ) as mock_az_cls, patch(
+            "vault.research.tldv_client.SupabaseTranscriptClient", create=True
+        ) as mock_sb_cls:
+            mock_az_cls.return_value.fetch_transcript.return_value = None
+            mock_sb_cls.return_value.fetch_transcript.return_value = None
+
+            client = TLDVClient(
+                supabase_url="https://example.supabase.co",
+                supabase_key="key123",
+            )
+            assert client.fetch_meeting_transcript("meet_abc") is None

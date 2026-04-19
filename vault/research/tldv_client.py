@@ -11,6 +11,9 @@ from typing import Any
 
 import requests
 
+from vault.research.azure_blob_client import AzureBlobClient
+from vault.research.supabase_transcript import SupabaseTranscriptClient
+
 logger = logging.getLogger(__name__)
 
 DEFAULT_LOOKBACK_DAYS = 7
@@ -33,6 +36,11 @@ class TLDVClient:
         )
         self.supabase_key = (
             supabase_key if supabase_key is not None else os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
+        )
+        self.azure_blob_client = AzureBlobClient()
+        self.supabase_transcript_client = SupabaseTranscriptClient(
+            supabase_url=self.supabase_url,
+            supabase_key=self.supabase_key,
         )
 
     def fetch_events_since(self, last_seen_at: str | None) -> list[dict[str, Any]]:
@@ -132,6 +140,17 @@ class TLDVClient:
             return self._normalize_meeting(rows[0])
         except Exception:
             return {}
+
+    def fetch_meeting_transcript(self, meeting_id: str) -> str | None:
+        """Fetch transcript preferring Azure Blob, fallback to Supabase transcript fields."""
+        if not meeting_id:
+            return None
+
+        transcript = self.azure_blob_client.fetch_transcript(meeting_id)
+        if transcript:
+            return transcript
+
+        return self.supabase_transcript_client.fetch_transcript(meeting_id)
 
     def _compute_cutoff(self, last_seen_at: str | None) -> datetime:
         if last_seen_at:
