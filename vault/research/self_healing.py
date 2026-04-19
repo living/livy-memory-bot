@@ -620,7 +620,38 @@ def apply_merge_to_ssot(
 ) -> dict[str, Any]:
     """Persist an applied merge into SSOT with lock + idempotency.
 
+    Parameters
+    ----------
+    decision : dict
+        Result of ``apply_decision`` with at least ``decision``, ``merge_id``,
+        ``source``, ``confidence``, ``policy_version``.
+        If the merge represents a contradiction and the caller holds the
+        contradicting source, set ``decision["contradiction"] = True`` so the
+        entry is stamped correctly in SSOT.  (Currently ``apply_decision``
+        does not populate this field — the calling pipeline is responsible for
+        injecting it when the merge originates from a fusion contradiction.)
+    state_path : str | Path
+        Path to the SSOT state file.  Expected value:
+        ``state/identity-graph/state.json``.
+    lock_path : str | Path
+        Path to the lockfile used by ``lock_manager``.  Must be passed
+        explicitly by callers; there is no module-level default because the
+        lock directory is deployment-specific.  Typical value:
+        ``state/identity-graph/.apply.lock``.
+
     Returns dict with: merge_id, state_changed, reason.
+
+    Note
+    ----
+    The ``merge_id`` in the SSOT entry is derived from
+    ``(hypothesis, confidence, source)``, not from ``claim_ids + reason`` as
+    the wiki-v2 spec describes for supersession.  This means two different
+    claim pairs that produce the same hypothesis and confidence from the same
+    source will share a merge_id and the second will be deduplicated as a
+    duplicate — even if they represent distinct supersession events.
+    Alignment of the deduplication key with the spec is a pending follow-up
+    once the pipeline that calls this function is updated to provide
+    ``claim_ids`` and ``reason`` in the hypothesis context.
     """
     if decision.get("decision") != "applied":
         return {
