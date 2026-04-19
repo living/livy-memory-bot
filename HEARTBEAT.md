@@ -24,11 +24,11 @@ _Atualizado: 2026-04-19 16:12 UTC (13:12 BRT)_
 | **vault-lint** | 21h | ✅ ok | 0 | delivery telegram ativo |
 | **vault-insights-weekly-validate** | seg 06:30 | ✅ ok | 0 | sintaxe + imports |
 | **vault-insights-weekly-generate** | seg 07h | ✅ ok | 0 | geração + envio resumo |
-| **agenda-trello-0930** | 09:30 | 🔴 error | 3 | billing provider/model |
-| **agenda-trello-1230** | 12:30 | 🔴 error | 2 | billing provider/model |
-| **agenda-trello-1700** | 17h | 🔴 error | 3 | billing provider/model |
+| ~~agenda-trello-0930~~ | 09:30 | ❌ removido | — | job do Victor (neo); removido da memória-agent |
+| ~~agenda-trello-1230~~ | 12:30 | ❌ removido | — | job do Victor (neo); removido da memória-agent |
+| ~~agenda-trello-1700~~ | 17h | ❌ removido | — | job do Victor (neo); removido da memória-agent |
 
-**Resumo:** 18/21 ok, 3/21 em error
+**Resumo:** 18/21 ok, 3 removidos (Victor/neo)
 
 ## Alertas
 

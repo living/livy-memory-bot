@@ -222,3 +222,15 @@
   - commit `d81eb7e`
   - branch `master` pushada para `origin/master`
 - Documentação desta sessão atualizada em `MEMORY.md`, `memory/curated/livy-memory-agent.md`, `HEARTBEAT.md` e `.claude/napkin.md`.
+
+## Session Log — 2026-04-19 16:18 UTC (remoção agenda-trello + wiki v2 produção)
+
+- Lincoln decidiu que os 3 jobs `agenda-trello-*` são do Victor (agentId neo) e não deveriam estar na memória-agent.
+- Jobs removidos do gateway:
+  - `agenda-trello-0930` (id: `24514a66-db4f-4bbf-b5d1-08032509507c`) — ✅ removido
+  - `agenda-trello-1230` (id: `1a0e180b-781b-4ae3-a9fd-e2ba66858ea2`) — ✅ removido
+  - `agenda-trello-1700` (id: `23bc1aba-7b78-4ca1-b662-e9cbbd2f27e2`) — ✅ removido
+- Lincoln definiu que Wiki v2 vai para produção (não só auditoria).
+- Flag `WIKI_V2_ENABLED=true` já está ativo em `~/.openclaw/.env` desde sessão anterior.
+- Pipeline agora audita `wiki_v2_active` em cada run (commit `d81eb7e`).
+- Comportamento v2 real (FusionEngine + MemoryCore serializing) é a próxima fase de implementação — mais complexa, requer planejamento.
