@@ -180,3 +180,45 @@
 - Commit `8e1bc76` (local, pendente push).
 - Validação: **370/370 tests passed**; smoke real: **11 PRs processados** (inclui #17, #18, #19).
 - Nota: 4 PRs retornam 404 no fetch individual (`#133, #132, #131, #42` — provavelmente PRs deletados/fechados antes do search index atualizar). Edge case pré-existente, não bloqueante.
+
+## Session Log — 2026-04-19 15:39 UTC (PR #20 merge + validação E2E completa)
+
+- PR #20 (`feature/wiki-v2-phase1-subagent` → `master`) **mergeada via squash**.
+- Merge commit: `a1c0dd3`.
+- Lincoln pediu merge + validação E2E + ajustes se necessário + documentação STM/LTM/napkin.
+- Clone limpo do repo (`/tmp/livy-pr20-XXXX`) para validação sem poluir workspace local.
+- Validação em clone limpo:
+  - `pytest -q tests/vault/test_memory_core_models.py tests/vault/test_fusion_engine.py ...` → **118 passed**
+  - `pytest -q tests/research/` → **439 passed**
+- Workspace sincronizado com `git reset --hard origin/master` (havia divergence local).
+- Validação no workspace sincronizado:
+  - `PYTHONPATH=. pytest tests/research/ -q` → **439 passed**
+  - `PYTHONPATH=. pytest tests/vault/ -q` → **90 passed**
+  - `ResearchPipeline(source='github', ...)` smoke → pipeline_ok=True, cadence_state_path OK
+- Resultado: **sem ajustes necessários** — conteúdo do PR consistente com `master`.
+- Documentação atualizada:
+  - `MEMORY.md`: decisão PR #20 registrada
+  - `memory/curated/livy-memory-agent.md`: seção PR #20 adicionada
+  - `memory/consolidation-log.md`: este session log
+  - `.claude/napkin.md`: regra de validação em clone limpo adicionada
+  - `HEARTBEAT.md`: PR #20 adicionado em mudanças desde último heartbeat
+
+## Session Log — 2026-04-19 16:12 UTC (WIKI_V2_ENABLED no pipeline + documentação)
+
+- Lincoln pediu execução de "2 + 1" (consolidation backfill + rollout gradual), seguido de conexão real do flag no pipeline.
+- Backfill executado em estado isolado (`.research/backfill-monfri/state.json`), sem tocar SSOT de produção (`state/identity-graph/state.json`).
+- Rollout env ativado: `WIKI_V2_ENABLED=true` em `~/.openclaw/.env`.
+- TDD para conexão do flag no pipeline:
+  - novo arquivo `tests/research/test_pipeline_wiki_v2_flag.py`
+  - RED verificado (4 falhas)
+  - GREEN implementado em `vault/research/pipeline.py`:
+    - `self.wiki_v2_active = is_wiki_v2_enabled()` no início de `run()`
+    - `run_started` auditando `wiki_v2_active`
+- Verificação:
+  - `PYTHONPATH=. pytest tests/research/test_pipeline_wiki_v2_flag.py -q` → **4 passed**
+  - subset pipelines + flag → **61 passed**
+  - sanity canônico `PYTHONPATH=. pytest tests/research/ -q` → **443 passed**
+- Commit e push:
+  - commit `d81eb7e`
+  - branch `master` pushada para `origin/master`
+- Documentação desta sessão atualizada em `MEMORY.md`, `memory/curated/livy-memory-agent.md`, `HEARTBEAT.md` e `.claude/napkin.md`.

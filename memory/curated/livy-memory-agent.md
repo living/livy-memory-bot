@@ -78,6 +78,81 @@ status: ativo
 
 ---
 
+## PR #20 — Wiki v2 Phase 1 Foundation (merge 2026-04-19)
+
+### Decisão
+
+Mergear PR #20 após validação E2E completa sem ajustes necessários.
+
+### O que entrou no merge
+
+- `vault/memory_core/models.py` — `Claim`, `Evidence`, `SourceRef`, `AuditTrail` com invariantes obrigatórias em `Claim.validate()`:
+  - `evidence_ids` não pode ser vazio
+  - `audit_trail` é obrigatório
+  - `superseded_by` exige `supersession_reason` + `supersession_version`
+  - Impede `supersession_reason/version` quando `superseded_by` é `None`
+- `vault/fusion_engine/confidence.py` — fórmula de confiança: base 0.5 + fonte + recência + convergência − contradição (clamp 0-1)
+- `vault/fusion_engine/contradiction.py` — detecção de contradição por `topic_id + entity_id` + texto divergente (ignora superseded)
+- `vault/fusion_engine/supersession.py` — supersession por timestamp, gera nova instância + valida invariantes
+- `vault/fusion_engine/engine.py` — orquestra contradição + supersession + confiança
+- `vault/capture/azure_blob_client.py` — transcripts Azure Blob (padrões configuráveis por env, 2 paths: consolidado → original → fallback Supabase)
+- `vault/capture/supabase_transcript.py` — fallback segmentado para Supabase
+- `vault/research/azure_blob_client.py` + `vault/research/supabase_transcript.py` — clientes legacy research (texto raw)
+- `vault/research/tldv_client.py` atualizado — `fetch_meeting_transcript()` agora prefere Azure, fallback Supabase
+- `vault/research/trello_parsers.py` — extrai GitHub links, horas, normaliza via `ParsedTrelloCard`
+- `vault/research/github_parsers.py` — extrai approvers, refs, statuses via `GitHubRichClient`
+- `vault/research/state_store.py` — idempotência dual-key: `content_key = {source}:{source_id}:{sha256(payload)}`, skip por conteúdo além de evento
+- `vault/ops/shadow_run.py` — diff + relatório em `state/shadow-run-reports/`
+- `vault/ops/rollback.py` — patch via feature flag (estrutura pronta/indicativa)
+- `vault/ops/replay_pipeline.py` — replay determinístico a partir de audit log, claim_id por hash do evento
+- `docs/superpowers/specs/2026-04-19-wiki-v2-design.md` — especificação completa do sistema Wiki v2
+- `docs/superpowers/plans/2026-04-19-wiki-v2-implementation.md` — plano detalhado por tarefas (TDD estrito)
+
+### Verificação operacional pós-merge
+
+- PR #20: `MERGED` em `master` (commit `a1c0dd3`).
+- Workspace sincronizado: `git reset --hard origin/master` → `a1c0dd3`.
+- Sanity checks executados:
+  - `PYTHONPATH=. pytest tests/research/ -q` → **439 passed**
+  - `PYTHONPATH=. pytest tests/vault/ -q` → **90 passed**
+  - `ResearchPipeline(source='github', ...)` smoke → OK, `cadence_state_path` resolvido corretamente
+
+### Gaps documentados (sem ação necessária no momento)
+
+- Parsers geram "claim dicts" de pipeline, não objetos `Claim` do Memory Core — convergência fica para fase de consolidação.
+- Dual implementation Azure (research texto vs capture segments) — requer disciplina para evitar drift.
+- `vault/ops/rollback.py` missing `import json` — estruturalmente pronto, mas uso real precisa verificar.
+
+## WIKI_V2_ENABLED no ResearchPipeline (2026-04-19)
+
+### Decisão
+
+Conectar o feature flag `WIKI_V2_ENABLED` ao `ResearchPipeline` para permitir rollout gradual auditável da Wiki v2 sem alterar SSOT de forma implícita.
+
+### Implementação
+
+- `vault/research/pipeline.py`
+  - import de `is_wiki_v2_enabled` (`vault.ops.rollback`)
+  - inicialização de `self.wiki_v2_active = is_wiki_v2_enabled()` no início de `run()`
+  - enriquecimento de `run_started` no audit com `wiki_v2_active`
+- Novo teste TDD:
+  - `tests/research/test_pipeline_wiki_v2_flag.py`
+  - cenários: flag `true`, `false`, unset + assert de auditoria
+
+### Verificação
+
+- RED: teste novo falhando antes da implementação
+- GREEN:
+  - `PYTHONPATH=. pytest tests/research/test_pipeline_wiki_v2_flag.py -q` → **4 passed**
+  - `PYTHONPATH=. pytest tests/research/test_pipeline_tldv.py tests/research/test_pipeline_github.py tests/research/test_pipeline_trello.py tests/research/test_pipeline_wiki_v2_flag.py -q` → **61 passed**
+  - `PYTHONPATH=. pytest tests/research/ -q` → **443 passed**
+
+### Commit
+
+- `d81eb7e` — `feat(research): connect WIKI_V2_ENABLED flag to ResearchPipeline`
+
+---
+
 ## PR #18 — Batch-first Research Pipeline (merge 2026-04-19)
 
 ### Decisão

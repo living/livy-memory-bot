@@ -1,6 +1,6 @@
 # HEARTBEAT — Livy Memory Agent
 
-_Atualizado: 2026-04-19 02:04 UTC (23:04 BRT)_
+_Atualizado: 2026-04-19 16:12 UTC (13:12 BRT)_
 
 ## Jobs Ativos — 21 crons
 
@@ -55,6 +55,7 @@ _Atualizado: 2026-04-19 02:04 UTC (23:04 BRT)_
 | ✅ Smoke test manual dos crons de research | `research-trello` processed=390, `research-github`/`research-tldv` ok, `research-consolidation` sem alertas |
 | ✅ **PR #18 mergeada — batch-first research pipeline** | merge `08672fd` squash; github_client two-step (search→pulls), tldv_client cutoff always applied, cadence wired in pipeline, global cadence documented; sanity: 343 tests, smoke OK |
 | ✅ **Hotfix `8e1bc76` — gh search GET** | `gh api search/issues` precisa `-X GET` senão usa POST → 404 em todos os repos; 370 tests passing; 11 PRs processados (inclui #19) |
+| ✅ **PR #20 mergeada — Wiki v2 Phase 1 Foundation** | merge `a1c0dd3` squash; Memory Core + Fusion Engine + Azure-first capture + dual-key idempotency + ops (shadow/rollback/replay); validação pós-merge: 439 tests research + 90 tests vault |
 | ✅ **PR #17 mergeada — Evo Wiki Research Phase 2** | merge `842852c` squash; Trello stream + circuit breaker + self-healing write-mode; 2 bloqueantes corrigidos (namespace event_key + untrack metrics); 321 testes passing |
 
 ## Memória
@@ -140,3 +141,6 @@ gh api graphql -f query='{ marketplacePurchases(first:5) { nodes { plan { name }
 | ✅ docs: MEMORY.md + livy-memory-agent.md atualizados | registro de PR #19 e fix |
 | ✅ docs: consolidation-log atualizado | session log de 2026-04-19 02:50 UTC |
 | 🟡 Test failure em `skills/meetings-tldv/` | pre-existente, não relacionado a PR #19; skill fora do escopo do repo |
+| ✅ **WIKI_V2_ENABLED conectado ao ResearchPipeline** | commit `d81eb7e`; flag audita `wiki_v2_active` no `run_started`; TDD 4 testes passando; 443 tests research |
+| ✅ **Consolidation backfill seg-sex executado** | `.research/backfill-monfri/state.json` isolado; SSOT produção intocado; 8 eventos Trello dentro da janela |
+| ✅ **Rollout gradual ativado** | `WIKI_V2_ENABLED=true` em `~/.openclaw/.env`; `is_wiki_v2_enabled()=True` |

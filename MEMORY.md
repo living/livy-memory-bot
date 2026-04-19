@@ -182,4 +182,46 @@ Monitorando — não é bug, mas volume elevado.
 
 ---
 
+### 2026-04-19 — PR #20 mergeada: Wiki v2 Phase 1 Foundation
+
+Merge da foundation da Wiki v2: **Memory Core** (invariantes de Claim/Evidence), **Fusion Engine** (confiança, contradição, supersession), **Azure Blob transcripts** (com fallback Supabase segmentado), **Trello/GitHub parsers** evoluídos, **idempotência dual-key** (event_key + content_key), e utilitários operacionais (**shadow run, rollback, replay**).
+
+**Commit:** `a1c0dd3` (squash) | Branch: `feature/wiki-v2-phase1-subagent`
+
+**Validação pós-merge:**
+- `PYTHONPATH=. pytest tests/research/ -q` → **439 passed**
+- `PYTHONPATH=. pytest tests/vault/ -q` → **90 passed**
+- `ResearchPipeline(...)` smoke → OK
+- Sem ajustes necessários após merge; todo o conteúdo do PR era consistente com a base.
+
+**Arquitetura nova (módulos entregues):**
+- `vault/memory_core/` — models Claim/Evidence/SourceRef/AuditTrail + validação de invariantes
+- `vault/fusion_engine/` — confidence scoring, contradição, supersession, engine de fusão
+- `vault/capture/azure_blob_client.py` + `vault/capture/supabase_transcript.py` — transcripts segmentados (Azure-first + fallback)
+- `vault/research/trello_parsers.py` + `vault/research/github_parsers.py` — parsers normalizados
+- `vault/ops/shadow_run.py` + `vault/ops/rollback.py` + `vault/ops/replay_pipeline.py` — operações seguras
+- `vault/research/state_store.py` — idempotência dual-key com `processed_content_keys`
+
+**Pontos de atenção documentados (PR body):**
+- Parsers ainda geram "claim dicts" de pipeline, não objetos `Claim` do Memory Core (convergência na fase de consolidação)
+- Convivência de `vault/research/azure_blob_client.py` (texto raw) vs `vault/capture/azure_blob_client.py` (segments) exige disciplina para evitar drift
+- Rollback helper com possível missing import de `json`
+
+Topic file: `memory/curated/livy-memory-agent.md`
+
+### 2026-04-19 — WIKI_V2_ENABLED conectado ao ResearchPipeline (rollout auditável)
+
+Implementação do gating real da Wiki v2 no pipeline de research:
+- `vault/research/pipeline.py` agora lê `WIKI_V2_ENABLED` via `is_wiki_v2_enabled()`
+- `run_started` passa a registrar `wiki_v2_active` no `audit.log`
+- comportamento coberto por TDD em `tests/research/test_pipeline_wiki_v2_flag.py` (4 testes)
+
+Validação:
+- `PYTHONPATH=. pytest tests/research/test_pipeline_wiki_v2_flag.py -q` → **4 passed**
+- subset pipeline (`tldv/github/trello + wiki_v2_flag`) → **61 passed**
+- suíte canônica: `PYTHONPATH=. pytest tests/research/ -q` → **443 passed**
+
+Commit: `d81eb7e`
+Topic file: `memory/curated/livy-memory-agent.md`
+
 _Last updated: 2026-04-19_
