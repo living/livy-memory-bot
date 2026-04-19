@@ -51,6 +51,7 @@ _Atualizado: 2026-04-19 16:12 UTC (13:12 BRT)_
 | ✅ PR #15 mergeada (`6ea8005`) — fallback `TELEGRAM_TOKEN` | Compatibilidade com ambiente de produção atual |
 | 🆕 Cron `vault-insights-weekly-validate` | Validação preventiva semanal antes da geração |
 | 🆕 Cron `vault-insights-weekly-generate` | Geração + envio semanal para `7426291192` |
+| ✅ Weekly insights claims-first + fallback por cobertura temporal | Novos módulos `vault/insights/claim_inspector.py` + `renderers.py`; grupo recebe HTML como documento em `-5158607302` |
 | 🆕 Crons `research-tldv`, `research-github` e `research-trello` | Polling por fonte com lock distribuído e rebuild de estado derivado |
 | 🆕 Cron `research-consolidation` | Consolidação diária 07h BRT substituindo `dream-memory-consolidation` |
 | ✅ Smoke test manual dos crons de research | `research-trello` processed=390, `research-github`/`research-tldv` ok, `research-consolidation` sem alertas |
