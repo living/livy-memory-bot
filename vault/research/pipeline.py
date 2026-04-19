@@ -32,6 +32,7 @@ from vault.research.github_client import GitHubClient
 from vault.research.github_rich_client import GitHubRichClient, extract_github_refs, extract_trello_urls
 from vault.research.github_parsers import pr_to_claims
 from vault.research.trello_client import TrelloClient
+from vault.research.trello_parsers import parse_trello_card, card_to_claims
 from vault.research.tldv_client import TLDVClient
 from vault.research.cadence_manager import record_budget_warning, record_healthy_run
 from vault.ops.rollback import is_wiki_v2_enabled
@@ -688,7 +689,11 @@ class ResearchPipeline:
         claim_path.write_text(content, encoding="utf-8")
         return str(claim_path)
 
-    def _process_wiki_v2_github_event(self, event: dict[str, Any], payload: dict[str, Any]) -> dict[str, Any]:
+    def _fuse_and_persist_normalized_claims(
+        self,
+        event: dict[str, Any],
+        claims_normalized: list[dict[str, Any]],
+    ) -> dict[str, Any]:
         state = load_state(self.state_path)
         claims_raw = list(state.get("claims", []))
 
@@ -698,33 +703,6 @@ class ResearchPipeline:
                 c = self._claim_from_state_dict(raw)
                 if c is not None:
                     existing_claims.append(c)
-
-        pr_number = payload.get("pr_number") or event.get("pr_number")
-        repo = payload.get("repo") or event.get("repo") or ""
-        if pr_number is None or not repo:
-            return {"claims_written": 0, "claims_superseded": 0}
-
-        # Convert rich GitHub payload to normalized claims.
-        # pr_to_claims expects GitHub API-like PR shape (number/base.repo/user/html_url).
-        if isinstance(payload, dict) and isinstance(payload.get("base"), dict):
-            pr_payload = payload
-        else:
-            pr_payload = {
-                "number": pr_number,
-                "title": payload.get("title") if isinstance(payload, dict) else "",
-                "body": payload.get("body") if isinstance(payload, dict) else "",
-                "state": payload.get("state") if isinstance(payload, dict) else "closed",
-                "merged": payload.get("merged") if isinstance(payload, dict) else False,
-                "merged_at": payload.get("merged_at") if isinstance(payload, dict) else None,
-                "created_at": payload.get("created_at") if isinstance(payload, dict) else None,
-                "base": {"repo": {"full_name": repo}},
-                "html_url": f"https://github.com/{repo}/pull/{pr_number}",
-                "user": payload.get("author") if isinstance(payload.get("author"), dict) else payload.get("user", {}) if isinstance(payload, dict) else {},
-                "labels": payload.get("labels", []) if isinstance(payload, dict) else [],
-                "milestone": payload.get("milestone") if isinstance(payload, dict) else None,
-            }
-
-        claims_normalized = pr_to_claims(pr_payload, payload.get("reviews", []) if isinstance(payload, dict) else [])
 
         event_key = self._calculate_event_key(event)
         superseded_total = 0
@@ -759,6 +737,89 @@ class ResearchPipeline:
         state["claims"] = claims_raw
         save_state(state, self.state_path)
         return {"claims_written": written, "claims_superseded": superseded_total}
+
+    def _process_wiki_v2_github_event(self, event: dict[str, Any], payload: dict[str, Any]) -> dict[str, Any]:
+        pr_number = payload.get("pr_number") or event.get("pr_number")
+        repo = payload.get("repo") or event.get("repo") or ""
+        if pr_number is None or not repo:
+            return {"claims_written": 0, "claims_superseded": 0}
+
+        # Convert rich GitHub payload to normalized claims.
+        # pr_to_claims expects GitHub API-like PR shape (number/base.repo/user/html_url).
+        if isinstance(payload, dict) and isinstance(payload.get("base"), dict):
+            pr_payload = payload
+        else:
+            pr_payload = {
+                "number": pr_number,
+                "title": payload.get("title") if isinstance(payload, dict) else "",
+                "body": payload.get("body") if isinstance(payload, dict) else "",
+                "state": payload.get("state") if isinstance(payload, dict) else "closed",
+                "merged": payload.get("merged") if isinstance(payload, dict) else False,
+                "merged_at": payload.get("merged_at") if isinstance(payload, dict) else None,
+                "created_at": payload.get("created_at") if isinstance(payload, dict) else None,
+                "base": {"repo": {"full_name": repo}},
+                "html_url": f"https://github.com/{repo}/pull/{pr_number}",
+                "user": payload.get("author") if isinstance(payload.get("author"), dict) else payload.get("user", {}) if isinstance(payload, dict) else {},
+                "labels": payload.get("labels", []) if isinstance(payload, dict) else [],
+                "milestone": payload.get("milestone") if isinstance(payload, dict) else None,
+            }
+
+        claims_normalized = pr_to_claims(pr_payload, payload.get("reviews", []) if isinstance(payload, dict) else [])
+        return self._fuse_and_persist_normalized_claims(event, claims_normalized)
+
+    def _process_wiki_v2_trello_event(self, event: dict[str, Any]) -> dict[str, Any]:
+        card_id = str(event.get("card_id", ""))
+        if not card_id:
+            return {"claims_written": 0, "claims_superseded": 0}
+
+        card_payload = {
+            "id": card_id,
+            "name": event.get("card_name", ""),
+            "url": event.get("card_url", f"https://trello.com/c/{card_id}"),
+            "idBoard": event.get("board_id", ""),
+            "desc": "\n".join(event.get("github_links", [])) if isinstance(event.get("github_links"), list) else "",
+            "labels": event.get("labels", []) if isinstance(event.get("labels"), list) else [],
+            "due": event.get("due_date"),
+            "dateLastActivity": event.get("timestamp") or event.get("event_at"),
+        }
+        list_name = str(event.get("list_id") or "unknown")
+        parsed = parse_trello_card(card_payload, list_name=list_name)
+        claims_normalized = card_to_claims(parsed)
+        return self._fuse_and_persist_normalized_claims(event, claims_normalized)
+
+    def _process_wiki_v2_tldv_event(self, event: dict[str, Any], payload: dict[str, Any]) -> dict[str, Any]:
+        meeting_id = str(payload.get("meeting_id") or payload.get("id") or event.get("meeting_id") or "")
+        if not meeting_id:
+            return {"claims_written": 0, "claims_superseded": 0}
+
+        event_ts = str(
+            payload.get("event_at")
+            or payload.get("updated_at")
+            or payload.get("created_at")
+            or event.get("event_at")
+            or event.get("updated_at")
+            or datetime.now(timezone.utc).isoformat()
+        )
+        summary = str(payload.get("summary") or payload.get("name") or f"Meeting {meeting_id}")
+        source_ref = {
+            "source_id": meeting_id,
+            "url": payload.get("url") if isinstance(payload, dict) else None,
+        }
+
+        claims_normalized = [
+            {
+                "source": "tldv",
+                "claim_type": "status",
+                "entity_type": "meeting",
+                "entity_id": meeting_id,
+                "text": summary,
+                "event_timestamp": event_ts,
+                "source_ref": source_ref,
+                "metadata": {"author": "system"},
+            }
+        ]
+
+        return self._fuse_and_persist_normalized_claims(event, claims_normalized)
 
     def run(self) -> dict[str, Any]:
         # WIKI_V2_ENABLED feature flag — gates wiki v2 behavior (Memory Core + Fusion Engine)
@@ -871,8 +932,15 @@ class ResearchPipeline:
                     "entity_type": "event",
                 }
 
-            if self.wiki_v2_active and self.source == "github" and isinstance(payload, dict):
-                v2_stats = self._process_wiki_v2_github_event(event, payload)
+            if self.wiki_v2_active:
+                v2_stats = {"claims_written": 0, "claims_superseded": 0}
+                if self.source == "github" and isinstance(payload, dict):
+                    v2_stats = self._process_wiki_v2_github_event(event, payload)
+                elif self.source == "trello":
+                    v2_stats = self._process_wiki_v2_trello_event(event)
+                elif self.source == "tldv" and isinstance(payload, dict):
+                    v2_stats = self._process_wiki_v2_tldv_event(event, payload)
+
                 self._log_audit("wiki_v2_event_processed", {
                     "event_key": self._calculate_event_key(event),
                     **v2_stats,
