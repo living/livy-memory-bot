@@ -4,9 +4,9 @@ API:
     load_transcript_segments(meeting_id) -> list[dict]
 
 Behavior:
-- Uses AZURE_STORAGE_ACCOUNT and AZURE_STORAGE_KEY from env.
+- Uses AZURE_STORAGE_ACCOUNT_NAME and AZURE_STORAGE_ACCOUNT_KEY from env.
 - Container defaults to AZURE_STORAGE_CONTAINER or "meetings".
-- Tries two blob naming patterns.
+- Tries two blob naming patterns (consolidated, then original), configurable by env.
 - Falls back to Supabase segment loader when Azure content is missing.
 """
 from __future__ import annotations
@@ -22,13 +22,33 @@ logger = logging.getLogger(__name__)
 
 
 DEFAULT_CONTAINER = "meetings"
+DEFAULT_TRANSCRIPT_CONSOLIDATED_PATTERN = "meetings/{meeting_id}.transcript.json"
+DEFAULT_TRANSCRIPT_ORIGINAL_PATTERN = "meetings/{meeting_id}.transcript.tldv.json"
+
+
+def _resolve_blob_pattern(pattern: str, meeting_id: str) -> str:
+    """Resolve a blob path pattern with either {meeting_id} or {id}."""
+    clean = meeting_id.strip().lstrip("/")
+    if "{meeting_id}" in pattern:
+        return pattern.format(meeting_id=clean)
+    if "{id}" in pattern:
+        return pattern.format(id=clean)
+    return pattern.format(meeting_id=clean)
 
 
 def _candidate_blob_paths(meeting_id: str) -> list[str]:
-    clean = meeting_id.strip().lstrip("/")
+    consolidated_pattern = os.environ.get(
+        "AZURE_TRANSCRIPT_CONSOLIDATED_PATTERN",
+        DEFAULT_TRANSCRIPT_CONSOLIDATED_PATTERN,
+    )
+    original_pattern = os.environ.get(
+        "AZURE_TRANSCRIPT_ORIGINAL_PATTERN",
+        DEFAULT_TRANSCRIPT_ORIGINAL_PATTERN,
+    )
+
     return [
-        f"meetings/{clean}.transcript.json",
-        f"{clean}/transcript.json",
+        _resolve_blob_pattern(consolidated_pattern, meeting_id),
+        _resolve_blob_pattern(original_pattern, meeting_id),
     ]
 
 
@@ -89,8 +109,8 @@ def load_transcript_segments(meeting_id: str | None) -> list[dict[str, Any]]:
     if not meeting_id or not str(meeting_id).strip():
         return []
 
-    account = os.environ.get("AZURE_STORAGE_ACCOUNT", "").strip()
-    key = os.environ.get("AZURE_STORAGE_KEY", "").strip()
+    account = os.environ.get("AZURE_STORAGE_ACCOUNT_NAME", "").strip()
+    key = os.environ.get("AZURE_STORAGE_ACCOUNT_KEY", "").strip()
     container = os.environ.get("AZURE_STORAGE_CONTAINER", DEFAULT_CONTAINER).strip() or DEFAULT_CONTAINER
 
     if account and key:
