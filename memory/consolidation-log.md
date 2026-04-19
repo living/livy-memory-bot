@@ -95,3 +95,49 @@
   - `git reset --hard origin/master` → workspace sincronizado com `842852c`.
   - `python3 -m pytest tests/research/ -q` → **321 passed**.
   - Cron status: `research-tldv` e `research-github` OK; `research-trello` com erro de delivery (`Delivering to Telegram requires target <chatId>`), não de execução do pipeline.
+
+
+## Consolidation 2026-04-19T00:45:02.754115+00:00
+{
+  "run_at": "2026-04-19T00:45:02.754102+00:00",
+  "tldv": {
+    "events_processed": 0,
+    "events_skipped": 0,
+    "status": "success"
+  },
+  "github": {
+    "events_processed": 0,
+    "events_skipped": 0,
+    "status": "success"
+  },
+  "metrics": {
+    "github": {
+      "key_count": 0,
+      "size_bytes": 2
+    },
+    "tldv": {
+      "key_count": 0,
+      "size_bytes": 2
+    },
+    "trello": {
+      "key_count": 180,
+      "size_bytes": 16560
+    }
+  },
+  "snapshot_created": false,
+  "watchdog_alerts": []
+}
+
+## Session Log — 2026-04-19 02:04 UTC (PR #18 merge + sync + sanity)
+
+- PR #18 (`feature/research-pipeline-batch-first-impl` → `master`) **mergeada via squash**.
+- Merge commit em `master`: `08672fd`.
+- Workspace sincronizado pós-merge:
+  - `git fetch origin`
+  - `git checkout master`
+  - `git pull --ff-only origin master`
+- Sanity checks executados após sync:
+  - `PYTHONPATH=. pytest tests/research/ -q` → **343 passed**.
+  - Smoke de imports (`run_research_trello`, `run_research_github`, `run_research_tldv`, `run_research_consolidation`) → OK.
+  - Smoke de pipeline/cadence (`ResearchPipeline(...).cadence_state_path`) → OK.
+- Resultado: sem correções adicionais necessárias após merge/sync; estado operacional consistente com o que foi revisado na PR.

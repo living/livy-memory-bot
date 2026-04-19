@@ -1,6 +1,6 @@
 # HEARTBEAT — Livy Memory Agent
 
-_Atualizado: 2026-04-19 00:32 UTC (21:32 BRT)_
+_Atualizado: 2026-04-19 02:04 UTC (23:04 BRT)_
 
 ## Jobs Ativos — 21 crons
 
@@ -38,6 +38,7 @@ _Atualizado: 2026-04-19 00:32 UTC (21:32 BRT)_
 | 🟡 | Jobs legados desabilitados (openclaw-health, sonhar, signal-curation, daily-memory-save) | Manter desabilitados ou replanejar com configuração nova |
 | 🟢 | Vault insights semanal operacional | Manter monitoramento das segundas 06:30/07:00 |
 | 🟢 | Loop de research v1 (TLDV/GitHub/Trello/Consolidation) ativo | Manter observabilidade de lock, rebuild de estado e retry policy |
+| ✅ | **PR #18 mergeada — batch-first research clients + cadence wiring** | merge `08672fd` squash; 958 inserções; 6 correções de review implementadas; 343 testes research passando |
 | ✅ | **PR #17 mergeada — Evo Wiki Research Phase 2** | merge `842852c` squash; 15 commits; 321 testes; 2 bloqueantes corrigidos (namespace event_key + untrack metrics) |
 
 ## Mudanças desde Último HEARTBEAT
@@ -52,6 +53,7 @@ _Atualizado: 2026-04-19 00:32 UTC (21:32 BRT)_
 | 🆕 Crons `research-tldv`, `research-github` e `research-trello` | Polling por fonte com lock distribuído e rebuild de estado derivado |
 | 🆕 Cron `research-consolidation` | Consolidação diária 07h BRT substituindo `dream-memory-consolidation` |
 | ✅ Smoke test manual dos crons de research | `research-trello` processed=390, `research-github`/`research-tldv` ok, `research-consolidation` sem alertas |
+| ✅ **PR #18 mergeada — batch-first research pipeline** | merge `08672fd` squash; github_client two-step (search→pulls), tldv_client cutoff always applied, cadence wired in pipeline, global cadence documented; sanity: 343 tests, smoke OK |
 | ✅ **PR #17 mergeada — Evo Wiki Research Phase 2** | merge `842852c` squash; Trello stream + circuit breaker + self-healing write-mode; 2 bloqueantes corrigidos (namespace event_key + untrack metrics); 321 testes passing |
 
 ## Memória
@@ -59,7 +61,7 @@ _Atualizado: 2026-04-19 00:32 UTC (21:32 BRT)_
 | Camada | Estado |
 |---|---|
 | Observations (claude-mem) | ✅ worker 37777 ativo |
-| Curated (topic files) | ✅ atualizado com Vault Insights + PRs #13/#14/#15 |
+| Curated (topic files) | ✅ atualizado com Vault Insights + PRs #13/#14/#15/#17/#18 |
 | Operational (crons) | ✅ 3 novos jobs operacionais adicionados |
 
 ## Incident Playbook

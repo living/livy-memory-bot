@@ -89,6 +89,25 @@ Decisão: substituir a consolidação legada por um loop de research v1 composto
 SSOT permanece em `state/identity-graph/state.json`; arquivos `.research/<source>/state.json` são cache derivado e descartável.
 Impacto: consolidação diária passa a refletir pipeline research v1 com lock distribuído, retry policy e rebuild determinístico do estado por fonte.
 
+### 2026-04-19 — PR #18 mergeada: batch-first research clients + cadence wiring
+
+Merge da evolução batch-first do pipeline research com clientes reais para GitHub/TLDV e integração de cadence no loop principal.
+
+**Correções de review implementadas antes do merge:**
+1. `research_trello_cron.py`: fallback inválido alinhado para `360` (6h) em vez de `20`.
+2. `tldv_client.py`: filtro temporal `updated_at=gte.<cutoff>` aplicado também no first-run (lookback de 7d).
+3. `github_client.py`: fluxo robusto em 2 etapas (`search/issues` → `repos/{owner}/{repo}/pulls/{number}`) para garantir `merged_at`, `merged`, `repo` e `author` estáveis.
+4. `cadence_manager.py`: contrato documentado explicitamente como **global cadence** (não per-source).
+5. Logging estruturado em falhas de clients (sem fail-open silencioso sem evidência).
+6. `pipeline.py`: wiring de `record_budget_warning`/`record_healthy_run` + teste de integração 4h↔6h.
+
+**Validação pós-merge:**
+- PR #18 mergeada em `master` (`08672fd`)
+- `343` testes da suíte research passando (`PYTHONPATH=. pytest tests/research/ -q`)
+- Smoke de imports/pipeline/cadence OK
+
+Topic file: `memory/curated/livy-memory-agent.md`
+
 ### 2026-04-19 — PR #17 mergeada: Evo Wiki Research Phase 2 (Trello + self-healing)
 
 Merge da fase 2 do pipeline de research: streaming de eventos Trello, circuit breaker com thresholds, rollback append-only, board-to-project mapper, e cron `research-trello` registrado.

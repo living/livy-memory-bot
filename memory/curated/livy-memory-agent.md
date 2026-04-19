@@ -78,6 +78,33 @@ status: ativo
 
 ---
 
+## PR #18 — Batch-first Research Pipeline (merge 2026-04-19)
+
+### Decisão
+
+Aprovar e mergear PR #18 após implementar feedback de review e validar suíte de research completa.
+
+### O que entrou no merge
+
+- `github_client.py` com fetch em 2 etapas (search → pulls) para payload consistente.
+- `tldv_client.py` com cutoff temporal obrigatório também em first-run.
+- `cadence_manager.py` formalizando contrato de **cadência global**.
+- `pipeline.py` com wiring de cadence (`record_budget_warning` / `record_healthy_run`).
+- `research_trello_cron.py` fallback de intervalo corrigido para 6h.
+- Testes de integração/cliente cobrindo os ajustes de review.
+
+### Verificação operacional pós-merge
+
+- PR #18: `MERGED` em `master` (commit `08672fd`).
+- Sanity checks executados no workspace sincronizado:
+  - `PYTHONPATH=. pytest tests/research/ -q` → **343 passed**
+  - imports de crons/pipeline/cadence → OK
+  - smoke de `ResearchPipeline(...).cadence_state_path` → OK
+
+### Guardrail ativo
+
+- Evolução de ingest de texto de PR (body/comments/reviews) fica para PR seguinte com feature flag e budget guardrails; não expandir escopo no PR de hardening.
+
 ## Crosslink Pipeline (Vault Ingest)
 
 Pipeline de enriquecimento de grafo que conecta PRs a projects e persons via GitHub API.
