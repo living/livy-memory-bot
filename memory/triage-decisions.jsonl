@@ -2,3 +2,11 @@
 {"timestamp": "2026-04-19T13:42:40.553490Z", "action": "route_to_triage", "signal_id": "sig-2026-0420-001", "tier": "C", "routed": false, "destination": "mattermost", "skipped_reason": "tier_c_deferred", "webhook_status": "skipped"}
 {"timestamp": "2026-04-19T13:45:40.690268Z", "action": "route_to_triage", "signal_id": "sig-2026-0420-001", "tier": "A", "routed": true, "destination": "mattermost", "webhook_status": "ok"}
 {"timestamp": "2026-04-19T13:45:40.691388Z", "action": "route_to_triage", "signal_id": "sig-2026-0420-001", "tier": "C", "routed": false, "destination": "mattermost", "skipped_reason": "tier_c_deferred", "webhook_status": "skipped"}
+{"timestamp": "2026-04-19T14:44:13.610175Z", "action": "route_to_triage", "signal_id": "sig-2026-0420-001", "tier": "A", "routed": true, "destination": "mattermost", "webhook_status": "ok"}
+{"timestamp": "2026-04-19T14:44:13.611673Z", "action": "route_to_triage", "signal_id": "sig-2026-0420-001", "tier": "C", "routed": false, "destination": "mattermost", "skipped_reason": "tier_c_deferred", "webhook_status": "skipped"}
+{"timestamp": "2026-04-19T14:55:56.113701Z", "action": "route_to_triage", "signal_id": "sig-2026-0420-001", "tier": "A", "routed": true, "destination": "mattermost", "webhook_status": "ok"}
+{"timestamp": "2026-04-19T14:55:56.114639Z", "action": "route_to_triage", "signal_id": "sig-2026-0420-001", "tier": "C", "routed": false, "destination": "mattermost", "skipped_reason": "tier_c_deferred", "webhook_status": "skipped"}
+{"timestamp": "2026-04-19T15:06:01.065163Z", "action": "route_to_triage", "signal_id": "sig-2026-0420-001", "tier": "A", "routed": true, "destination": "mattermost", "webhook_status": "ok"}
+{"timestamp": "2026-04-19T15:06:01.067160Z", "action": "route_to_triage", "signal_id": "sig-2026-0420-001", "tier": "C", "routed": false, "destination": "mattermost", "skipped_reason": "tier_c_deferred", "webhook_status": "skipped"}
+{"timestamp": "2026-04-19T15:09:19.551476Z", "action": "route_to_triage", "signal_id": "sig-2026-0420-001", "tier": "A", "routed": true, "destination": "mattermost", "webhook_status": "ok"}
+{"timestamp": "2026-04-19T15:09:19.552469Z", "action": "route_to_triage", "signal_id": "sig-2026-0420-001", "tier": "C", "routed": false, "destination": "mattermost", "skipped_reason": "tier_c_deferred", "webhook_status": "skipped"}
