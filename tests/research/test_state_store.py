@@ -12,6 +12,7 @@ from vault.research.state_store import (
     load_state,
     save_state,
     upsert_processed_event_key,
+    upsert_processed_content_key,
     compact_processed_keys,
     monthly_snapshot,
     state_metrics,
@@ -29,6 +30,7 @@ from vault.research.state_store import (
 
 FULL_STATE = {
     "processed_event_keys": {"github": [], "tldv": [], "trello": []},
+    "processed_content_keys": {"github": [], "tldv": [], "trello": []},
     "last_seen_at": {"github": None, "tldv": None, "trello": None},
     "pending_conflicts": [],
     "version": 1,
@@ -49,10 +51,12 @@ def tmp_state_file(tmp_path):
 
 
 def test_default_state_has_trello_sources():
-    """Trello must be present in processed_event_keys and last_seen_at."""
+    """Trello must be present in processed_event_keys/content_keys and last_seen_at."""
     assert "trello" in DEFAULT_STATE["processed_event_keys"]
+    assert "trello" in DEFAULT_STATE["processed_content_keys"]
     assert "trello" in DEFAULT_STATE["last_seen_at"]
     assert DEFAULT_STATE["processed_event_keys"]["trello"] == []
+    assert DEFAULT_STATE["processed_content_keys"]["trello"] == []
     assert DEFAULT_STATE["last_seen_at"]["trello"] is None
 
 
@@ -81,6 +85,7 @@ def test_load_state_returns_dict_with_required_keys(tmp_state_file):
     state = load_state(tmp_state_file)
     assert isinstance(state, dict)
     assert "processed_event_keys" in state
+    assert "processed_content_keys" in state
     assert "last_seen_at" in state
     assert "version" in state
 
@@ -97,6 +102,7 @@ def test_load_state_adds_trello_if_missing(tmp_path):
     """Legacy state without trello source should get it added on load."""
     legacy = {
         "processed_event_keys": {"github": [], "tldv": []},
+        "processed_content_keys": {"github": [], "tldv": []},
         "last_seen_at": {"github": None, "tldv": None},
         "version": 1,
     }
@@ -104,8 +110,10 @@ def test_load_state_adds_trello_if_missing(tmp_path):
     p.write_text(json.dumps(legacy))
     state = load_state(p)
     assert "trello" in state["processed_event_keys"]
+    assert "trello" in state["processed_content_keys"]
     assert "trello" in state["last_seen_at"]
     assert state["processed_event_keys"]["trello"] == []
+    assert state["processed_content_keys"]["trello"] == []
     assert state["last_seen_at"]["trello"] is None
 
 
@@ -113,6 +121,7 @@ def test_load_state_adds_pending_conflicts_if_missing(tmp_path):
     """Legacy state without pending_conflicts should get it added on load."""
     legacy = {
         "processed_event_keys": {"github": [], "tldv": [], "trello": []},
+        "processed_content_keys": {"github": [], "tldv": [], "trello": []},
         "last_seen_at": {"github": None, "tldv": None, "trello": None},
         "version": 1,
     }

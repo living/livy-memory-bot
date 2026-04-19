@@ -7,10 +7,12 @@ from __future__ import annotations
 
 import logging
 import os
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any
 
 import requests
+
+from vault.research.trello_parsers import ParsedTrelloCard, parse_trello_card
 
 logger = logging.getLogger(__name__)
 
@@ -61,14 +63,14 @@ class TrelloClient:
         # Allow constructor overrides, but env vars are the primary source
         self.api_key = api_key or os.environ.get("TRELLO_API_KEY", "")
         self.token = token or os.environ.get("TRELLO_TOKEN", "")
-        self.board_ids = board_ids or os.environ.get("TRELLO_BOARD_IDS", "").split(",")
+
+        env_board_ids = os.environ.get("TRELLO_BOARD_IDS", "")
+        raw_board_ids = board_ids if board_ids is not None else env_board_ids.split(",")
+        self.board_ids = [b.strip() for b in raw_board_ids if b and b.strip()]
 
         # Validate required credentials
         if not self.api_key or not self.token:
             raise EnvironmentError("TRELLO_API_KEY and TRELLO_TOKEN must be set")
-
-        # Filter out empty strings from board_ids
-        self.board_ids = [b.strip() for b in self.board_ids if b.strip()]
 
     def fetch_events_since(self, last_seen_at: str | None) -> list[dict[str, Any]]:
         """Fetch events from all configured boards since last_seen_at.
@@ -109,6 +111,87 @@ class TrelloClient:
 
         actions = response.json()
         return [self.normalize_action(action) for action in actions]
+
+    def get_normalized_cards(self, last_seen_at: str | None = None) -> list[ParsedTrelloCard]:
+        """Fetch and normalize cards from configured boards.
+
+        Args:
+            last_seen_at: ISO timestamp string; when provided, returns only cards
+                with dateLastActivity >= last_seen_at.
+
+        Returns:
+            Parsed Trello cards enriched with GitHub links and hours metadata.
+        """
+        normalized_cards: list[ParsedTrelloCard] = []
+
+        threshold_dt: datetime | None = None
+        if last_seen_at:
+            try:
+                threshold_dt = datetime.fromisoformat(last_seen_at.replace("Z", "+00:00"))
+            except ValueError:
+                logger.warning("Invalid last_seen_at timestamp %r; disabling date filter", last_seen_at)
+
+        for board_id in self.board_ids:
+            url = f"{TRELLO_API_BASE}/boards/{board_id}/cards"
+            params: dict[str, Any] = {
+                "key": self.api_key,
+                "token": self.token,
+                "fields": "id,name,url,idBoard,desc,labels,due,dateLastActivity,idList",
+            }
+
+            response = requests.get(url, params=params, timeout=30)
+            if response.status_code != 200:
+                raise TrelloAPIError(board_id, response.status_code, response.text)
+
+            cards = response.json()
+            list_name_cache: dict[str, str] = {}
+
+            for card in cards:
+                if threshold_dt is not None:
+                    last_activity = card.get("dateLastActivity")
+                    if not last_activity:
+                        continue
+
+                    card_dt: datetime | None = None
+                    try:
+                        card_dt = datetime.fromisoformat(last_activity.replace("Z", "+00:00"))
+                    except ValueError:
+                        logger.warning(
+                            "Invalid card dateLastActivity for card %s: %r; including card anyway",
+                            card.get("id"),
+                            last_activity,
+                        )
+
+                    if card_dt is not None and card_dt < threshold_dt:
+                        continue
+
+                list_id = card.get("idList", "")
+                if list_id not in list_name_cache:
+                    list_name_cache[list_id] = self._fetch_list_name(list_id)
+                list_name = list_name_cache[list_id]
+
+                normalized_cards.append(parse_trello_card(card, list_name))
+
+        return normalized_cards
+
+    def _fetch_list_name(self, list_id: str) -> str:
+        """Fetch Trello list name from list id."""
+        if not list_id:
+            return "unknown"
+
+        url = f"{TRELLO_API_BASE}/lists/{list_id}"
+        params = {
+            "key": self.api_key,
+            "token": self.token,
+            "fields": "name",
+        }
+        response = requests.get(url, params=params, timeout=30)
+
+        if response.status_code != 200:
+            logger.warning("Failed to fetch Trello list name for %s", list_id)
+            return "unknown"
+
+        return response.json().get("name", "unknown")
 
     def normalize_action(self, action: dict[str, Any]) -> dict[str, Any]:
         """Convert a Trello action dict into the internal event format.

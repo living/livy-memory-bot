@@ -11,6 +11,8 @@ from typing import Any
 
 import requests
 
+from vault.capture.azure_blob_client import load_transcript_segments
+
 logger = logging.getLogger(__name__)
 
 DEFAULT_LOOKBACK_DAYS = 7
@@ -26,13 +28,24 @@ class TLDVClient:
         supabase_key: str | None = None,
     ) -> None:
         self.lookback_days = lookback_days
-        # Use explicit value if provided (including empty string to override env);
-        # otherwise fall back to environment.
         self.supabase_url = (
             supabase_url if supabase_url is not None else os.environ.get("SUPABASE_URL", "")
         )
         self.supabase_key = (
             supabase_key if supabase_key is not None else os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
+        )
+
+    def _transcript_clients(self) -> tuple[Any, Any]:
+        """Lazy import transcript clients to keep module import-safe."""
+        from vault.research.azure_blob_client import AzureBlobClient
+        from vault.research.supabase_transcript import SupabaseTranscriptClient
+
+        return (
+            AzureBlobClient(),
+            SupabaseTranscriptClient(
+                supabase_url=self.supabase_url,
+                supabase_key=self.supabase_key,
+            ),
         )
 
     def fetch_events_since(self, last_seen_at: str | None) -> list[dict[str, Any]]:
@@ -47,21 +60,6 @@ class TLDVClient:
             "order": "updated_at.desc",
             "limit": 100,
         }
-
-        # Primary path (backward-compatible with existing test contract):
-        # apply temporal cursor on updated_at.
-        params["updated_at"] = f"gte.{cutoff.isoformat()}"
-
-        cutoff = self._compute_cutoff(last_seen_at)
-        headers = self._headers()
-        params: dict[str, Any] = {
-            "select": "id,name,created_at,updated_at,meeting_id",
-            "order": "updated_at.desc",
-            "limit": 100,
-        }
-
-        # Primary path (backward-compatible with existing test contract):
-        # apply temporal cursor on updated_at.
         params["updated_at"] = f"gte.{cutoff.isoformat()}"
 
         try:
@@ -98,7 +96,7 @@ class TLDVClient:
 
             rows = resp.json() or []
             return [self._normalize_meeting(row) for row in rows]
-        except Exception as exc:
+        except requests.RequestException as exc:
             logger.warning(
                 "source=tldv exception=%s url=%s",
                 exc,
@@ -108,12 +106,13 @@ class TLDVClient:
 
     def fetch_meeting(self, meeting_id: str) -> dict[str, Any]:
         """Fetch one meeting by ID and normalize it."""
-        if not self.supabase_url or not self.supabase_key:
+        normalized_meeting_id = (meeting_id or "").strip()
+        if not self.supabase_url or not self.supabase_key or not normalized_meeting_id:
             return {}
 
         headers = self._headers()
         params = {
-            "id": f"eq.{meeting_id}",
+            "id": f"eq.{normalized_meeting_id}",
             "limit": 1,
         }
 
@@ -130,8 +129,30 @@ class TLDVClient:
             if not rows:
                 return {}
             return self._normalize_meeting(rows[0])
-        except Exception:
+        except requests.RequestException:
             return {}
+
+    def fetch_meeting_transcript(self, meeting_id: str) -> str | None:
+        """Fetch transcript preferring Azure Blob, fallback to Supabase transcript fields."""
+        normalized_meeting_id = (meeting_id or "").strip()
+        if not normalized_meeting_id:
+            return None
+
+        azure_client, supabase_client = self._transcript_clients()
+        transcript = azure_client.fetch_transcript(normalized_meeting_id)
+        if transcript:
+            return transcript
+
+        return supabase_client.fetch_transcript(normalized_meeting_id)
+
+    def load_transcript_segments(self, meeting_id: str) -> list[dict[str, Any]]:
+        """Load structured transcript segments via vault.capture module.
+
+        Tries Azure Blob first (two naming patterns), falls back to Supabase
+        meetings table. Returns empty list for empty/missing meeting_id or when
+        no source is available.
+        """
+        return load_transcript_segments(meeting_id)
 
     def _compute_cutoff(self, last_seen_at: str | None) -> datetime:
         if last_seen_at:

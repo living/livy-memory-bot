@@ -10,6 +10,7 @@ from typing import Any
 
 DEFAULT_STATE = {
     "processed_event_keys": {"github": [], "tldv": [], "trello": []},
+    "processed_content_keys": {"github": [], "tldv": [], "trello": []},
     "last_seen_at": {"github": None, "tldv": None, "trello": None},
     "pending_conflicts": [],
     "version": 1,
@@ -68,15 +69,17 @@ def load_state(state_path: str | Path = DEFAULT_STATE_PATH) -> dict[str, Any]:
     # Normalize: ensure all required top-level keys exist.
     if "processed_event_keys" not in raw:
         raw["processed_event_keys"] = {"github": [], "tldv": [], "trello": []}
+    if "processed_content_keys" not in raw:
+        raw["processed_content_keys"] = {"github": [], "tldv": [], "trello": []}
     if "last_seen_at" not in raw:
         raw["last_seen_at"] = {"github": None, "tldv": None, "trello": None}
     if "version" not in raw:
         raw["version"] = 1
 
     # Retroactively add trello source to legacy state files.
-    for section in ("processed_event_keys", "last_seen_at"):
+    for section in ("processed_event_keys", "processed_content_keys", "last_seen_at"):
         if section in raw and "trello" not in raw[section]:
-            raw[section]["trello"] = [] if section == "processed_event_keys" else None
+            raw[section]["trello"] = [] if section in {"processed_event_keys", "processed_content_keys"} else None
 
     # Retroactively add pending_conflicts to legacy state files.
     if "pending_conflicts" not in raw:
@@ -113,6 +116,31 @@ def upsert_processed_event_key(
     return state
 
 
+def upsert_processed_content_key(
+    source: str,
+    content_key: str,
+    event_at: datetime | str,
+    state_path: str | Path = DEFAULT_STATE_PATH,
+) -> dict[str, Any]:
+    """Store a content_key in the SSOT state.
+
+    Content keys dedupe *semantically identical* content even when it arrives
+    via different event keys (e.g. replay / retry scenarios).
+
+    Idempotent: calling twice with the same key does not duplicate entries.
+    """
+    state = load_state(state_path)
+    processed = state.setdefault("processed_content_keys", {})
+    entries = processed.setdefault(source, [])
+
+    existing = any(item.get("key") == content_key for item in entries if isinstance(item, dict))
+    if not existing:
+        entries.append({"key": content_key, "event_at": _to_iso(event_at)})
+
+    save_state(state, state_path)
+    return state
+
+
 def compact_processed_keys(
     retention_days: int = 180,
     state_path: str | Path = DEFAULT_STATE_PATH,
@@ -120,22 +148,26 @@ def compact_processed_keys(
     state = load_state(state_path)
     cutoff = datetime.now(timezone.utc) - timedelta(days=retention_days)
 
-    processed = state.setdefault("processed_event_keys", {})
-    for source, entries in processed.items():
-        cleaned: list[dict[str, Any]] = []
-        for item in entries:
-            if not isinstance(item, dict):
-                continue
-            event_at = item.get("event_at")
-            if not event_at:
-                continue
-            try:
-                dt = _parse_iso(event_at)
-            except ValueError:
-                continue
-            if dt >= cutoff:
-                cleaned.append(item)
-        processed[source] = cleaned
+    def _compact_section(section_name: str) -> None:
+        section = state.setdefault(section_name, {})
+        for source, entries in section.items():
+            cleaned: list[dict[str, Any]] = []
+            for item in entries:
+                if not isinstance(item, dict):
+                    continue
+                event_at = item.get("event_at")
+                if not event_at:
+                    continue
+                try:
+                    dt = _parse_iso(event_at)
+                except ValueError:
+                    continue
+                if dt >= cutoff:
+                    cleaned.append(item)
+            section[source] = cleaned
+
+    _compact_section("processed_event_keys")
+    _compact_section("processed_content_keys")
 
     save_state(state, state_path)
     return state
@@ -148,6 +180,7 @@ def monthly_snapshot(state_path: str | Path = DEFAULT_STATE_PATH) -> dict[str, A
         "version": state.get("version", 1),
         "last_seen_at": copy.deepcopy(state.get("last_seen_at", {})),
         "processed_event_keys": copy.deepcopy(state.get("processed_event_keys", {})),
+        "processed_content_keys": copy.deepcopy(state.get("processed_content_keys", {})),
     }
     return snapshot
 
@@ -156,11 +189,21 @@ def state_metrics(state_path: str | Path = DEFAULT_STATE_PATH) -> dict[str, dict
     state = load_state(state_path)
     result: dict[str, dict[str, int]] = {}
 
-    for source, entries in state.get("processed_event_keys", {}).items():
-        payload = json.dumps(entries, ensure_ascii=False)
+    event_sections = state.get("processed_event_keys", {})
+    content_sections = state.get("processed_content_keys", {})
+
+    all_sources = set(event_sections.keys()) | set(content_sections.keys())
+    for source in all_sources:
+        event_entries = event_sections.get(source, [])
+        content_entries = content_sections.get(source, [])
+        event_payload = json.dumps(event_entries, ensure_ascii=False)
+        content_payload = json.dumps(content_entries, ensure_ascii=False)
+
         result[source] = {
-            "key_count": len(entries),
-            "size_bytes": len(payload.encode("utf-8")),
+            "key_count": len(event_entries),
+            "size_bytes": len(event_payload.encode("utf-8")),
+            "content_key_count": len(content_entries),
+            "content_size_bytes": len(content_payload.encode("utf-8")),
         }
 
     return result
