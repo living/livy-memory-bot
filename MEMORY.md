@@ -260,4 +260,35 @@ Merge da evolução do weekly insights para formato claims-first com entrega dua
 
 Topic file: `memory/curated/livy-memory-agent.md`
 
+### 2026-04-19 — PR #23 mergeada: Self-Healing Apply V2 + Hotfix GitHub cross-repo noise
+
+**PR #23 — Self-Healing Apply V2** (`feature/self-healing-apply-v2` → `master`):
+
+Merge squash commit `cea58c8`. Infraestrutura de self-healing v2 pronta para integração com pipeline:
+- `apply_decision()` — política v2 strict (>=0.85 auto-apply, 0.45–0.84 queued, <0.45 dropped)
+- `apply_merge_to_ssot()` — persistência em `state/identity-graph/state.json` com lock + idempotência + prune 180d
+- Circuit breaker v2 — 3-tier (monitoring → write_paused → global_paused), reset automático após 3 clean runs
+- `merge_id` determinístico de `(hypothesis, confidence, source)` via SHA256
+- Schema migration v1→v2 in-place
+- Append-only rollback via `vault/logs/experiments.jsonl`
+- **50 testes** cobrindo policy v1/v2, idempotência, lock, pruning, schema upgrade
+
+Review attention points documentados no docstring de `apply_merge_to_ssot`:
+- `decision['contradiction']` deve ser injetado pelo pipeline chamador (apply_decision não popula)
+- `merge_id` gap vs spec (usa hypothesis vs claim_ids+reason — follow-up de alinhamento com pipeline)
+- `lock_path` documentado como obrigatório por callers
+
+**Fix orthogonal encontrado durante E2E — GitHub search cross-repo noise:**
+- Bug: `gh api search/issues` com `repo:living/repo AND org:living` retorna PRs de múltiplos repos na org (comportamento inesperado do Search API com ambos os qualificadores)
+- Fix: remover `org:living` do query; adicionar filtro defensivo por `repository_url` normalizado em `_search_merged_pr_summaries`
+- Commit `e645c42` pushado para `origin/master`
+- Validação: research_github cron sem 404 pull lookups no audit log
+
+**Validação E2E pós-merge:**
+- `PYTHONPATH=. pytest tests/research/ -q` → **476 passed**
+- E2E com `apply_decision` + `apply_merge_to_ssot` em contexto real: idempotência ✅, contradição ✅, lock+persistência ✅
+- Crons E2E (github/trello/tldv): todos `status=success`
+
+Topic file: `memory/curated/livy-memory-agent.md`
+
 _Last updated: 2026-04-19_

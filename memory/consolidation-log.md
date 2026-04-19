@@ -287,3 +287,30 @@
     - `[OK] Personal report sent to 7426291192`
     - `[OK] Group HTML document sent to -5158607302`
 - Estado final: PR #21 e PR #22 em produção com entrega dual-channel funcional.
+
+## Session Log — 2026-04-19 21:45 UTC (PR #23 merge + hotfix GitHub search + E2E produção)
+
+- Solicitação do Lincoln: mergear PR #23, validar ponta a ponta com dados reais, corrigir o necessário para produção e documentar STM/LTM/napkin.
+- PR #23 mergeada via squash:
+  - PR: `https://github.com/living/livy-memory-bot/pull/23`
+  - merge commit: `cea58c8`
+  - escopo: self-healing apply v2 (policy strict, merge_id determinístico, apply_merge_to_ssot com lock/idempotência/prune, circuit breaker v2)
+- Validação pós-merge (testes):
+  - `PYTHONPATH=. pytest tests/research/test_self_healing_apply.py tests/research/test_self_healing_apply_v2.py tests/research/test_self_healing_rollback.py -q` → **50 passed**
+  - `PYTHONPATH=. pytest tests/research/ -q` → **476 passed**
+- Validação E2E com dados reais:
+  - execução dos crons reais (`research_github_cron.py`, `research_tldv_cron.py`, `research_trello_cron.py`) com status success
+  - smoke real de `apply_decision` + `apply_merge_to_ssot`: confirmou lock, idempotência por merge_id e persistência de `contradiction=True` quando injetado pelo chamador
+- Bug de produção encontrado durante E2E GitHub:
+  - `gh api search/issues` com query `repo:... org:living` retornando itens de outros repos da org
+  - efeito colateral: tentativas de `repos/{repo}/pulls/{number}` com PR number inválido para o repo → 404 ruído
+- Correção aplicada em produção (`master`):
+  - commit `e645c42`
+  - `vault/research/github_client.py`:
+    - remove `org:living` da query (manter `repo:{repo}`)
+    - filtro defensivo por `repository_url` normalizado para garantir repo exato
+  - testes atualizados em `tests/research/test_github_client.py`
+- Validação do hotfix:
+  - `PYTHONPATH=. pytest tests/research/test_github_client.py -q` → **9 passed**
+  - `research_github_cron.py` sem novos 404 de pull lookup no audit/log
+- Estado final: PR #23 em produção + hotfix de ruído cross-repo aplicado e validado.

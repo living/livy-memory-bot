@@ -212,6 +212,61 @@ Aprovar e mergear PR #18 após implementar feedback de review e validar suíte d
 - `research_trello_cron.py` fallback de intervalo corrigido para 6h.
 - Testes de integração/cliente cobrindo os ajustes de review.
 
+## PR #23 — Self-Healing Apply V2 (merge 2026-04-19)
+
+### Decisão
+
+Mergear PR #23 após validação de review, testes completos e smoke E2E com dados reais.
+
+### O que entrou no merge
+
+- `vault/research/self_healing.py`
+  - política `SELF_HEALING_POLICY_VERSION=v2` (strict):
+    - `>= 0.85` → `applied`
+    - `0.45..0.84` → `queued`
+    - `< 0.45` → `dropped`
+  - `merge_id` determinístico via SHA256 de `(hypothesis, confidence, source)`
+  - `apply_merge_to_ssot()` com lock, idempotência por `merge_id` e prune de 180 dias
+  - circuit breaker v2 (monitoring / write_paused / global_paused)
+  - append-only rollback (`vault/logs/experiments.jsonl`)
+- `tests/research/test_self_healing_apply_v2.py` (24 testes)
+- cobertura consolidada self-healing (v1+v2+rollback): 50 testes
+
+### Atenções de review documentadas
+
+- `decision["contradiction"]` deve ser injetado pelo pipeline chamador; `apply_decision` não popula esse campo.
+- `merge_id` atual não usa `claim_ids+reason` (spec wiki v2) — alinhamento pendente no pipeline.
+- `lock_path` é obrigatório e foi documentado explicitamente no docstring.
+
+### Validação pós-merge
+
+- PR #23: `MERGED` em `master` (commit `cea58c8`).
+- Testes:
+  - `PYTHONPATH=. pytest tests/research/test_self_healing_apply.py tests/research/test_self_healing_apply_v2.py tests/research/test_self_healing_rollback.py -q` → **50 passed**
+  - `PYTHONPATH=. pytest tests/research/ -q` → **476 passed**
+- E2E real (scripts/cron):
+  - `research_github_cron.py`, `research_tldv_cron.py`, `research_trello_cron.py` → `status=success`
+  - `apply_decision` + `apply_merge_to_ssot` validados com lock/idempotência/contradição em SSOT.
+
+### Hotfix pós-merge (produção)
+
+**Problema encontrado no E2E GitHub:**
+- `gh api search/issues` com `repo:...` + `org:living` retornava resultados de múltiplos repos da org.
+- Isso gerava tentativas de lookup em `repos/{repo}/pulls/{number}` com PR numbers de outros repos → `404 Not Found`.
+
+**Correção aplicada:**
+- `vault/research/github_client.py`
+  - remover `org:living` da query (manter apenas `repo:{repo}`)
+  - filtrar defensivamente resultados por `repository_url` normalizado (api.github.com + github.com)
+- `tests/research/test_github_client.py`
+  - atualizar teste para validar query repo-only e filtro de cross-repo noise
+
+**Commit:** `e645c42` (push em `origin/master`)
+
+**Validação:**
+- `PYTHONPATH=. pytest tests/research/test_github_client.py -q` → **9 passed**
+- `research_github_cron.py` sem novos 404 de pull lookup em audit/log
+
 ### Verificação operacional pós-merge
 
 - PR #18: `MERGED` em `master` (commit `08672fd`).
