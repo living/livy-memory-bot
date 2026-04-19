@@ -84,6 +84,9 @@ Both: `--session isolated`, `--agent main`, `--exact`, `--no-deliver`
 
 ## Decisões
 
+- [2026-04-16] Aprovação necessária para ação junto à E-Premiums [https://tldv.io/meeting/69e0cf369c64de0013f1a12d] — via tldv
+- [2026-04-13] Documentar todas as horas gastas no projeto para repasse à Bianca (cliente) [https://tldv.io/meeting/69dce9015ce47900135d41dc] — via tldv
+- [2026-04-13] Esteves dedicaste horas ao ambiente de dev; ajustar cobrança [https://tldv.io/meeting/69dce9015ce47900135d41dc] — via tldv
 - [2026-04-06] Limpar o banco Supabase e re-migrar os dados do MySQL de forma mais controlada, corrigindo FKs e removendo registros duplicados/órfãos [https://tldv.io/meeting/69d3a0419a861200135c6d50] — via tldv
 - [2026-04-06] Limpar o banco Supabase e re-migrar os dados do MySQL de forma mais controlada, corrigindo FKs e removendo registros duplicados/órfãos [https://tldv.io/meeting/69d3a0419a861200135c6d50] — via tldv
 - [2026-04-06] Utilizar Lightning para tarefas que não dependam de status (custos, tempo de sessão, contexto) [https://tldv.io/meeting/69cbb73298acd80013fa20ce] — via tldv
