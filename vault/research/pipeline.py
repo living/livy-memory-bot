@@ -30,10 +30,13 @@ from vault.research.identity_resolver import resolve_identity
 from vault.research.state_store import DEFAULT_STATE, load_state, save_state, upsert_processed_event_key, upsert_processed_content_key
 from vault.research.github_client import GitHubClient
 from vault.research.github_rich_client import GitHubRichClient, extract_github_refs, extract_trello_urls
+from vault.research.github_parsers import pr_to_claims
 from vault.research.trello_client import TrelloClient
 from vault.research.tldv_client import TLDVClient
 from vault.research.cadence_manager import record_budget_warning, record_healthy_run
 from vault.ops.rollback import is_wiki_v2_enabled
+from vault.memory_core.models import Claim, SourceRef, AuditTrail
+from vault.fusion_engine.engine import fuse
 
 
 def _hash16(s: str) -> str:
@@ -553,6 +556,210 @@ class ResearchPipeline:
         cache_path = self.research_dir / "state.json"
         cache_path.write_text(json.dumps(cache, ensure_ascii=False, indent=2), encoding="utf-8")
 
+    @staticmethod
+    def _normalize_claim_type(claim_type: str) -> str:
+        allowed = {"status", "decision", "action_item", "risk", "ownership", "timeline_event", "linkage"}
+        if claim_type in allowed:
+            return claim_type
+        return "timeline_event"
+
+    @staticmethod
+    def _normalize_entity_type(entity_type: str) -> str:
+        if entity_type == "github_pr":
+            return "pull_request"
+        allowed = {
+            "person", "project", "repository", "pull_request", "meeting", "topic", "decision", "email_thread"
+        }
+        if entity_type in allowed:
+            return entity_type
+        return "topic"
+
+    def _claim_from_state_dict(self, raw: dict[str, Any]) -> Claim | None:
+        try:
+            src = raw.get("source_ref") or {}
+            source_ref = SourceRef(
+                source_id=str(src.get("source_id", "")),
+                url=src.get("url"),
+                blob_path=src.get("blob_path"),
+            )
+            audit_raw = raw.get("audit_trail") or {}
+            audit = AuditTrail(
+                model_used=str(audit_raw.get("model_used", "omniroute/fastest")),
+                parser_version=str(audit_raw.get("parser_version", "v1")),
+                trace_id=str(audit_raw.get("trace_id", "trace-missing")),
+            )
+            claim = Claim(
+                claim_id=str(raw.get("claim_id")),
+                entity_type=self._normalize_entity_type(str(raw.get("entity_type", "topic"))),
+                entity_id=str(raw.get("entity_id", "unknown")),
+                topic_id=raw.get("topic_id"),
+                claim_type=self._normalize_claim_type(str(raw.get("claim_type", "timeline_event"))),
+                text=str(raw.get("text", "")),
+                source=str(raw.get("source", self.source)),
+                source_ref=source_ref,
+                evidence_ids=[str(e) for e in raw.get("evidence_ids", []) or []],
+                author=str(raw.get("author", "system")),
+                event_timestamp=str(raw.get("event_timestamp", datetime.now(timezone.utc).isoformat())),
+                ingested_at=str(raw.get("ingested_at", datetime.now(timezone.utc).isoformat())),
+                confidence=float(raw.get("confidence", 0.0) or 0.0),
+                privacy_level=str(raw.get("privacy_level", "internal")),
+                superseded_by=raw.get("superseded_by"),
+                supersession_reason=raw.get("supersession_reason"),
+                supersession_version=raw.get("supersession_version"),
+                audit_trail=audit,
+            )
+            claim.validate()
+            return claim
+        except Exception:
+            return None
+
+    def _claim_to_state_dict(self, claim: Claim) -> dict[str, Any]:
+        return {
+            "claim_id": claim.claim_id,
+            "entity_type": claim.entity_type,
+            "entity_id": claim.entity_id,
+            "topic_id": claim.topic_id,
+            "claim_type": claim.claim_type,
+            "text": claim.text,
+            "source": claim.source,
+            "source_ref": {
+                "source_id": claim.source_ref.source_id,
+                "url": claim.source_ref.url,
+                "blob_path": claim.source_ref.blob_path,
+            },
+            "evidence_ids": claim.evidence_ids,
+            "author": claim.author,
+            "event_timestamp": claim.event_timestamp,
+            "ingested_at": claim.ingested_at,
+            "confidence": claim.confidence,
+            "privacy_level": claim.privacy_level,
+            "superseded_by": claim.superseded_by,
+            "supersession_reason": claim.supersession_reason,
+            "supersession_version": claim.supersession_version,
+            "audit_trail": {
+                "model_used": claim.audit_trail.model_used if claim.audit_trail else "omniroute/fastest",
+                "parser_version": claim.audit_trail.parser_version if claim.audit_trail else "v1",
+                "trace_id": claim.audit_trail.trace_id if claim.audit_trail else "trace-missing",
+            } if claim.audit_trail else None,
+        }
+
+    def _new_claim_from_normalized(self, normalized: dict[str, Any], event_key: str, idx: int) -> Claim:
+        source_ref_raw = normalized.get("source_ref") or {}
+        source_ref = SourceRef(
+            source_id=str(source_ref_raw.get("source_id", f"{event_key}:{idx}")),
+            url=source_ref_raw.get("url"),
+            blob_path=source_ref_raw.get("blob_path"),
+        )
+        metadata = normalized.get("metadata") if isinstance(normalized.get("metadata"), dict) else {}
+        author = str(metadata.get("author") or normalized.get("author") or "system")
+        event_ts = str(normalized.get("event_timestamp") or datetime.now(timezone.utc).isoformat())
+
+        return Claim.new(
+            entity_type=self._normalize_entity_type(str(normalized.get("entity_type", "topic"))),
+            entity_id=str(normalized.get("entity_id", "unknown")),
+            claim_type=self._normalize_claim_type(str(normalized.get("claim_type", "timeline_event"))),
+            text=str(normalized.get("text", "")),
+            source=str(normalized.get("source", self.source)),
+            source_ref=source_ref,
+            evidence_ids=[f"{event_key}:{idx}"],
+            author=author,
+            event_timestamp=event_ts,
+            privacy_level=str(normalized.get("privacy_level", "internal")),
+            topic_id=normalized.get("topic_id"),
+            model_used="omniroute/fastest",
+            parser_version="wiki-v2",
+        )
+
+    def _write_claim_blob(self, claim: Claim) -> str:
+        claims_dir = self.wiki_root / "claims"
+        claims_dir.mkdir(parents=True, exist_ok=True)
+        claim_path = claims_dir / f"{claim.claim_id}.md"
+        content = (
+            f"# Claim {claim.claim_id}\n\n"
+            f"- source: {claim.source}\n"
+            f"- entity_type: {claim.entity_type}\n"
+            f"- entity_id: {claim.entity_id}\n"
+            f"- claim_type: {claim.claim_type}\n"
+            f"- confidence: {claim.confidence:.3f}\n"
+            f"- event_timestamp: {claim.event_timestamp}\n"
+            f"- superseded_by: {claim.superseded_by or '-'}\n\n"
+            f"## Text\n{claim.text}\n"
+        )
+        claim_path.write_text(content, encoding="utf-8")
+        return str(claim_path)
+
+    def _process_wiki_v2_github_event(self, event: dict[str, Any], payload: dict[str, Any]) -> dict[str, Any]:
+        state = load_state(self.state_path)
+        claims_raw = list(state.get("claims", []))
+
+        existing_claims: list[Claim] = []
+        for raw in claims_raw:
+            if isinstance(raw, dict):
+                c = self._claim_from_state_dict(raw)
+                if c is not None:
+                    existing_claims.append(c)
+
+        pr_number = payload.get("pr_number") or event.get("pr_number")
+        repo = payload.get("repo") or event.get("repo") or ""
+        if pr_number is None or not repo:
+            return {"claims_written": 0, "claims_superseded": 0}
+
+        # Convert rich GitHub payload to normalized claims.
+        # pr_to_claims expects GitHub API-like PR shape (number/base.repo/user/html_url).
+        if isinstance(payload, dict) and isinstance(payload.get("base"), dict):
+            pr_payload = payload
+        else:
+            pr_payload = {
+                "number": pr_number,
+                "title": payload.get("title") if isinstance(payload, dict) else "",
+                "body": payload.get("body") if isinstance(payload, dict) else "",
+                "state": payload.get("state") if isinstance(payload, dict) else "closed",
+                "merged": payload.get("merged") if isinstance(payload, dict) else False,
+                "merged_at": payload.get("merged_at") if isinstance(payload, dict) else None,
+                "created_at": payload.get("created_at") if isinstance(payload, dict) else None,
+                "base": {"repo": {"full_name": repo}},
+                "html_url": f"https://github.com/{repo}/pull/{pr_number}",
+                "user": payload.get("author") if isinstance(payload.get("author"), dict) else payload.get("user", {}) if isinstance(payload, dict) else {},
+                "labels": payload.get("labels", []) if isinstance(payload, dict) else [],
+                "milestone": payload.get("milestone") if isinstance(payload, dict) else None,
+            }
+
+        claims_normalized = pr_to_claims(pr_payload, payload.get("reviews", []) if isinstance(payload, dict) else [])
+
+        event_key = self._calculate_event_key(event)
+        superseded_total = 0
+        written = 0
+
+        for idx, normalized in enumerate(claims_normalized):
+            new_claim = self._new_claim_from_normalized(normalized, event_key, idx)
+            result = fuse(new_claim, existing_claims)
+
+            for superseded in result.superseded_claims:
+                superseded_total += 1
+                for raw in claims_raw:
+                    if isinstance(raw, dict) and raw.get("claim_id") == superseded.claim_id:
+                        raw["superseded_by"] = superseded.superseded_by
+                        raw["supersession_reason"] = superseded.supersession_reason
+                        raw["supersession_version"] = superseded.supersession_version
+
+            claims_raw.append(self._claim_to_state_dict(result.fused_claim))
+            existing_claims.append(result.fused_claim)
+            blob_path = self._write_claim_blob(result.fused_claim)
+            self._log_audit(
+                "wiki_v2_claim_written",
+                {
+                    "claim_id": result.fused_claim.claim_id,
+                    "blob_path": blob_path,
+                    "entity_id": result.fused_claim.entity_id,
+                    "claim_type": result.fused_claim.claim_type,
+                },
+            )
+            written += 1
+
+        state["claims"] = claims_raw
+        save_state(state, self.state_path)
+        return {"claims_written": written, "claims_superseded": superseded_total}
+
     def run(self) -> dict[str, Any]:
         # WIKI_V2_ENABLED feature flag — gates wiki v2 behavior (Memory Core + Fusion Engine)
         self.wiki_v2_active = is_wiki_v2_enabled()
@@ -664,10 +871,17 @@ class ResearchPipeline:
                     "entity_type": "event",
                 }
 
-            validation = self._validate(hypothesis)
-            skip_apply = hypothesis.get("skip_apply", False)
-            if validation.get("approved") and self._is_path_allowed(hypothesis["path"]) and not skip_apply:
-                self._apply([hypothesis])
+            if self.wiki_v2_active and self.source == "github" and isinstance(payload, dict):
+                v2_stats = self._process_wiki_v2_github_event(event, payload)
+                self._log_audit("wiki_v2_event_processed", {
+                    "event_key": self._calculate_event_key(event),
+                    **v2_stats,
+                })
+            else:
+                validation = self._validate(hypothesis)
+                skip_apply = hypothesis.get("skip_apply", False)
+                if validation.get("approved") and self._is_path_allowed(hypothesis["path"]) and not skip_apply:
+                    self._apply([hypothesis])
 
             # Step 10/11
             self._persist_event_key(event)
