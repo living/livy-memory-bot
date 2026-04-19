@@ -14,6 +14,26 @@ import pytest
 # Fixtures
 # ---------------------------------------------------------------------------
 
+_MOCK_PR_PAYLOAD = {
+    "number": 42,
+    "title": "t",
+    "body": "b",
+    "merged": True,
+    "user": {"login": "x"},
+    "base": {"repo": {"full_name": "living/livy-memory-bot"}},
+    "state": "closed",
+    "labels": [],
+    "merged_at": "2026-04-14T10:00:00Z",
+    "created_at": "2026-04-13T09:00:00Z",
+}
+
+_MOCK_REVIEWS = [{"state": "APPROVED", "user": {"login": "alice"}, "body": "LGTM"}]
+
+
+# ---------------------------------------------------------------------------
+# Fixtures
+# ---------------------------------------------------------------------------
+
 def _make_pr_payload(
     number: int = 42,
     title: str = "feat: implement something",
@@ -57,44 +77,41 @@ def _make_review(state: str, user_login: str, body: str = "") -> dict:
 # ---------------------------------------------------------------------------
 
 class TestFetchPrWithReviews:
-    """fetch_pr_with_reviews fetches PR + reviews and merges them."""
+    """fetch_pr_with_reviews fetches PR + reviews via GitHubRichClient and merges them."""
 
-    def test_fetches_pr_and_reviews_via_gh_cli(self):
-        """gh CLI is called for PR endpoint and reviews endpoint."""
+    def test_fetches_pr_and_reviews_via_github_rich_client(self):
+        """GitHubRichClient is called for PR endpoint and reviews endpoint."""
         from vault.research.github_parsers import GitHubParsers
 
-        pr_json = '{"number":42,"title":"t","body":"b","merged":true,"user":{"login":"x"},"base":{"repo":{"full_name":"r"}},"state":"closed","labels":[],"merged_at":"2026-04-14T10:00:00Z","created_at":"2026-04-13T09:00:00Z"}'
-        reviews_json = '[{"state":"APPROVED","user":{"login":"alice"},"body":"LGTM"}]'
+        rich_client_mock = MagicMock()
+        rich_client_mock.fetch_rich_pr.return_value = dict(_MOCK_PR_PAYLOAD)
+        rich_client_mock.fetch_reviews.return_value = list(_MOCK_REVIEWS)
 
-        calls: list = []
-
-        def run_side(cmd, *a, **kw):
-            m = MagicMock(returncode=0)
-            cmd_str = str(cmd)
-            if "reviews" in cmd_str:
-                m.stdout = reviews_json
-            else:
-                m.stdout = pr_json
-            calls.append(cmd_str)
-            return m
-
-        with patch("subprocess.run", side_effect=run_side):
+        with patch(
+            "vault.research.github_parsers.GitHubRichClient",
+            return_value=rich_client_mock,
+        ):
             result = GitHubParsers.fetch_pr_with_reviews(42, "living/livy-memory-bot")
 
+        rich_client_mock.fetch_rich_pr.assert_called_once_with(42, "living/livy-memory-bot")
+        rich_client_mock.fetch_reviews.assert_called_once_with(42, "living/livy-memory-bot")
         assert result["pr"]["number"] == 42
         assert len(result["reviews"]) == 1
         assert result["reviews"][0]["state"] == "APPROVED"
         assert result["reviews"][0]["user"]["login"] == "alice"
 
-    def test_returns_empty_reviews_on_failure(self):
-        """If gh CLI fails, returns empty reviews list (graceful degradation)."""
+    def test_returns_empty_reviews_on_github_rich_client_failure(self):
+        """If GitHubRichClient returns empty dict, returns empty reviews list (graceful degradation)."""
         from vault.research.github_parsers import GitHubParsers
 
-        def run_side(cmd, *a, **kw):
-            m = MagicMock(returncode=1, stdout="")
-            return m
+        rich_client_mock = MagicMock()
+        rich_client_mock.fetch_rich_pr.return_value = {}
+        rich_client_mock.fetch_reviews.return_value = []
 
-        with patch("subprocess.run", side_effect=run_side):
+        with patch(
+            "vault.research.github_parsers.GitHubRichClient",
+            return_value=rich_client_mock,
+        ):
             result = GitHubParsers.fetch_pr_with_reviews(99, "living/test")
 
         assert result["reviews"] == []
@@ -104,9 +121,18 @@ class TestFetchPrWithReviews:
         """reviews field is always a list, never None or empty-dict."""
         from vault.research.github_parsers import GitHubParsers
 
-        pr_json = '{"number":1,"title":"t","body":"","merged":true,"user":{"login":"x"},"base":{"repo":{"full_name":"r"}},"state":"closed","labels":[],"merged_at":"1Z","created_at":"1Z"}'
+        rich_client_mock = MagicMock()
+        rich_client_mock.fetch_rich_pr.return_value = {
+            "number": 1, "title": "t", "body": "", "merged": True,
+            "user": {"login": "x"}, "base": {"repo": {"full_name": "r"}},
+            "state": "closed", "labels": [], "merged_at": "1Z", "created_at": "1Z",
+        }
+        rich_client_mock.fetch_reviews.return_value = []
 
-        with patch("subprocess.run", return_value=MagicMock(returncode=0, stdout=pr_json)):
+        with patch(
+            "vault.research.github_parsers.GitHubRichClient",
+            return_value=rich_client_mock,
+        ):
             result = GitHubParsers.fetch_pr_with_reviews(1, "r")
 
         assert isinstance(result["reviews"], list)
@@ -115,9 +141,18 @@ class TestFetchPrWithReviews:
         """Empty/null body does not raise."""
         from vault.research.github_parsers import GitHubParsers
 
-        pr_json = '{"number":2,"title":"t","body":null,"merged":true,"user":{"login":"x"},"base":{"repo":{"full_name":"r"}},"state":"closed","labels":[],"merged_at":"2Z","created_at":"2Z"}'
+        rich_client_mock = MagicMock()
+        rich_client_mock.fetch_rich_pr.return_value = {
+            "number": 2, "title": "t", "body": None, "merged": True,
+            "user": {"login": "x"}, "base": {"repo": {"full_name": "r"}},
+            "state": "closed", "labels": [], "merged_at": "2Z", "created_at": "2Z",
+        }
+        rich_client_mock.fetch_reviews.return_value = []
 
-        with patch("subprocess.run", return_value=MagicMock(returncode=0, stdout=pr_json)):
+        with patch(
+            "vault.research.github_parsers.GitHubRichClient",
+            return_value=rich_client_mock,
+        ):
             result = GitHubParsers.fetch_pr_with_reviews(2, "r")
 
         assert result["pr"].get("body") in ("", None)
@@ -126,19 +161,23 @@ class TestFetchPrWithReviews:
         """Result includes list of approvers (unique logins with APPROVED state)."""
         from vault.research.github_parsers import GitHubParsers
 
-        pr_json = '{"number":3,"title":"t","body":"","merged":true,"user":{"login":"x"},"base":{"repo":{"full_name":"r"}},"state":"closed","labels":[],"merged_at":"3Z","created_at":"3Z"}'
-        reviews_json = """[
-            {"state":"APPROVED","user":{"login":"alice"},"body":"ok"},
-            {"state":"CHANGES_REQUESTED","user":{"login":"bob"},"body":"nits"},
-            {"state":"APPROVED","user":{"login":"alice"},"body":"still ok"}
-        ]"""
+        reviews = [
+            {"state": "APPROVED", "user": {"login": "alice"}, "body": "ok"},
+            {"state": "CHANGES_REQUESTED", "user": {"login": "bob"}, "body": "nits"},
+            {"state": "APPROVED", "user": {"login": "alice"}, "body": "still ok"},
+        ]
+        rich_client_mock = MagicMock()
+        rich_client_mock.fetch_rich_pr.return_value = {
+            "number": 3, "title": "t", "body": "", "merged": True,
+            "user": {"login": "x"}, "base": {"repo": {"full_name": "r"}},
+            "state": "closed", "labels": [], "merged_at": "3Z", "created_at": "3Z",
+        }
+        rich_client_mock.fetch_reviews.return_value = reviews
 
-        with patch("subprocess.run") as mock_run:
-            def side(cmd, *a, **kw):
-                m = MagicMock(returncode=0)
-                m.stdout = reviews_json if "reviews" in str(cmd) else pr_json
-                return m
-            mock_run.side_effect = side
+        with patch(
+            "vault.research.github_parsers.GitHubRichClient",
+            return_value=rich_client_mock,
+        ):
             result = GitHubParsers.fetch_pr_with_reviews(3, "r")
 
         assert "approvers" in result
@@ -149,9 +188,18 @@ class TestFetchPrWithReviews:
         """Result exposes pr_number and repo fields for downstream use."""
         from vault.research.github_parsers import GitHubParsers
 
-        pr_json = '{"number":4,"title":"t","body":"","merged":true,"user":{"login":"x"},"base":{"repo":{"full_name":"living/livy-forge"}},"state":"closed","labels":[],"merged_at":"4Z","created_at":"4Z"}'
+        rich_client_mock = MagicMock()
+        rich_client_mock.fetch_rich_pr.return_value = {
+            "number": 4, "title": "t", "body": "", "merged": True,
+            "user": {"login": "x"}, "base": {"repo": {"full_name": "living/livy-forge"}},
+            "state": "closed", "labels": [], "merged_at": "4Z", "created_at": "4Z",
+        }
+        rich_client_mock.fetch_reviews.return_value = []
 
-        with patch("subprocess.run", return_value=MagicMock(returncode=0, stdout=pr_json)):
+        with patch(
+            "vault.research.github_parsers.GitHubRichClient",
+            return_value=rich_client_mock,
+        ):
             result = GitHubParsers.fetch_pr_with_reviews(4, "living/livy-forge")
 
         assert result["pr_number"] == 4
@@ -362,15 +410,27 @@ class TestGitHubParsersIntegration:
         """fetch_pr_with_reviews → pr_to_claims produces non-empty claims."""
         from vault.research.github_parsers import GitHubParsers, pr_to_claims
 
-        pr_json = '{"number":80,"title":"feat: full round-trip","body":"Closes #1","merged":true,"user":{"login":"dev"},"base":{"repo":{"full_name":"living/test"}},"state":"closed","labels":[{"name":"enhancement","color":"84b6eb"}],"merged_at":"2026-04-14T10:00:00Z","created_at":"2026-04-13T09:00:00Z"}'
-        reviews_json = '[{"state":"APPROVED","user":{"login":"alice"},"body":"LGTM"}]'
+        rich_client_mock = MagicMock()
+        rich_client_mock.fetch_rich_pr.return_value = {
+            "number": 80,
+            "title": "feat: full round-trip",
+            "body": "Closes #1",
+            "merged": True,
+            "user": {"login": "dev"},
+            "base": {"repo": {"full_name": "living/test"}},
+            "state": "closed",
+            "labels": [{"name": "enhancement", "color": "84b6eb"}],
+            "merged_at": "2026-04-14T10:00:00Z",
+            "created_at": "2026-04-13T09:00:00Z",
+        }
+        rich_client_mock.fetch_reviews.return_value = [
+            {"state": "APPROVED", "user": {"login": "alice"}, "body": "LGTM"}
+        ]
 
-        def run_side(cmd, *a, **kw):
-            m = MagicMock(returncode=0)
-            m.stdout = reviews_json if "reviews" in str(cmd) else pr_json
-            return m
-
-        with patch("subprocess.run", side_effect=run_side):
+        with patch(
+            "vault.research.github_parsers.GitHubRichClient",
+            return_value=rich_client_mock,
+        ):
             fetched = GitHubParsers.fetch_pr_with_reviews(80, "living/test")
             claims = pr_to_claims(fetched["pr"], fetched["reviews"])
 

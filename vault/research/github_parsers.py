@@ -1,11 +1,11 @@
 """GitHub PR parsers: fetch PR+reviews and convert to normalized claims."""
 from __future__ import annotations
 
-import json
 import re
-import subprocess
 from dataclasses import dataclass, field
 from typing import Any
+
+from vault.research.github_rich_client import GitHubRichClient
 
 
 GITHUB_REF_PATTERN = re.compile(
@@ -38,27 +38,15 @@ class ParsedGitHubPR:
 
 
 class GitHubParsers:
-    """Collection of GitHub parsing utilities (gh CLI)."""
+    """Collection of GitHub parsing utilities (wraps GitHubRichClient)."""
 
     @staticmethod
-    def _run_gh(cmd: list[str]) -> str:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
-        if result.returncode != 0:
-            return ""
-        return result.stdout or ""
+    def fetch_pr_with_reviews(pr_number: int, repo: str) -> dict[str, Any]:
+        """Fetch PR payload and reviews via GitHubRichClient; return merged dict with approvers.
 
-    @staticmethod
-    def _parse_json(text: str, default: Any) -> Any:
-        if not text.strip():
-            return default
-        try:
-            return json.loads(text)
-        except json.JSONDecodeError:
-            return default
-
-    @classmethod
-    def fetch_pr_with_reviews(cls, pr_number: int, repo: str) -> dict[str, Any]:
-        """Fetch PR payload and reviews via gh CLI; return merged dict with approvers.
+        Uses GitHubRichClient (existing rich PR client) to avoid duplicating
+        gh API calls. This reuses fetch_rich_pr and fetch_reviews from the
+        established GitHubRichClient, consistent with the project architecture.
 
         Returns:
             {
@@ -69,15 +57,9 @@ class GitHubParsers:
                 "repo": str,
             }
         """
-        pr_cmd = ["gh", "api", f"repos/{repo}/pulls/{pr_number}", "--jq", "."]
-        reviews_cmd = ["gh", "api", f"repos/{repo}/pulls/{pr_number}/reviews", "--paginate", "--jq", "."]
-
-        pr_text = cls._run_gh(pr_cmd)
-        reviews_text = cls._run_gh(reviews_cmd)
-
-        pr_data: dict[str, Any] = cls._parse_json(pr_text, {})
-        reviews_raw: Any = cls._parse_json(reviews_text, [])
-        reviews: list[dict[str, Any]] = reviews_raw if isinstance(reviews_raw, list) else []
+        rich = GitHubRichClient()
+        pr_data: dict[str, Any] = rich.fetch_rich_pr(pr_number, repo)
+        reviews: list[dict[str, Any]] = rich.fetch_reviews(pr_number, repo)
 
         approvers = list(dict.fromkeys(
             r.get("user", {}).get("login", "")
