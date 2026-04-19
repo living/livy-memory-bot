@@ -1,0 +1,14 @@
+# Trello Board → Project Source Key mapping
+# Used by vault/research/trello_mapper.py to resolve board IDs to projects.
+#
+# Format:
+#   boards:
+#     <board_id>:
+#       project_source_key: <owner/repo-name>
+
+boards:
+  # Example entries — replace with actual Trello board IDs
+  # board_abc123:
+  #   project_source_key: github/living-bat
+  # board_xyz789:
+  #   project_source_key: github/living-delphos

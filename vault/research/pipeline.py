@@ -1,4 +1,4 @@
-"""Research pipeline core (v1) for TLDV and GitHub.
+"""Research pipeline core (v1) for TLDV, GitHub, and Trello."
 
 Implements the 11-step pipeline in a minimal/YAGNI form:
 1) State
@@ -18,6 +18,7 @@ MVP self-healing mode is read-only: it only accumulates evidence.
 
 from __future__ import annotations
 
+import hashlib
 import json
 from datetime import datetime, timezone
 from pathlib import Path
@@ -25,7 +26,83 @@ from typing import Any
 
 from vault.research.event_key import build_event_key
 from vault.research.identity_resolver import resolve_identity
-from vault.research.state_store import load_state, save_state, upsert_processed_event_key
+from vault.research.state_store import DEFAULT_STATE, load_state, save_state, upsert_processed_event_key
+from vault.research.trello_client import TrelloClient
+
+
+def _hash16(s: str) -> str:
+    """Compute first 16 hex chars of SHA256 of a string."""
+    return hashlib.sha256(s.encode()).hexdigest()[:16]
+
+
+def _parse_ts_to_epoch(timestamp: str | None) -> int | None:
+    """Parse ISO timestamp to Unix epoch seconds."""
+    if not timestamp:
+        return None
+    try:
+        # Handle both with and without 'Z' suffix
+        ts = timestamp
+        if ts.endswith("Z"):
+            ts = ts[:-1] + "+00:00"
+        dt = datetime.fromisoformat(ts)
+        return int(dt.timestamp())
+    except (ValueError, TypeError):
+        return None
+
+
+def build_trello_event_key(event: dict[str, Any]) -> str:
+    """Build a collision-safe event_key for Trello events.
+
+    Fallback hierarchy (first applicable):
+    1. action_id (if present and non-empty)
+    2. list_id + updated_at_ts (for card_created/card_updated)
+    3. target_list_id + card_id + timestamp (for list_moved)
+    4. member_id + timestamp (for member_added/member_removed)
+    5. hash16(field1 + '_' + field2 + '_' + timestamp) — last resort
+
+    Args:
+        event: Normalized Trello event dict from TrelloClient
+
+    Returns:
+        A string event_key with no '::' separators (to avoid collision
+        with the generic build_event_key format)
+    """
+    event_type = event.get("event_type", "")
+    action_id = event.get("action_id")
+    timestamp = event.get("timestamp") or event.get("date")
+    ts_epoch = _parse_ts_to_epoch(timestamp)
+
+    # 1. action_id if present and non-empty/non-whitespace
+    if action_id and action_id.strip():
+        return f"trello:{action_id}"
+
+    # 2. list_id + updated_at_ts for card_created/card_updated
+    if event_type in ("trello:card_created", "trello:card_updated"):
+        list_id = event.get("list_id")
+        if list_id and ts_epoch is not None:
+            return f"{list_id}_{ts_epoch}"
+        # Fall through to hash if list_id missing
+
+    # 3. target_list_id + card_id + timestamp for list_moved
+    if event_type == "trello:list_moved":
+        target_list_id = event.get("target_list_id") or event.get("list_id")
+        card_id = event.get("card_id")
+        if target_list_id and card_id and ts_epoch is not None:
+            return f"{target_list_id}_{card_id}_{ts_epoch}"
+        # Fall through to hash if target_list_id or card_id missing
+
+    # 4. member_id + timestamp for member_added/member_removed
+    if event_type in ("trello:member_added", "trello:member_removed"):
+        member_id = event.get("member_id")
+        if member_id and ts_epoch is not None:
+            return f"{member_id}_{ts_epoch}"
+        # Fall through to hash if member_id missing
+
+    # 5. Hash fallback: field1 + '_' + field2 + '_' + timestamp
+    field1 = event.get("field1", event.get("list_id", ""))
+    field2 = event.get("field2", event.get("card_id", ""))
+    ts_str = timestamp or ""
+    return _hash16(f"{field1}_{field2}_{ts_str}")
 
 
 def get_claude_mem_context(payload: dict[str, Any]) -> dict[str, Any]:
@@ -63,7 +140,7 @@ class ResearchPipeline:
         allowed_paths: list[str] | None = None,
         read_only_mode: bool = False,
     ) -> None:
-        if source not in {"tldv", "github"}:
+        if source not in {"tldv", "github", "trello"}:
             raise ValueError(f"unsupported source: {source}")
 
         self.source = source
@@ -93,7 +170,10 @@ class ResearchPipeline:
             return None
         if iso_value.endswith("Z"):
             iso_value = iso_value.replace("Z", "+00:00")
-        return datetime.fromisoformat(iso_value)
+        try:
+            return datetime.fromisoformat(iso_value)
+        except ValueError:
+            return None
 
     @staticmethod
     def _to_iso(dt: datetime) -> str:
@@ -102,17 +182,131 @@ class ResearchPipeline:
         return dt.isoformat()
 
     def _event_at(self, event: dict[str, Any]) -> datetime:
-        raw = event.get("event_at")
-        if isinstance(raw, str):
-            parsed = self._parse_iso(raw)
-            if parsed is not None:
-                return parsed
+        for field in ("event_at", "timestamp"):
+            raw = event.get(field)
+            if isinstance(raw, str):
+                parsed = self._parse_iso(raw)
+                if parsed is not None:
+                    return parsed
         return datetime.now(timezone.utc)
 
     def _calculate_event_key(self, event: dict[str, Any]) -> str:
+        if self.source == "trello":
+            return build_trello_event_key(event)
         event_type = str(event.get("type", "event"))
         object_id = str(event.get("id") or event.get("meeting_id") or event.get("pr_number") or "unknown")
         return build_event_key(self.source, event_type, object_id)
+
+    def _build_trello_hypothesis(self, event: dict[str, Any]) -> dict[str, Any]:
+        """Build a hypothesis for a Trello event, with semantics per event type.
+
+        contract:
+          - trello:card_created  -> evidence markdown path (create_page)
+          - trello:card_updated  -> upsert entity semantics
+          - trello:list_moved   -> status transition old->new (captures both lists)
+          - trello:member_added  -> identity reinforcement event
+          - trello:member_removed -> soft unlink event (skip_apply)
+        """
+        event_type = event.get("event_type", "")
+        event_key = self._calculate_event_key(event)
+        card_id = event.get("card_id", "")
+        list_id = event.get("list_id", "")
+        target_list_id = event.get("target_list_id", "") or list_id
+        member_id = event.get("member_id", "")
+        member_name = event.get("member_name", "")
+        card_name = event.get("card_name", "")
+        timestamp = event.get("timestamp", "")
+        board_id = event.get("board_id", "")
+
+        base_path = str(self.research_dir / f"trello-{event_key}.md")
+        card_entity_path = f"memory/vault/entities/cards/{card_id}.md" if card_id else base_path
+
+        if event_type == "trello:card_created":
+            content = (
+                f"# Trello Card Created\n\n"
+                f"- card_id: {card_id}\n"
+                f"- card_name: {card_name}\n"
+                f"- list_id: {list_id}\n"
+                f"- board_id: {board_id}\n"
+                f"- timestamp: {timestamp}\n"
+                f"- event_key: {event_key}\n"
+            )
+            return {"action": "create_page", "path": card_entity_path, "content": content, "entity_type": "card"}
+
+        elif event_type == "trello:card_updated":
+            content = (
+                f"# Trello Card Updated\n\n"
+                f"- card_id: {card_id}\n"
+                f"- card_name: {card_name}\n"
+                f"- list_id: {list_id}\n"
+                f"- board_id: {board_id}\n"
+                f"- timestamp: {timestamp}\n"
+                f"- event_key: {event_key}\n"
+            )
+            return {"action": "upsert_page", "path": card_entity_path, "content": content, "entity_type": "card"}
+
+        elif event_type == "trello:list_moved":
+            # Capture both source (old) list and target (new) list
+            content = (
+                f"# Trello Card Moved\n\n"
+                f"- card_id: {card_id}\n"
+                f"- card_name: {card_name}\n"
+                f"- source_list_id: {list_id}\n"
+                f"- target_list_id: {target_list_id}\n"
+                f"- board_id: {board_id}\n"
+                f"- timestamp: {timestamp}\n"
+                f"- event_key: {event_key}\n"
+            )
+            return {"action": "create_page", "path": base_path, "content": content, "entity_type": "status_transition"}
+
+        elif event_type == "trello:member_added":
+            content = (
+                f"# Trello Member Added\n\n"
+                f"- member_id: {member_id}\n"
+                f"- member_name: {member_name}\n"
+                f"- card_id: {card_id}\n"
+                f"- board_id: {board_id}\n"
+                f"- timestamp: {timestamp}\n"
+                f"- event_key: {event_key}\n"
+            )
+            return {
+                "action": "create_page",
+                "path": base_path,
+                "content": content,
+                "entity_type": "identity_reinforcement",
+                "identities": [{"source": "trello", "identifier": member_id, "name": member_name}],
+            }
+
+        elif event_type == "trello:member_removed":
+            content = (
+                f"# Trello Member Removed (Soft Unlink)\n\n"
+                f"- member_id: {member_id}\n"
+                f"- member_name: {member_name}\n"
+                f"- card_id: {card_id}\n"
+                f"- board_id: {board_id}\n"
+                f"- timestamp: {timestamp}\n"
+                f"- event_key: {event_key}\n"
+            )
+            # Soft unlink: accumulate evidence but do not apply a new page
+            return {
+                "action": "unlink",
+                "path": base_path,
+                "content": content,
+                "entity_type": "soft_unlink",
+                "skip_apply": True,
+                "identities": [{"source": "trello", "identifier": member_id, "name": member_name}],
+            }
+
+        else:
+            content = (
+                f"# Trello Event\n\n"
+                f"- event_type: {event_type}\n"
+                f"- card_id: {card_id}\n"
+                f"- board_id: {board_id}\n"
+                f"- timestamp: {timestamp}\n"
+                f"- event_key: {event_key}\n"
+            )
+            return {"action": "create_page", "path": base_path, "content": content, "entity_type": "event"}
 
     def _is_duplicate(self, event: dict[str, Any]) -> bool:
         return self._calculate_event_key(event) in self.processed_event_keys
@@ -269,8 +463,10 @@ class ResearchPipeline:
 
         if self.source == "tldv":
             client: Any = TLDVClient()
-        else:
+        elif self.source == "github":
             client = GitHubClient()
+        else:  # trello
+            client = TrelloClient()
 
         events = client.fetch_events_since(self.last_seen_at.isoformat() if self.last_seen_at else None)
         processed = 0
@@ -287,15 +483,28 @@ class ResearchPipeline:
             if self.source == "tldv":
                 meeting_id = event.get("meeting_id")
                 payload = client.fetch_meeting(meeting_id) if meeting_id else event
-            else:
+            elif self.source == "github":
                 pr_number = event.get("pr_number")
                 payload = client.fetch_pr(pr_number) if pr_number is not None else event
+            else:
+                payload = event  # Trello events are already normalized
 
             _ = self._build_context(payload)
 
-            # Step 6 resolve (minimal identity extraction)
+            # Step 6 resolve — Trello-specific identity extraction
             identities: list[dict[str, Any]] = []
-            if self.source == "github":
+            if self.source == "trello":
+                member_id = event.get("member_id", "")
+                if member_id:
+                    identities.append(
+                        {
+                            "source": "trello",
+                            "identifier": member_id,
+                            "name": event.get("member_name", ""),
+                            "candidates": [],
+                        }
+                    )
+            elif self.source == "github":
                 author = payload.get("author", {}) if isinstance(payload, dict) else {}
                 if isinstance(author, dict):
                     identities.append(
@@ -308,15 +517,20 @@ class ResearchPipeline:
                     )
             self._resolve_entities(identities)
 
-            # Step 7/8/9 minimal hypothesis flow
-            hypothesis = {
-                "action": "create_page",
-                "path": str(self.research_dir / f"evidence-{self._calculate_event_key(event).replace(':', '-')}.md"),
-                "content": f"# Evidence\n\nsource={self.source}\nevent_key={self._calculate_event_key(event)}\n",
-                "entity_type": "event",
-            }
+            # Step 7/8/9 hypothesis flow
+            if self.source == "trello":
+                hypothesis = self._build_trello_hypothesis(event)
+            else:
+                hypothesis = {
+                    "action": "create_page",
+                    "path": str(self.research_dir / f"evidence-{self._calculate_event_key(event).replace(':', '-')}.md"),
+                    "content": f"# Evidence\n\nsource={self.source}\nevent_key={self._calculate_event_key(event)}\n",
+                    "entity_type": "event",
+                }
+
             validation = self._validate(hypothesis)
-            if validation.get("approved") and self._is_path_allowed(hypothesis["path"]):
+            skip_apply = hypothesis.get("skip_apply", False)
+            if validation.get("approved") and self._is_path_allowed(hypothesis["path"]) and not skip_apply:
                 self._apply([hypothesis])
 
             # Step 10/11

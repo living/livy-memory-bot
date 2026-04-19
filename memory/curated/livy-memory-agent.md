@@ -138,9 +138,51 @@ BOT_ACCOUNTS = {
 
 ---
 
+## Evo Wiki Research Pipeline (Fase 1)
+
+Pipeline de pesquisa evolutiva que substitui o loop `dream-memory-consolidation` por um sistema de pesquisa incremental com deduplicação por `event_key` e resolução de identidade cross-source.
+
+### Arquitetura (MVP read-only, Fase 1)
+
+| Componente | Arquivo | Responsabilidade |
+|---|---|---|
+| event_key builder | `vault/research/event_key.py` | `source:event_type:object_id[:action_id]` |
+| state store (SSOT) | `vault/research/state_store.py` | `state/identity-graph/state.json`, retenção 180d |
+| lock manager | `vault/research/lock_manager.py` | `flock(2)`, PID/start_ts, TTL 600s |
+| retry policy | `vault/research/retry_policy.py` | 429→60-480s, 5xx→30-120s, 401/403→no retry |
+| identity resolver | `vault/research/identity_resolver.py` | email exact → username partial → context/LLM |
+| source priority | `vault/research/source_priority.py` | github>tldv>trello |
+| archive guard | `vault/research/archive_guard.py` | 90d + sem ref ativa + sem conflito pendente |
+| pipeline core | `vault/research/pipeline.py` | 11-step: state→poll→ingest→dedupe→context→resolve→hyp→validate→apply→verify→state |
+| crons | `vault/crons/research_*_cron.py` | polling por fonte + consolidação diária 07h BRT |
+
+### Crons Registrados (OpenClaw)
+
+| Job ID | Schedule | Script |
+|---|---|---|
+| `88e37467` | `*/15 * * * *` BRT | `research_tldv_cron.py` |
+| `b1b496f8` | `*/10 * * * *` BRT | `research_github_cron.py` |
+| `49d1d21e` | `*/20 * * * *` BRT | `research_trello_cron.py` |
+| `2664597b` | `0 7 * * *` BRT | `research_consolidation_cron.py` (substitui `dream-memory-consolidation`) |
+
+### Self-Healing MVP
+
+Fase 1 é **read-only**: acumula evidência em `self_healing_evidence.jsonl`, não aplica merges automaticamente. Próxima fase implementa aplicação automática.
+
+### Testes
+
+```bash
+PYTHONPATH=. pytest -q tests/research/          # 150 tests
+PYTHONPATH=. pytest -q vault/tests/test_identity_resolution.py vault/tests/test_resilience.py --ignore=vault/tests/test_reverify_module.py  # 46 tests
+```
+
+**Merge commit:** `e68d9cd` (PR #16)
+
+---
+
 ## Status
 
-**ativo** — 2026-04-12
+**ativo** — 2026-04-18
 
 - ✅ Bug #1781 corrigido: agent name era `livy-memory`, deveria ser `memory-agent`
 - ✅ Bug #1661 corrigido: accountId `livy-memory-feed` → `memory`; regra channel-per-agent adicionada

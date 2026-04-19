@@ -81,8 +81,9 @@ Topic file: `memory/curated/projeto-super-memoria-robert.md`
 ### 2026-04-18 — Loop de consolidação de research substitui `dream-memory-consolidation`
 
 Decisão: substituir a consolidação legada por um loop de research v1 composto por:
-- `research-tldv` (polling de fonte + rebuild de estado derivado)
-- `research-github` (polling de fonte + rebuild de estado derivado)
+- `research-tldv` (polling de fonte + rebuild de estado derivado, `*/15 * * * *`)
+- `research-github` (polling de fonte + rebuild de estado derivado, `*/10 * * * *`)
+- `research-trello` (polling de fonte + rebuild de estado derivado, `*/20 * * * *`)
 - `research-consolidation` (consolidação diária às 07h BRT)
 
 SSOT permanece em `state/identity-graph/state.json`; arquivos `.research/<source>/state.json` são cache derivado e descartável.

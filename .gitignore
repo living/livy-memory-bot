@@ -48,3 +48,8 @@ memory/vault/insights/.last_sent.json
 
 # Research derived state cache (SSOT is state/identity-graph/state.json)
 .research/*/state.json
+
+# Identity graph runtime artifacts
+state/identity-graph/*
+!state/identity-graph/.gitkeep
+!state/identity-graph/state.json
