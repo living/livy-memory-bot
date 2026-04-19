@@ -63,7 +63,7 @@ class Claim:
     audit_trail: AuditTrail | None = None
 
     def validate(self) -> None:
-        """Validate all invariants. Raises CorruptStateError on violation."""
+        """Validate all invariants. Raises CorruptStateError or MissingEvidenceError on violation."""
         from vault.memory_core.exceptions import CorruptStateError, MissingEvidenceError
 
         if not self.evidence_ids:
@@ -84,6 +84,15 @@ class Claim:
             if self.supersession_version is None:
                 raise CorruptStateError(
                     f"Claim {self.claim_id} superseded without supersession_version"
+                )
+        if self.superseded_by is None:
+            if self.supersession_reason is not None:
+                raise CorruptStateError(
+                    f"Claim {self.claim_id} has supersession_reason but superseded_by is None"
+                )
+            if self.supersession_version is not None:
+                raise CorruptStateError(
+                    f"Claim {self.claim_id} has supersession_version but superseded_by is None"
                 )
 
     @staticmethod
