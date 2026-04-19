@@ -29,6 +29,7 @@ from vault.research.event_key import build_event_key
 from vault.research.identity_resolver import resolve_identity
 from vault.research.state_store import DEFAULT_STATE, load_state, save_state, upsert_processed_event_key
 from vault.research.github_client import GitHubClient
+from vault.research.github_rich_client import GitHubRichClient
 from vault.research.trello_client import TrelloClient
 from vault.research.tldv_client import TLDVClient
 from vault.research.cadence_manager import record_budget_warning, record_healthy_run
@@ -300,6 +301,72 @@ class ResearchPipeline:
     def _is_duplicate(self, event: dict[str, Any]) -> bool:
         return self._calculate_event_key(event) in self.processed_event_keys
 
+    def _build_github_hypothesis(self, event: dict[str, Any]) -> dict[str, Any]:
+        """Build a hypothesis for a rich GitHub PR event with crosslink relations."""
+        event_key = self._calculate_event_key(event)
+        pr_number = event.get("pr_number")
+        repo = event.get("repo", "")
+
+        # Collect text surfaces for crosslink extraction.
+        text_parts: list[str] = [str(event.get("body") or "")]
+        for collection_name in ("issue_comments", "review_comments", "reviews"):
+            for item in event.get(collection_name, []) or []:
+                if isinstance(item, dict):
+                    text_parts.append(str(item.get("body") or ""))
+
+        extractor = GitHubRichClient()
+        trello_urls: list[str] = []
+        github_refs: list[str] = []
+        for text in text_parts:
+            trello_urls.extend(extractor._extract_trello_urls(text))
+            github_refs.extend(extractor._extract_github_refs(text))
+
+        # Dedupe while preserving order.
+        trello_urls = list(dict.fromkeys(trello_urls))
+        github_refs = list(dict.fromkeys(github_refs))
+
+        relations: list[dict[str, Any]] = []
+        for ref in github_refs:
+            relation_type = "mentions"
+            low = ref.lower()
+            full_text = "\n".join(text_parts).lower()
+            if "implements" in full_text or "fixes" in full_text or "closes" in full_text:
+                relation_type = "implements"
+            if "blocks" in full_text:
+                relation_type = "blocks"
+            relations.append({"type": relation_type, "target": ref, "source": f"{repo}#{pr_number}"})
+
+        for url in trello_urls:
+            relations.append({"type": "mentions", "target": url, "source": f"{repo}#{pr_number}"})
+
+        for review in event.get("reviews", []) or []:
+            if not isinstance(review, dict):
+                continue
+            reviewer = review.get("user", {}).get("login") if isinstance(review.get("user"), dict) else None
+            if review.get("state"):
+                relations.append({"type": "reviews", "target": reviewer, "state": review.get("state")})
+            if str(review.get("state", "")).upper() == "APPROVED" and reviewer:
+                relations.append({"type": "approved_by", "target": reviewer})
+
+        content = (
+            f"# GitHub PR Rich Event\n\n"
+            f"- repo: {repo}\n"
+            f"- pr_number: {pr_number}\n"
+            f"- event_key: {event_key}\n"
+            f"- trello_urls: {', '.join(trello_urls) if trello_urls else '-'}\n"
+            f"- github_refs: {', '.join(github_refs) if github_refs else '-'}\n"
+            f"- relations: {len(relations)}\n"
+        )
+
+        return {
+            "action": "create_page",
+            "path": str(self.research_dir / f"github-{event_key.replace(':', '-')}.md"),
+            "content": content,
+            "entity_type": "github_pr",
+            "crosslinks": relations,
+            "relations": relations,
+        }
+
     def _build_context(self, payload: dict[str, Any]) -> dict[str, Any]:
         wiki: dict[str, str] = {}
         if self.wiki_root.exists():
@@ -454,6 +521,7 @@ class ResearchPipeline:
             client: Any = TLDVClient()
         elif self.source == "github":
             client = GitHubClient()
+            rich_client = GitHubRichClient()
         else:  # trello
             client = TrelloClient()
 
@@ -475,6 +543,11 @@ class ResearchPipeline:
             elif self.source == "github":
                 pr_number = event.get("pr_number")
                 payload = client.fetch_pr(pr_number) if pr_number is not None else event
+                event_type = event.get("event_type") or event.get("type")
+                if event_type in {"github:pr_rich", "pr_rich"} and pr_number is not None:
+                    repo = event.get("repo") or payload.get("repo") or ""
+                    if repo:
+                        payload = rich_client.normalize_rich_event(pr_number, repo)
             else:
                 payload = event  # Trello events are already normalized
 
@@ -509,6 +582,8 @@ class ResearchPipeline:
             # Step 7/8/9 hypothesis flow
             if self.source == "trello":
                 hypothesis = self._build_trello_hypothesis(event)
+            elif self.source == "github":
+                hypothesis = self._build_github_hypothesis(payload if isinstance(payload, dict) else event)
             else:
                 hypothesis = {
                     "action": "create_page",
