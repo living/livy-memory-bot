@@ -33,6 +33,7 @@ from vault.research.github_rich_client import GitHubRichClient, extract_github_r
 from vault.research.trello_client import TrelloClient
 from vault.research.tldv_client import TLDVClient
 from vault.research.cadence_manager import record_budget_warning, record_healthy_run
+from vault.ops.rollback import is_wiki_v2_enabled
 
 
 def _hash16(s: str) -> str:
@@ -553,7 +554,12 @@ class ResearchPipeline:
         cache_path.write_text(json.dumps(cache, ensure_ascii=False, indent=2), encoding="utf-8")
 
     def run(self) -> dict[str, Any]:
-        self._log_audit("run_started", {"last_seen_at": self.last_seen_at.isoformat() if self.last_seen_at else None})
+        # WIKI_V2_ENABLED feature flag — gates wiki v2 behavior (Memory Core + Fusion Engine)
+        self.wiki_v2_active = is_wiki_v2_enabled()
+        self._log_audit("run_started", {
+            "last_seen_at": self.last_seen_at.isoformat() if self.last_seen_at else None,
+            "wiki_v2_active": self.wiki_v2_active,
+        })
 
         if self.source == "tldv":
             client: Any = TLDVClient()
