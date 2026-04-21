@@ -35,6 +35,34 @@ def _mark_new_claim_superseded(new_claim: Claim, superseding_claim: Claim) -> Cl
     return updated
 
 
+_LOW_CONFIDENCE_THRESHOLD = 0.5
+
+
+def _apply_review_flags(claim: Claim) -> None:
+    """Apply canonical review flags for low-confidence or missing-evidence claims.
+
+    Backward compatibility:
+    - Preserve existing manual review flags when no canonical trigger is present.
+    - Canonical triggers override existing reason.
+    """
+    if claim.confidence < _LOW_CONFIDENCE_THRESHOLD:
+        claim.needs_review = True
+        claim.review_reason = "low_confidence"
+        return
+
+    if not claim.evidence_ids:
+        claim.needs_review = True
+        claim.review_reason = "missing_evidence"
+        return
+
+    # Preserve existing manual flags when present.
+    if claim.needs_review:
+        return
+
+    claim.needs_review = False
+    claim.review_reason = None
+
+
 def fuse(new_claim: Claim, existing_claims: list[Claim]) -> FusionResult:
     """Fuse new_claim with existing_claims.
 
@@ -78,6 +106,7 @@ def fuse(new_claim: Claim, existing_claims: list[Claim]) -> FusionResult:
         ),
         other_sources=other_sources,
     )
+    _apply_review_flags(fused_claim)
 
     return FusionResult(
         fused_claim=fused_claim,
