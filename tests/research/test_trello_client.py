@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import os
-from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -262,3 +261,37 @@ def test_get_card_checklists_calls_card_checklists_endpoint(mocker):
         params={"key": "k", "token": "t"},
         timeout=30,
     )
+
+
+def test_get_card_comments_raises_trello_api_error_on_non_200(mocker):
+    """Non-200 on card comments should raise TrelloAPIError with card+endpoint context."""
+    mock_get = mocker.patch("requests.get")
+    mock_get.return_value.status_code = 500
+    mock_get.return_value.text = "internal error"
+
+    client = TrelloClient(api_key="k", token="t", board_ids=["b1"])
+
+    with pytest.raises(TrelloAPIError) as exc_info:
+        client.get_card_comments("card123")
+
+    assert exc_info.value.board_id == "card123"
+    assert exc_info.value.status_code == 500
+    assert "card_id=card123" in str(exc_info.value)
+    assert "/cards/card123/actions" in str(exc_info.value)
+
+
+def test_get_card_checklists_raises_trello_api_error_on_non_200(mocker):
+    """Non-200 on card checklists should raise TrelloAPIError with card+endpoint context."""
+    mock_get = mocker.patch("requests.get")
+    mock_get.return_value.status_code = 503
+    mock_get.return_value.text = "upstream unavailable"
+
+    client = TrelloClient(api_key="k", token="t", board_ids=["b1"])
+
+    with pytest.raises(TrelloAPIError) as exc_info:
+        client.get_card_checklists("card123")
+
+    assert exc_info.value.board_id == "card123"
+    assert exc_info.value.status_code == 503
+    assert "card_id=card123" in str(exc_info.value)
+    assert "/cards/card123/checklists" in str(exc_info.value)

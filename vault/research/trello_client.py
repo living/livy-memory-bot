@@ -130,7 +130,10 @@ class TrelloClient:
 
         response = requests.get(url, params=params, timeout=30)
         if response.status_code != 200:
-            raise TrelloAPIError(card_id, response.status_code, response.text)
+            error_context = f"card_id={card_id} endpoint=/cards/{card_id}/actions"
+            if response.text:
+                error_context = f"{error_context} - {response.text}"
+            raise TrelloAPIError(card_id, response.status_code, error_context)
 
         return response.json()
 
@@ -151,7 +154,10 @@ class TrelloClient:
 
         response = requests.get(url, params=params, timeout=30)
         if response.status_code != 200:
-            raise TrelloAPIError(card_id, response.status_code, response.text)
+            error_context = f"card_id={card_id} endpoint=/cards/{card_id}/checklists"
+            if response.text:
+                error_context = f"{error_context} - {response.text}"
+            raise TrelloAPIError(card_id, response.status_code, error_context)
 
         return response.json()
 
