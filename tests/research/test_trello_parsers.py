@@ -119,7 +119,7 @@ def test_card_to_claims_extracts_decision_from_checklist(mocker):
                 "id": "checklist_1",
                 "name": "Deploy Steps",
                 "checkItems": [
-                    {"name": "Rodar migrations do banco de dados primeiro", "state": "complete"},
+                    {"name": "Definido: rodar migrations do banco de dados primeiro", "state": "complete"},
                     {"name": "Deploy", "state": "incomplete"},  # < 5 words
                 ],
             }
@@ -153,7 +153,7 @@ def test_card_to_claims_combines_decisions_from_comments_and_checklists(mocker):
                 "id": "checklist_1",
                 "name": "Setup",
                 "checkItems": [
-                    {"name": "Configurar variáveis de ambiente antes de subir", "state": "complete"},
+                    {"name": "Decisão: configurar variáveis de ambiente antes de subir", "state": "complete"},
                 ],
             }
         ],
@@ -216,6 +216,28 @@ def test_card_to_claims_all_short_comments_emits_no_decision_claims(mocker, capl
         comments=[
             {"text": "OK", "creator": "alice", "date": "2026-04-20T09:00:00.000Z"},
             {"text": "LGTM", "creator": "bob", "date": "2026-04-20T10:00:00.000Z"},
+        ],
+    )
+
+    parsed = parse_trello_card(card, list_name="Review")
+    claims = card_to_claims(parsed)
+
+    decision_claims = [c for c in claims if c["claim_type"] == "decision"]
+    assert len(decision_claims) == 0
+    assert any("trello_comments_unavailable" in record.message for record in caplog.records)
+
+
+def test_card_to_claims_comments_with_5_plus_words_without_keyword_emit_no_decisions(mocker, caplog):
+    """Comments must match decision keywords; word count alone is not enough."""
+    card = _make_card(
+        card_id="card_no_keyword",
+        name="No keyword card",
+        comments=[
+            {
+                "text": "Precisamos revisar a documentação ainda hoje",
+                "creator": "alice",
+                "date": "2026-04-20T09:00:00.000Z",
+            },
         ],
     )
 

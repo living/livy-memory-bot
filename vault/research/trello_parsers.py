@@ -56,8 +56,9 @@ def _extract_hours(card: dict[str, Any]) -> float:
 
 
 def _is_decision_text(text: str) -> bool:
-    words = WORD_PATTERN.findall(text or "")
-    return len(words) >= 5
+    normalized = text or ""
+    words = WORD_PATTERN.findall(normalized)
+    return len(words) >= 5 and DECISION_KEYWORDS_PATTERN.search(normalized) is not None
 
 
 def _extract_decision_comments(card: dict[str, Any]) -> list[str]:
