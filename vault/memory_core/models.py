@@ -57,6 +57,8 @@ class Claim:
     ingested_at: str
     confidence: float
     privacy_level: PrivacyLevel
+    needs_review: bool = False
+    review_reason: str | None = None
     superseded_by: str | None = None
     supersession_reason: str | None = None
     supersession_version: int | None = None
