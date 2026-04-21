@@ -437,3 +437,46 @@ class TestGitHubParsersIntegration:
         assert len(claims) > 0
         assert all(c["source"] == "github" for c in claims)
         assert any(c.get("claim_type") == "approval" for c in claims)
+
+
+def test_github_pr_claim_has_needs_review_false_by_default():
+    """Existing PR status claim behavior remains unchanged (no mandatory review fields)."""
+    from vault.research.github_parsers import pr_to_claims
+
+    pr_payload = _make_pr_payload(number=101)
+    claims = pr_to_claims(pr_payload, [])
+
+    status_claim = next(c for c in claims if c["claim_type"] == "status")
+    assert status_claim.get("needs_review", False) is False
+    assert "review_reason" not in status_claim
+
+
+def test_github_pr_review_comment_claim_has_needs_review_true_comentario_github():
+    """GitHub review comments (non-formal approval signal) must require review."""
+    from vault.research.github_parsers import pr_to_claims
+
+    pr_payload = _make_pr_payload(number=102)
+    reviews = [_make_review("COMMENTED", "alice", "Temos que validar esse edge case")]
+    claims = pr_to_claims(pr_payload, reviews)
+
+    comment_review_claims = [
+        c for c in claims
+        if c.get("claim_type") == "approval" and c.get("metadata", {}).get("review_state") == "COMMENTED"
+    ]
+    assert len(comment_review_claims) == 1
+    claim = comment_review_claims[0]
+    assert claim["needs_review"] is True
+    assert claim["review_reason"] == "comentario_github"
+
+
+def test_github_formal_review_claim_has_needs_review_true_review_github():
+    """Formal GitHub code reviews (APPROVED/CHANGES_REQUESTED) must require review."""
+    from vault.research.github_parsers import pr_to_claims
+
+    pr_payload = _make_pr_payload(number=103)
+    reviews = [_make_review("APPROVED", "alice", "LGTM")]
+    claims = pr_to_claims(pr_payload, reviews)
+
+    approval_claim = next(c for c in claims if c.get("claim_type") == "approval")
+    assert approval_claim["needs_review"] is True
+    assert approval_claim["review_reason"] == "review_github"
