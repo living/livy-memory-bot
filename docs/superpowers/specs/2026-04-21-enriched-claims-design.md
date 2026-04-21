@@ -183,7 +183,7 @@ declarar explicitamente fallback quando esses campos estiverem ausentes.
   - Se texto contem regex de decisao E >= 5 palavras:
     - Mesma logica de decision.
 - **Fallback:** se `actions` nao estao na resposta, loga warning
-  "trello_comments_unavailable" e пропускаetapa de decisao por comentario
+  "trello_comments_unavailable" e pula a etapa de decisao por comentario
   (nao gera claim fantasma).
 
 ---
@@ -345,11 +345,11 @@ Se 2 ciclos consecutivos fora do threshold:
 
 | Risco | Prob | Impacto | Mitigacao |
 |-------|------|---------|-----------|
-| Volume excessivo de claims ruins | media | alto | `needs_review` + dedupe semantico隔离 |
+| Volume excessivo de claims ruins | media | alto | `needs_review` + dedupe semantico |
 | Decisoes falsas por regex | media | medio | contexto de 5 palavras minimas + `needs_review` + alta precisao no TLDV decisions |
 | Supersessao excessiva | baixa | medio | Limitar supersession automatica a same claim_type + similarity > 0.7 |
 | Performance degradada por deduplicacao complexa | baixa | baixo | Dedupe por SHA256 (O(1) lookup), nao por string diff |
-| Trello comments ausentes na API | baixa | medio | Fallback explicito com log warning, пропускаetapa e nao gera claim fantasma |
+| Trello comments ausentes na API | baixa | medio | Fallback explicito com log warning, pula etapa e nao gera claim fantasma |
 
 ---
 
