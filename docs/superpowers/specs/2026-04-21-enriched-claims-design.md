@@ -1,11 +1,11 @@
 # SPEC: Enriquecimento de Claims — Decision & Linkage
 
 **Data:** 2026-04-21
-**Versão:** 1.1 (após review Livy Deep)
+**Versao:** 1.2 (após review v2 Livy Deep)
 **Status:** spec
 **Tipo:** feature (pipeline de memoria)
 **Origem:** brainstorming 2026-04-21
-**Review:** Livy Deep, 2026-04-21
+**Review:** Livy Deep, 2026-04-21 (v1) + v2 review
 
 ---
 
@@ -37,11 +37,11 @@ Pipeline em 3 fases (A -> B -> C), incrementais e independentes:
 | C | Observabilidade | KPIs, guardrails, alertas no HEARTBEAT |
 
 **Perfil:** balanceado (2.5) -- boa precisao + volume visivel.
-**Ambiguidade:** gera claim com `needs_review=true` quando confianca < 0.55 ou sem evidência.
+**Ambiguidade:** gera claim com `needs_review=true` quando confianca < 0.55 ou sem evidencia.
 
 ---
 
-## 3. Contrato Canônico de Claim
+## 3. Contrato Canonico de Claim
 
 ### 3.1 Claim `decision`
 
@@ -57,14 +57,14 @@ class DecisionClaim:
     event_timestamp: str              # ISO8601
     confidence: float                 # 0.0-1.0
     needs_review: bool = False
-    review_reason: str | None = None  # "baixa_confianca", "sem_evidencia", "regex_incerto"
+    review_reason: str | None = None  # "baixa_confianca"|"sem_evidencia"|"regex_incerto"
     decision_scope: str | None = None # "tech", "product", "ops"
     decision_owner: str | None = None # Login ou nome do responsible
-    evidence_refs: list[SourceRef] = field(default_factory=list)
+    evidence_ids: list[str] = field(default_factory=list)  # alinhado ao model atual
     audit_trail: list[AuditEntry] = field(default_factory=list)
 ```
 
-### 3.2 Claim `linkage` (NOVO -- contrato completo)
+### 3.2 Claim `linkage` (contrato completo)
 
 ```python
 @dataclass
@@ -73,7 +73,7 @@ class LinkageClaim:
     entity_id: str                    # ID da entidade origem (PR, card, meeting)
     entity_type: str                  # "pull_request", "project", "meeting"
     from_entity: str                  # Entidade que faz a referencia
-    from_entity_type: str             # Tipo da entidade origem
+    from_entity_type: str            # Tipo da entidade origem
     to_entity: str                   # Entidade referenciada (PR#, card_id, meeting_id)
     to_entity_type: str              # Tipo da entidade destino
     relation: Literal[               # Enum fechado de relacoes
@@ -91,7 +91,7 @@ class LinkageClaim:
     confidence: float                 # 0.0-1.0
     needs_review: bool = False
     review_reason: str | None = None
-    evidence_refs: list[SourceRef] = field(default_factory=list)
+    evidence_ids: list[str] = field(default_factory=list)  # alinhado ao model atual
     audit_trail: list[AuditEntry] = field(default_factory=list)
 ```
 
@@ -107,7 +107,7 @@ class LinkageClaim:
 - `entity_id` = `meeting.id`.
 - `text` = decisao crua.
 - `confidence = 0.85` (fonte estruturada tem precisao alta).
-- `evidence_refs` inclui ref para a reuniao.
+- `evidence_ids` inclui IDs de evidencias da reuniao (alinhado ao model atual).
 
 **Regra 2 -- Deteccao por linguagem (fallback)**
 - Padroes regex de linguagem decisoria em `topics` + `raw_text`:
@@ -144,11 +144,11 @@ class LinkageClaim:
   `from_entity_type=pull_request`, `to_entity_type` inferido do tipo de ref.
 
 **Regra 3 -- Decisoes por linguagem normativa**
-- Padrao no body/PR title:
+- Padrao no body/PR title (exclui conventional commits genericos para evitar falso positivo):
   ```
-  /(?:^(?:feat|fix|docs|chore)\(|padrao passa a ser|\
-       adotamos a partir de|implementar verso|mudar de|remover o|\
-       depreciar o)\b/i
+  /(?:padrao passa a ser|adotamos a partir de|decidimos por|\
+       arquitetura oficial|deprecado em favor de|migramos para|\
+       substitui definitivamente|politica obrigatoria)\b/i
   ```
 - Gera `decision` com `confidence = 0.55` + `needs_review=true`
   + `review_reason="linguagem_normativa"` se nao tiver label forte
@@ -162,8 +162,11 @@ class LinkageClaim:
 ### 4.3 Trello Parsers (`vault/research/trello_parsers.py`)
 
 **PRE-CONDICAO DE DADOS:** a regra 3 (comentarios/checklists) **exige**
-que o Trello client traga esses campos na resposta da API. O parser deve
-declarar explicitamente fallback quando esses campos estiverem ausentes.
+novos metodos no Trello client:
+- `get_card_comments(card_id)` via `/cards/{id}/actions?filter=commentCard`
+- `get_card_checklists(card_id)` via `/cards/{id}/checklists`
+
+O parser deve declarar explicitamente fallback quando esses campos estiverem ausentes.
 
 **Regra 1 -- Status remain**
 - Movimento de lista -> `status` (mantem).
@@ -208,23 +211,32 @@ Em `vault/fusion_engine/confidence.py`, ajustar `compute_confidence`:
 
 | Condicao | Ajuste |
 |----------|--------|
-| `claim_type=decision` com `evidence_refs` nao vazio | +0.15 bonus |
-| `claim_type=linkage` com convergencia multi-fonte | +0.20 bonus |
-| `claim_type=decision` sem evidência explícita | `needs_review=true`, `review_reason="sem_evidencia"` |
+| `claim_type=decision` com `evidence_ids` nao vazio | +0.15 bonus |
+| `claim_type=linkage` com convergencia multi-fonte | +0.20 bonus via `other_sources` |
+| `claim_type=decision` sem evidencia explícita | `needs_review=true`, `review_reason="sem_evidencia"` |
 | Extraido por regex de linguagem (nao por campo estruturado) | -0.10 |
 | `confidence` final < 0.55 | `needs_review=true` |
+
+Importante: o mecanismo de convergencia multi-fonte ja existe em `compute_confidence`
+via parametro `other_sources`. A implementacao nao deve duplicar esse caminho --
+apenas conecta os parsers para passarem `other_sources` corretamente.
 
 ### 5.3 Algoritmo de Convergencia Multi-Fonte (para bonus de linkage)
 
 "Evidencia cruzada" significa: o mesmo `to_entity` aparece em claims de
 **2 ou mais fontes diferentes** dentro de uma janela de **7 dias**.
 
+Importante: o `compute_confidence` ja recebe `other_sources`; a implementacao
+reaproveita esse mecanismo e nao cria caminho duplicado.
+
 Implementacao:
 ```
 convergence_key = SHA256(to_entity + relation)
-fontes_unicas = set(c.source for c in recent_claims if c.to_entity == to_entity and c.relation == relation)
+fontes_unicas = set(c.source for c in recent_claims
+                     if c.to_entity == to_entity and c.relation == relation)
+other_sources = sorted(fontes_unicas - {claim.source})
 if len(fontes_unicas) >= 2:
-    bonus +0.20 aplicado
+    bonus +0.20 aplicado via compute_confidence(..., other_sources=other_sources)
 ```
 
 onde `recent_claims` sao todos os claims dos ultimos 7 dias em `state/identity-graph/state.json`.
@@ -234,23 +246,26 @@ onde `recent_claims` sao todos os claims dos ultimos 7 dias em `state/identity-g
 **Dedup:** nao criar claim novo se chave ja existe com confianca >= 0.7.
 **Supersession:** atualizar vinculo entre claims conflitantes.
 
-Em `vault/research/state_store.py`, novas chaves:
+Em `vault/research/state_store.py`, as novas chaves **complementam** o `content_key`
+existente (nao substituem):
 
 ```
-decision_key:    SHA256(entity_id + "decision" + normalized_text_lower)
-linkage_key:     SHA256(from_entity + relation + to_entity)
+content_key (existente): SHA256(normalized_content)
+decision_key (novo):     SHA256(entity_id + "decision" + normalized_text_lower)
+linkage_key (novo):      SHA256(from_entity + relation + to_entity)
 ```
 
 **Comportamento:**
-- Se `decision_key` ja existe com confianca >= 0.7: **ignorar** (dedup).
-- Se `linkage_key` ja existe: **ignorar** (dedup).
+- Se `content_key` existe: **ignorar** (dedupe primario).
+- Se `content_key` nao existir mas `decision_key` ja existe com confianca >= 0.7: **ignorar** (dedupe semantico).
+- Se `content_key` nao existir mas `linkage_key` ja existe: **ignorar** (dedupe semantico).
 - **Nao aplicar supersession nesse caso** -- sao operacoes ortogonais.
 
 ### 5.5 Supersession para decision
 
 Em `vault/fusion_engine/supersession.py`:
 
-- `decision` só supersede `decision` anterior se:
+- `decision` so supersede `decision` anterior se:
   - Mesmo `entity_id` E
   - Similaridade de texto > 0.7 (usar `difflib.SequenceMatcher`)
     OU `supersession_reason` explicito no claim novo.
@@ -270,7 +285,7 @@ metrics = {
     "total_claims": len(new_claims),
     "by_type": Counter(c.claim_type for c in new_claims),
     "needs_review_count": sum(1 for c in new_claims if c.needs_review),
-    "with_evidence": sum(1 for c in new_claims if c.evidence_refs),
+    "with_evidence": sum(1 for c in new_claims if c.evidence_ids),
 }
 pct = lambda v: (v / metrics['total_claims'] * 100) if metrics['total_claims'] else 0
 ```
@@ -294,11 +309,11 @@ Em `HEARTBEAT.md`, nova secao "Qualidade de Claims":
 
 | Metrica | Atual | Limiar | Status |
 |---------|-------|--------|--------|
-| decision% | X% | >=15% | ✅/🟡/🔴 |
-| linkage% | X% | >=25% | ✅/🟡/🔴 |
-| status% | X% | <=60% | ✅/🟡/🔴 |
-| needs_review% | X% | <=20% | ✅/🟡/🔴 |
-| with_evidence% | X% | >=80% | ✅/🟡/🔴 |
+| decision% | X% | >=15% | verde/amarelo/vermelho |
+| linkage% | X% | >=25% | verde/amarelo/vermelho |
+| status% | X% | <=60% | verde/amarelo/vermelho |
+| needs_review% | X% | <=20% | verde/amarelo/vermelho |
+| with_evidence% | X% | >=80% | verde/amarelo/vermelho |
 ```
 
 ### 6.3 Alerta automatico
@@ -314,14 +329,15 @@ Se 2 ciclos consecutivos fora do threshold:
 | # | Arquivo | Fase | Prioridade |
 |---|---------|------|-----------|
 | 1 | `vault/memory_core/models.py` -- adicionar `needs_review` + `review_reason` | B | vermelho |
-| 2 | `vault/research/trello_parsers.py` -- adicionar `needs_review` + regex + fallback comments/checklists | A | vermelho |
-| 3 | `vault/research/github_parsers.py` -- linkage com `from/to_entity` completos + `needs_review` | A | vermelho |
-| 4 | `vault/research/tldv_client.py` -- decisions direto + regex + linkage com `from/to_entity` | A | vermelho |
-| 5 | `vault/fusion_engine/confidence.py` -- bonus e gates de `needs_review` | B | vermelho |
-| 6 | `vault/fusion_engine/supersession.py` -- protecao decision vs status | B | amarelo |
-| 7 | `vault/research/state_store.py` -- dedupe semantico decision_key/linkage_key (separado de supersession) | B | amarelo |
-| 8 | `vault/crons/research_consolidation_cron.py` -- KPIs + alertas | C | azul |
-| 9 | `HEARTBEAT.md` -- secao qualidade de claims | C | azul |
+| 2 | `vault/research/trello_client.py` -- implementar `get_card_comments` e `get_card_checklists` (novos endpoints) | A | vermelho |
+| 3 | `vault/research/trello_parsers.py` -- adicionar `needs_review` + regex + fallback comments/checklists | A | vermelho |
+| 4 | `vault/research/github_parsers.py` -- linkage com `from/to_entity` completos + `needs_review` | A | vermelho |
+| 5 | `vault/research/tldv_client.py` -- decisions direto + regex + linkage com `from/to_entity` | A | vermelho |
+| 6 | `vault/fusion_engine/confidence.py` -- bonus e gates de `needs_review` | B | vermelho |
+| 7 | `vault/fusion_engine/supersession.py` -- protecao decision vs status + similaridade textual em `should_supersede` | B | amarelo |
+| 8 | `vault/research/state_store.py` -- dedupe semantico decision_key/linkage_key (complementar ao content_key existente) | B | amarelo |
+| 9 | `vault/crons/research_consolidation_cron.py` -- KPIs + alertas | C | azul |
+| 10 | `HEARTBEAT.md` -- secao qualidade de claims | C | azul |
 
 ---
 
@@ -329,8 +345,8 @@ Se 2 ciclos consecutivos fora do threshold:
 
 | Teste | Arquivo | Cobertura |
 |-------|---------|-----------|
-| `needs_review` setado corretamente | `tests/vault/test_claim_model.py` (novo) | confianca < 0.55, sem evidência, regex fallback |
-| Bonus de confianca para decision com evidência | `tests/vault/fusion_engine/test_confidence.py` (expandir) | existing + novo bonus |
+| `needs_review` setado corretamente | `tests/vault/test_claim_model.py` (novo) | confianca < 0.55, sem evidencia, regex fallback |
+| Bonus de confianca para decision com evidence_ids | `tests/vault/fusion_engine/test_confidence.py` (expandir) | existing + novo bonus |
 | Convergencia multi-fonte detecta 2+ fontes | `tests/vault/fusion_engine/test_confidence.py` (novo) | janela 7 dias, mesma to_entity |
 | Deduplicate nao reinsere claim identico | `tests/vault/research/test_state_store.py` (expandir) | decision_key, linkage_key |
 | Trello parser gera decision de comentario | `tests/research/test_trello_parsers.py` (expandir) | regex hit + sem hit + fallback comentarios ausentes |
