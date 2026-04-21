@@ -11,6 +11,8 @@ def make_claim(
     superseded_by: str | None = None,
     claim_id: str = "test-claim",
     event_timestamp: str | None = None,
+    text: str = "Test claim",
+    supersession_reason: str | None = None,
 ) -> Claim:
     ts = event_timestamp or (datetime.now(timezone.utc) - timedelta(days=days_ago)).isoformat()
     return Claim(
@@ -19,7 +21,7 @@ def make_claim(
         entity_id=entity_id,
         topic_id="topic-1",
         claim_type=claim_type,
-        text="Test claim",
+        text=text,
         source="github",
         source_ref=SourceRef(source_id="src-1"),
         evidence_ids=["ev-1"],
@@ -29,7 +31,7 @@ def make_claim(
         confidence=0.0,
         privacy_level="internal",
         superseded_by=superseded_by,
-        supersession_reason=None,
+        supersession_reason=supersession_reason,
         supersession_version=None,
         audit_trail=AuditTrail(model_used="test", parser_version="v1", trace_id="trace-1"),
     )
@@ -79,6 +81,85 @@ class TestShouldSupersede:
         ts = datetime.now(timezone.utc).isoformat()
         existing = make_claim(claim_id="existing", event_timestamp=ts)
         candidate = make_claim(claim_id="candidate", event_timestamp=ts)
+        assert should_supersede(candidate, existing) is False
+
+
+class TestDecisionSupersessionHardening:
+    """Decision claims are protected from casual supersession."""
+
+    def test_status_never_supersedes_decision(self):
+        """A status claim must NEVER supersede a decision claim."""
+        from vault.fusion_engine.supersession import should_supersede
+
+        existing = make_claim(
+            claim_type="decision",
+            claim_id="existing-decision",
+            days_ago=10,
+            text="Use PostgreSQL for production",
+        )
+        candidate = make_claim(
+            claim_type="status",
+            claim_id="candidate-status",
+            days_ago=5,
+            text="Status: PostgreSQL is running",
+        )
+        assert should_supersede(candidate, existing) is False
+
+    def test_decision_supersedes_decision_with_high_similarity(self):
+        """Decision supersedes decision when text similarity > 0.7."""
+        from vault.fusion_engine.supersession import should_supersede
+
+        existing = make_claim(
+            claim_type="decision",
+            claim_id="existing",
+            days_ago=10,
+            text="Deploy using blue-green strategy for zero-downtime releases",
+        )
+        candidate = make_claim(
+            claim_type="decision",
+            claim_id="candidate",
+            days_ago=5,
+            text="Deploy using blue-green strategy for zero-downtime releases v2",
+            supersession_reason=None,
+        )
+        assert should_supersede(candidate, existing) is True
+
+    def test_decision_supersedes_decision_with_explicit_reason(self):
+        """Decision supersedes decision when explicit supersession_reason is set."""
+        from vault.fusion_engine.supersession import should_supersede
+
+        existing = make_claim(
+            claim_type="decision",
+            claim_id="existing",
+            days_ago=30,
+            text="Use Redis for caching",
+        )
+        candidate = make_claim(
+            claim_type="decision",
+            claim_id="candidate",
+            days_ago=5,
+            text="Switch to Memcached for cost reasons",
+            supersession_reason="Superseded: changed cache backend from Redis to Memcached per cost analysis",
+        )
+        assert should_supersede(candidate, existing) is True
+
+    def test_decision_cannot_supersede_decision_without_similarity_or_reason(self):
+        """Decision cannot supersede decision when similarity < 0.7 AND no explicit reason."""
+        from vault.fusion_engine.supersession import should_supersede
+
+        existing = make_claim(
+            claim_type="decision",
+            claim_id="existing",
+            days_ago=30,
+            text="Use Redis for caching",
+        )
+        candidate = make_claim(
+            claim_type="decision",
+            claim_id="candidate",
+            days_ago=5,
+            text="Switch to Memcached for cost reasons",
+            supersession_reason=None,
+        )
         assert should_supersede(candidate, existing) is False
 
 
