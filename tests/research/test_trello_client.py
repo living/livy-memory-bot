@@ -228,3 +228,37 @@ def test_fetch_events_since_uses_env_vars(mocker):
 
     # Should have made 2 calls (one per board)
     assert mock_get.call_count == 2
+
+
+def test_get_card_comments_calls_commentCard_endpoint(mocker):
+    """get_card_comments should call /cards/{id}/actions with filter=commentCard."""
+    mock_get = mocker.patch("requests.get")
+    mock_get.return_value.status_code = 200
+    mock_get.return_value.json.return_value = [{"id": "act1", "type": "commentCard"}]
+
+    client = TrelloClient(api_key="k", token="t", board_ids=["b1"])
+    comments = client.get_card_comments("card123")
+
+    assert comments == [{"id": "act1", "type": "commentCard"}]
+    mock_get.assert_called_once_with(
+        "https://api.trello.com/1/cards/card123/actions",
+        params={"key": "k", "token": "t", "filter": "commentCard"},
+        timeout=30,
+    )
+
+
+def test_get_card_checklists_calls_card_checklists_endpoint(mocker):
+    """get_card_checklists should call /cards/{id}/checklists."""
+    mock_get = mocker.patch("requests.get")
+    mock_get.return_value.status_code = 200
+    mock_get.return_value.json.return_value = [{"id": "chk1", "name": "Checklist"}]
+
+    client = TrelloClient(api_key="k", token="t", board_ids=["b1"])
+    checklists = client.get_card_checklists("card123")
+
+    assert checklists == [{"id": "chk1", "name": "Checklist"}]
+    mock_get.assert_called_once_with(
+        "https://api.trello.com/1/cards/card123/checklists",
+        params={"key": "k", "token": "t"},
+        timeout=30,
+    )

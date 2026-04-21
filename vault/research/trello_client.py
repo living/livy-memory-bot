@@ -112,6 +112,49 @@ class TrelloClient:
         actions = response.json()
         return [self.normalize_action(action) for action in actions]
 
+    def get_card_comments(self, card_id: str) -> list[dict[str, Any]]:
+        """Fetch card comments for a Trello card.
+
+        Args:
+            card_id: Trello card ID.
+
+        Returns:
+            List of Trello comment actions.
+        """
+        url = f"{TRELLO_API_BASE}/cards/{card_id}/actions"
+        params: dict[str, Any] = {
+            "key": self.api_key,
+            "token": self.token,
+            "filter": "commentCard",
+        }
+
+        response = requests.get(url, params=params, timeout=30)
+        if response.status_code != 200:
+            raise TrelloAPIError(card_id, response.status_code, response.text)
+
+        return response.json()
+
+    def get_card_checklists(self, card_id: str) -> list[dict[str, Any]]:
+        """Fetch checklists attached to a Trello card.
+
+        Args:
+            card_id: Trello card ID.
+
+        Returns:
+            List of Trello checklist objects.
+        """
+        url = f"{TRELLO_API_BASE}/cards/{card_id}/checklists"
+        params: dict[str, Any] = {
+            "key": self.api_key,
+            "token": self.token,
+        }
+
+        response = requests.get(url, params=params, timeout=30)
+        if response.status_code != 200:
+            raise TrelloAPIError(card_id, response.status_code, response.text)
+
+        return response.json()
+
     def get_normalized_cards(self, last_seen_at: str | None = None) -> list[ParsedTrelloCard]:
         """Fetch and normalize cards from configured boards.
 
