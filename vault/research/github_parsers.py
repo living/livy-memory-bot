@@ -215,7 +215,6 @@ def pr_to_claims(
     # -------------------------------------------------------------------------
     # Linkage claims — GitHub refs from body
     # -------------------------------------------------------------------------
-    from vault.research.github_parsers import GitHubParsers
     refs = GitHubParsers._parse_body_refs(body) if body else []
     for ref_str, relation, _ in refs:
         claims.append({
