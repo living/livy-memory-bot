@@ -542,3 +542,68 @@ QUALITY_GUARDRAIL_CONSECUTIVE_TRIGGER = 3   # era 2
 - `PYTHONPATH=. pytest tests/research/ -q` → **557 passed** (eram 548, +9 novos)
 - `_run_quality_guardrail()` produção: `passed=True`, `alert_emitted=False`
 - Histórico atualizado: `state/identity-graph/quality_guardrail_history.jsonl`
+
+## Session Log — 2026-04-22 01:26 UTC (factcheck + quick wins executados)
+
+### Escopo executado (com autorização do Lincoln)
+1. **Fact-check** do SSOT e gaps reais em TLDV/GitHub.
+2. **Backfill TLDV focado**: apenas meetings com `summaries.decisions` explícitos e ainda não processados.
+3. **Backfill GitHub focado**: PRs merged no `living/livy-memory-bot` ausentes em `processed_event_keys.github`.
+4. Revalidação completa da suíte research + guardrail.
+
+### Baseline (pré quick wins)
+- `total=527`, `decision=4`, `linkage=22`
+- cobertura (`decision+linkage`) = **4.93%**
+
+### Fact-check (gaps encontrados)
+- TLDV:
+  - meetings recentes: 77
+  - processados: 10
+  - meetings com `summaries.decisions` não vazios: 20
+  - **não processados com decisions: 17**
+- GitHub:
+  - PRs merged detectados: 23
+  - processados: 12
+  - **faltando: 11** (`#12, #11, #10, #8, #7, #6, #5, #4, #3, #2, #1`)
+
+### Execução quick wins
+
+#### TLDV (17 meetings com decisions)
+- **Target:** 17
+- **Meetings com escrita:** 17/17
+- Delta:
+  - `total +240`
+  - `decision +44`
+  - `linkage +0`
+  - cobertura: **4.93% → 9.13%** (`+4.19pp`)
+
+#### GitHub (11 PRs merged faltantes)
+- **Target:** 11
+- Alguns fetches ricos retornaram `command_failed` pontual, mas pipeline persistiu ganhos parciais.
+- Delta:
+  - `total +17`
+  - `decision +0`
+  - `linkage +6`
+  - cobertura: **9.13% → 9.69%** (`+0.57pp`)
+
+### Estado final (pós quick wins)
+- `total=784`
+- `decision=48`
+- `linkage=28`
+- `status=465`
+- `timeline_event=243`
+- cobertura (`decision+linkage`) = **9.69%**
+
+### Guardrail Option B (pós quick wins)
+- `_run_quality_guardrail()`:
+  - `pct_decision=6.12%`
+  - `pct_linkage=3.57%`
+  - `decision_count_30d=40`
+  - `passed=true`, `alert_emitted=false`, `consecutive_bad_cycles=0`
+
+### Validação
+- `PYTHONPATH=. pytest tests/research/ -q` → **557 passed**
+
+### Conclusão
+- Quick wins identificados no fact-check estavam corretos e foram capturados.
+- Cobertura quase dobrou (**4.93% → 9.69%**), porém ainda abaixo de metas agressivas (ex. 40%), indicando limitação estrutural da distribuição de tipos no histórico.
