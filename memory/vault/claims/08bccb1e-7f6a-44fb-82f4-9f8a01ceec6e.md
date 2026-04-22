@@ -1,0 +1,12 @@
+# Claim 08bccb1e-7f6a-44fb-82f4-9f8a01ceec6e
+
+- source: trello
+- entity_type: project
+- entity_id: 69d8f50d097267a768563f3f
+- claim_type: status
+- confidence: 0.600
+- event_timestamp: 2026-04-10T13:03:09.538Z
+- superseded_by: 78308e36-7f98-47b4-92fc-dd54511d67c2
+
+## Text
+Card '13:00 - Living as Service+Software Provider: Billing ' está em '6964f88f5b00feaf40789886'

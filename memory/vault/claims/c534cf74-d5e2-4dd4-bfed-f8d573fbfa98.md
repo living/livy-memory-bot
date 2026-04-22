@@ -1,0 +1,12 @@
+# Claim c534cf74-d5e2-4dd4-bfed-f8d573fbfa98
+
+- source: trello
+- entity_type: project
+- entity_id: c2
+- claim_type: status
+- confidence: 0.800
+- event_timestamp: 2026-04-18T10:00:00.000Z
+- superseded_by: -
+
+## Text
+Card '' está em 'l2'

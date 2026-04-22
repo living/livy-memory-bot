@@ -1,0 +1,2186 @@
+[
+  {
+    "ts": "2026-04-19T16:52:04.282144+00:00",
+    "source": "tldv",
+    "action": "run_started",
+    "data": {
+      "last_seen_at": null,
+      "wiki_v2_active": false
+    }
+  },
+  {
+    "ts": "2026-04-19T16:52:06.576352+00:00",
+    "source": "tldv",
+    "action": "event_processed",
+    "data": {
+      "event_key": "tldv:event:69e235dcf55c8200142fb060",
+      "content_key": "tldv:69e235dcf55c8200142fb060:a62a9a24e91a01eb9d3e67895b1037a6c71b83d7bf871397f1bcfc439a0226eb"
+    }
+  },
+  {
+    "ts": "2026-04-19T16:52:07.425937+00:00",
+    "source": "tldv",
+    "action": "event_processed",
+    "data": {
+      "event_key": "tldv:event:69e220bbf55c8200142fab03",
+      "content_key": "tldv:69e220bbf55c8200142fab03:251084a912116c3a01560904e286d0b4db84503538c0090ed17f2bfa4b2b13b5"
+    }
+  },
+  {
+    "ts": "2026-04-19T16:52:08.254175+00:00",
+    "source": "tldv",
+    "action": "event_processed",
+    "data": {
+      "event_key": "tldv:event:69e0cf369c64de0013f1a12d",
+      "content_key": "tldv:69e0cf369c64de0013f1a12d:98cbc93c842dc27bea6c9a1c3741fe9eda6c8e268f0b9f8b179c4bbb90a6064b"
+    }
+  },
+  {
+    "ts": "2026-04-19T16:53:27.469217+00:00",
+    "source": "tldv",
+    "action": "run_started",
+    "data": {
+      "last_seen_at": "2026-04-19T16:52:08.253807+00:00",
+      "wiki_v2_active": false
+    }
+  },
+  {
+    "ts": "2026-04-19T16:53:27.937663+00:00",
+    "source": "tldv",
+    "action": "run_finished",
+    "data": {
+      "events_processed": 0,
+      "events_skipped": 0
+    }
+  },
+  {
+    "ts": "2026-04-19T16:55:24.363558+00:00",
+    "source": "tldv",
+    "action": "run_started",
+    "data": {
+      "last_seen_at": "2026-04-19T16:52:08.253807+00:00",
+      "wiki_v2_active": false
+    }
+  },
+  {
+    "ts": "2026-04-19T16:55:25.307761+00:00",
+    "source": "tldv",
+    "action": "run_finished",
+    "data": {
+      "events_processed": 0,
+      "events_skipped": 0
+    }
+  },
+  {
+    "ts": "2026-04-19T17:04:04.057044+00:00",
+    "source": "tldv",
+    "action": "run_started",
+    "data": {
+      "last_seen_at": "2026-04-19T16:52:08.253807+00:00",
+      "wiki_v2_active": true
+    }
+  },
+  {
+    "ts": "2026-04-19T17:04:05.052250+00:00",
+    "source": "tldv",
+    "action": "run_finished",
+    "data": {
+      "events_processed": 0,
+      "events_skipped": 0
+    }
+  },
+  {
+    "ts": "2026-04-19T17:11:38.120868+00:00",
+    "source": "tldv",
+    "action": "run_started",
+    "data": {
+      "last_seen_at": null,
+      "wiki_v2_active": true
+    }
+  },
+  {
+    "ts": "2026-04-19T17:11:39.890195+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "9d696f46-acd2-43d6-b513-b64321e0e523",
+      "blob_path": "memory/vault/claims/9d696f46-acd2-43d6-b513-b64321e0e523.md",
+      "entity_id": "69e235dcf55c8200142fb060",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-19T17:11:39.894089+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "tldv:event:69e235dcf55c8200142fb060",
+      "claims_written": 1,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-19T17:11:39.905032+00:00",
+    "source": "tldv",
+    "action": "event_processed",
+    "data": {
+      "event_key": "tldv:event:69e235dcf55c8200142fb060",
+      "content_key": "tldv:69e235dcf55c8200142fb060:a62a9a24e91a01eb9d3e67895b1037a6c71b83d7bf871397f1bcfc439a0226eb"
+    }
+  },
+  {
+    "ts": "2026-04-19T17:11:40.466260+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "b7ec9029-3e01-4366-b9bb-4462dcd2bd12",
+      "blob_path": "memory/vault/claims/b7ec9029-3e01-4366-b9bb-4462dcd2bd12.md",
+      "entity_id": "69e220bbf55c8200142fab03",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-19T17:11:40.470898+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "tldv:event:69e220bbf55c8200142fab03",
+      "claims_written": 1,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-19T17:11:40.489107+00:00",
+    "source": "tldv",
+    "action": "event_processed",
+    "data": {
+      "event_key": "tldv:event:69e220bbf55c8200142fab03",
+      "content_key": "tldv:69e220bbf55c8200142fab03:251084a912116c3a01560904e286d0b4db84503538c0090ed17f2bfa4b2b13b5"
+    }
+  },
+  {
+    "ts": "2026-04-19T17:11:41.225878+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "4558cacc-2162-4b63-9b88-fece22b764ac",
+      "blob_path": "memory/vault/claims/4558cacc-2162-4b63-9b88-fece22b764ac.md",
+      "entity_id": "69e0cf369c64de0013f1a12d",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-19T17:11:41.229194+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "tldv:event:69e0cf369c64de0013f1a12d",
+      "claims_written": 1,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-19T17:11:41.241478+00:00",
+    "source": "tldv",
+    "action": "event_processed",
+    "data": {
+      "event_key": "tldv:event:69e0cf369c64de0013f1a12d",
+      "content_key": "tldv:69e0cf369c64de0013f1a12d:98cbc93c842dc27bea6c9a1c3741fe9eda6c8e268f0b9f8b179c4bbb90a6064b"
+    }
+  },
+  {
+    "ts": "2026-04-19T17:11:41.814726+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "63d861e0-f3ea-4fc8-beb3-cecb0a39cf2d",
+      "blob_path": "memory/vault/claims/63d861e0-f3ea-4fc8-beb3-cecb0a39cf2d.md",
+      "entity_id": "69dfd21503320100137f60fe",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-19T17:11:41.817935+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "tldv:event:69dfd21503320100137f60fe",
+      "claims_written": 1,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-19T17:11:41.826298+00:00",
+    "source": "tldv",
+    "action": "event_processed",
+    "data": {
+      "event_key": "tldv:event:69dfd21503320100137f60fe",
+      "content_key": "tldv:69dfd21503320100137f60fe:06e623b70d07f3aef1164d82482d64892f30ee82e828ab44128d6731c2e32cde"
+    }
+  },
+  {
+    "ts": "2026-04-19T17:11:42.033546+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "8f37612a-d8b1-4cb8-a3d2-325ca331e684",
+      "blob_path": "memory/vault/claims/8f37612a-d8b1-4cb8-a3d2-325ca331e684.md",
+      "entity_id": "69df7dbf65b9b10014f66f09",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-19T17:11:42.036850+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "tldv:event:69df7dbf65b9b10014f66f09",
+      "claims_written": 1,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-19T17:11:42.051299+00:00",
+    "source": "tldv",
+    "action": "event_processed",
+    "data": {
+      "event_key": "tldv:event:69df7dbf65b9b10014f66f09",
+      "content_key": "tldv:69df7dbf65b9b10014f66f09:9e1a8deb025b6800ec4761cbeb9ce3e9d407995c96018f7eefba193451e500de"
+    }
+  },
+  {
+    "ts": "2026-04-19T17:11:42.520097+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "91bf7b8f-12c8-43a8-801a-0285968205f7",
+      "blob_path": "memory/vault/claims/91bf7b8f-12c8-43a8-801a-0285968205f7.md",
+      "entity_id": "69de2c352642340014c0727f",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-19T17:11:42.524152+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "tldv:event:69de2c352642340014c0727f",
+      "claims_written": 1,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-19T17:11:42.542146+00:00",
+    "source": "tldv",
+    "action": "event_processed",
+    "data": {
+      "event_key": "tldv:event:69de2c352642340014c0727f",
+      "content_key": "tldv:69de2c352642340014c0727f:77493ad5ffa73d0c981e035af84e73f267842204fab0ce0c082b22ee03e3483f"
+    }
+  },
+  {
+    "ts": "2026-04-19T17:11:43.009843+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "8c7c76e8-0b15-424b-8bd8-05236b88862a",
+      "blob_path": "memory/vault/claims/8c7c76e8-0b15-424b-8bd8-05236b88862a.md",
+      "entity_id": "69dce9015ce47900135d41dc",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-19T17:11:43.018161+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "tldv:event:69dce9015ce47900135d41dc",
+      "claims_written": 1,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-19T17:11:43.037972+00:00",
+    "source": "tldv",
+    "action": "event_processed",
+    "data": {
+      "event_key": "tldv:event:69dce9015ce47900135d41dc",
+      "content_key": "tldv:69dce9015ce47900135d41dc:bff71ffa76bcc4c85b55cfbf0fb8783e0bd091a627972125032d444746c23e6e"
+    }
+  },
+  {
+    "ts": "2026-04-19T17:11:43.251309+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "59ee7636-3ac1-425f-a5c5-1cf705e8d5b9",
+      "blob_path": "memory/vault/claims/59ee7636-3ac1-425f-a5c5-1cf705e8d5b9.md",
+      "entity_id": "69dcdab61846a7001344d7f8",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-19T17:11:43.255379+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "tldv:event:69dcdab61846a7001344d7f8",
+      "claims_written": 1,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-19T17:11:43.271088+00:00",
+    "source": "tldv",
+    "action": "event_processed",
+    "data": {
+      "event_key": "tldv:event:69dcdab61846a7001344d7f8",
+      "content_key": "tldv:69dcdab61846a7001344d7f8:ac1ccb61f3c77da68d3187261b8646cd6e6875d77efe51c658135b46339d0492"
+    }
+  },
+  {
+    "ts": "2026-04-19T17:11:43.273487+00:00",
+    "source": "tldv",
+    "action": "run_finished",
+    "data": {
+      "events_processed": 8,
+      "events_skipped": 0
+    }
+  },
+  {
+    "ts": "2026-04-19T21:03:04.738482+00:00",
+    "source": "tldv",
+    "action": "run_started",
+    "data": {
+      "last_seen_at": null,
+      "wiki_v2_active": true
+    }
+  },
+  {
+    "ts": "2026-04-19T21:03:06.709371+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "3e47f798-1448-4299-96c7-a017f02eb6b5",
+      "blob_path": "memory/vault/claims/3e47f798-1448-4299-96c7-a017f02eb6b5.md",
+      "entity_id": "69e235dcf55c8200142fb060",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:03:06.716002+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "tldv:event:69e235dcf55c8200142fb060",
+      "claims_written": 1,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-19T21:03:06.729545+00:00",
+    "source": "tldv",
+    "action": "event_processed",
+    "data": {
+      "event_key": "tldv:event:69e235dcf55c8200142fb060",
+      "content_key": "tldv:69e235dcf55c8200142fb060:a62a9a24e91a01eb9d3e67895b1037a6c71b83d7bf871397f1bcfc439a0226eb"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:03:07.542747+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "089351e8-3a69-43ba-a8af-ecddbd1ef9c2",
+      "blob_path": "memory/vault/claims/089351e8-3a69-43ba-a8af-ecddbd1ef9c2.md",
+      "entity_id": "69e220bbf55c8200142fab03",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:03:07.544962+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "tldv:event:69e220bbf55c8200142fab03",
+      "claims_written": 1,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-19T21:03:07.556533+00:00",
+    "source": "tldv",
+    "action": "event_processed",
+    "data": {
+      "event_key": "tldv:event:69e220bbf55c8200142fab03",
+      "content_key": "tldv:69e220bbf55c8200142fab03:251084a912116c3a01560904e286d0b4db84503538c0090ed17f2bfa4b2b13b5"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:03:08.328621+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "f055fb39-7b81-4663-8391-6f33f7c34756",
+      "blob_path": "memory/vault/claims/f055fb39-7b81-4663-8391-6f33f7c34756.md",
+      "entity_id": "69e0cf369c64de0013f1a12d",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:03:08.333789+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "tldv:event:69e0cf369c64de0013f1a12d",
+      "claims_written": 1,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-19T21:03:08.345110+00:00",
+    "source": "tldv",
+    "action": "event_processed",
+    "data": {
+      "event_key": "tldv:event:69e0cf369c64de0013f1a12d",
+      "content_key": "tldv:69e0cf369c64de0013f1a12d:98cbc93c842dc27bea6c9a1c3741fe9eda6c8e268f0b9f8b179c4bbb90a6064b"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:03:09.022725+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "81db3f96-6857-4360-85aa-4a3f3635c350",
+      "blob_path": "memory/vault/claims/81db3f96-6857-4360-85aa-4a3f3635c350.md",
+      "entity_id": "69dfd21503320100137f60fe",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:03:09.034309+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "tldv:event:69dfd21503320100137f60fe",
+      "claims_written": 1,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-19T21:03:09.047143+00:00",
+    "source": "tldv",
+    "action": "event_processed",
+    "data": {
+      "event_key": "tldv:event:69dfd21503320100137f60fe",
+      "content_key": "tldv:69dfd21503320100137f60fe:06e623b70d07f3aef1164d82482d64892f30ee82e828ab44128d6731c2e32cde"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:03:09.268850+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "8358e98a-9099-47b6-a9f8-fbbefa8ff601",
+      "blob_path": "memory/vault/claims/8358e98a-9099-47b6-a9f8-fbbefa8ff601.md",
+      "entity_id": "69df7dbf65b9b10014f66f09",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:03:09.274934+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "tldv:event:69df7dbf65b9b10014f66f09",
+      "claims_written": 1,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-19T21:03:09.286129+00:00",
+    "source": "tldv",
+    "action": "event_processed",
+    "data": {
+      "event_key": "tldv:event:69df7dbf65b9b10014f66f09",
+      "content_key": "tldv:69df7dbf65b9b10014f66f09:9e1a8deb025b6800ec4761cbeb9ce3e9d407995c96018f7eefba193451e500de"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:03:10.012465+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "94630342-f9a6-4d61-a450-3bbc15a0dd23",
+      "blob_path": "memory/vault/claims/94630342-f9a6-4d61-a450-3bbc15a0dd23.md",
+      "entity_id": "69de2c352642340014c0727f",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:03:10.016207+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "tldv:event:69de2c352642340014c0727f",
+      "claims_written": 1,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-19T21:03:10.026000+00:00",
+    "source": "tldv",
+    "action": "event_processed",
+    "data": {
+      "event_key": "tldv:event:69de2c352642340014c0727f",
+      "content_key": "tldv:69de2c352642340014c0727f:77493ad5ffa73d0c981e035af84e73f267842204fab0ce0c082b22ee03e3483f"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:03:10.817095+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "396260ad-0be7-4525-97ed-cdc45e6e3523",
+      "blob_path": "memory/vault/claims/396260ad-0be7-4525-97ed-cdc45e6e3523.md",
+      "entity_id": "69dce9015ce47900135d41dc",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:03:10.824751+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "tldv:event:69dce9015ce47900135d41dc",
+      "claims_written": 1,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-19T21:03:10.839730+00:00",
+    "source": "tldv",
+    "action": "event_processed",
+    "data": {
+      "event_key": "tldv:event:69dce9015ce47900135d41dc",
+      "content_key": "tldv:69dce9015ce47900135d41dc:bff71ffa76bcc4c85b55cfbf0fb8783e0bd091a627972125032d444746c23e6e"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:03:11.057850+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "3b931235-ba61-4963-a081-015ce30a2515",
+      "blob_path": "memory/vault/claims/3b931235-ba61-4963-a081-015ce30a2515.md",
+      "entity_id": "69dcdab61846a7001344d7f8",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:03:11.062808+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "tldv:event:69dcdab61846a7001344d7f8",
+      "claims_written": 1,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-19T21:03:11.071123+00:00",
+    "source": "tldv",
+    "action": "event_processed",
+    "data": {
+      "event_key": "tldv:event:69dcdab61846a7001344d7f8",
+      "content_key": "tldv:69dcdab61846a7001344d7f8:ac1ccb61f3c77da68d3187261b8646cd6e6875d77efe51c658135b46339d0492"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:03:11.073850+00:00",
+    "source": "tldv",
+    "action": "run_finished",
+    "data": {
+      "events_processed": 8,
+      "events_skipped": 0
+    }
+  },
+  {
+    "ts": "2026-04-19T21:33:34.763502+00:00",
+    "source": "tldv",
+    "action": "run_started",
+    "data": {
+      "last_seen_at": null,
+      "wiki_v2_active": true
+    }
+  },
+  {
+    "ts": "2026-04-19T21:33:36.537280+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "a6e6377c-86a3-4692-a307-af29f09e56d5",
+      "blob_path": "memory/vault/claims/a6e6377c-86a3-4692-a307-af29f09e56d5.md",
+      "entity_id": "69e235dcf55c8200142fb060",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:33:36.543973+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "tldv:event:69e235dcf55c8200142fb060",
+      "claims_written": 1,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-19T21:33:36.562078+00:00",
+    "source": "tldv",
+    "action": "event_processed",
+    "data": {
+      "event_key": "tldv:event:69e235dcf55c8200142fb060",
+      "content_key": "tldv:69e235dcf55c8200142fb060:a62a9a24e91a01eb9d3e67895b1037a6c71b83d7bf871397f1bcfc439a0226eb"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:33:36.955912+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "280a86b6-637e-4f27-aaf2-ce759ec82a21",
+      "blob_path": "memory/vault/claims/280a86b6-637e-4f27-aaf2-ce759ec82a21.md",
+      "entity_id": "69e220bbf55c8200142fab03",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:33:36.959187+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "tldv:event:69e220bbf55c8200142fab03",
+      "claims_written": 1,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-19T21:33:36.970467+00:00",
+    "source": "tldv",
+    "action": "event_processed",
+    "data": {
+      "event_key": "tldv:event:69e220bbf55c8200142fab03",
+      "content_key": "tldv:69e220bbf55c8200142fab03:251084a912116c3a01560904e286d0b4db84503538c0090ed17f2bfa4b2b13b5"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:33:37.830952+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "c56996c3-d777-4a81-aa4b-5240f9d645d2",
+      "blob_path": "memory/vault/claims/c56996c3-d777-4a81-aa4b-5240f9d645d2.md",
+      "entity_id": "69e0cf369c64de0013f1a12d",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:33:37.834466+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "tldv:event:69e0cf369c64de0013f1a12d",
+      "claims_written": 1,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-19T21:33:37.846722+00:00",
+    "source": "tldv",
+    "action": "event_processed",
+    "data": {
+      "event_key": "tldv:event:69e0cf369c64de0013f1a12d",
+      "content_key": "tldv:69e0cf369c64de0013f1a12d:98cbc93c842dc27bea6c9a1c3741fe9eda6c8e268f0b9f8b179c4bbb90a6064b"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:33:38.073901+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "0091c27a-69a3-49b8-bb63-92b126b86a2e",
+      "blob_path": "memory/vault/claims/0091c27a-69a3-49b8-bb63-92b126b86a2e.md",
+      "entity_id": "69dfd21503320100137f60fe",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:33:38.080938+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "tldv:event:69dfd21503320100137f60fe",
+      "claims_written": 1,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-19T21:33:38.088995+00:00",
+    "source": "tldv",
+    "action": "event_processed",
+    "data": {
+      "event_key": "tldv:event:69dfd21503320100137f60fe",
+      "content_key": "tldv:69dfd21503320100137f60fe:06e623b70d07f3aef1164d82482d64892f30ee82e828ab44128d6731c2e32cde"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:33:38.562188+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "4de89f0c-ecda-4be8-b5bb-464a04ab6c12",
+      "blob_path": "memory/vault/claims/4de89f0c-ecda-4be8-b5bb-464a04ab6c12.md",
+      "entity_id": "69df7dbf65b9b10014f66f09",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:33:38.565952+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "tldv:event:69df7dbf65b9b10014f66f09",
+      "claims_written": 1,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-19T21:33:38.572731+00:00",
+    "source": "tldv",
+    "action": "event_processed",
+    "data": {
+      "event_key": "tldv:event:69df7dbf65b9b10014f66f09",
+      "content_key": "tldv:69df7dbf65b9b10014f66f09:9e1a8deb025b6800ec4761cbeb9ce3e9d407995c96018f7eefba193451e500de"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:33:39.094619+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "75941e40-efa6-4f8f-87e2-4a2312eb8658",
+      "blob_path": "memory/vault/claims/75941e40-efa6-4f8f-87e2-4a2312eb8658.md",
+      "entity_id": "69de2c352642340014c0727f",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:33:39.101179+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "tldv:event:69de2c352642340014c0727f",
+      "claims_written": 1,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-19T21:33:39.113138+00:00",
+    "source": "tldv",
+    "action": "event_processed",
+    "data": {
+      "event_key": "tldv:event:69de2c352642340014c0727f",
+      "content_key": "tldv:69de2c352642340014c0727f:77493ad5ffa73d0c981e035af84e73f267842204fab0ce0c082b22ee03e3483f"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:33:39.657206+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "541bb2c6-5fdc-4093-9d4e-a362b43605c9",
+      "blob_path": "memory/vault/claims/541bb2c6-5fdc-4093-9d4e-a362b43605c9.md",
+      "entity_id": "69dce9015ce47900135d41dc",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:33:39.659857+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "tldv:event:69dce9015ce47900135d41dc",
+      "claims_written": 1,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-19T21:33:39.671114+00:00",
+    "source": "tldv",
+    "action": "event_processed",
+    "data": {
+      "event_key": "tldv:event:69dce9015ce47900135d41dc",
+      "content_key": "tldv:69dce9015ce47900135d41dc:bff71ffa76bcc4c85b55cfbf0fb8783e0bd091a627972125032d444746c23e6e"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:33:39.893390+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "0f14a3b0-f47b-4878-a9fa-07dca71bb91a",
+      "blob_path": "memory/vault/claims/0f14a3b0-f47b-4878-a9fa-07dca71bb91a.md",
+      "entity_id": "69dcdab61846a7001344d7f8",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:33:39.896477+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "tldv:event:69dcdab61846a7001344d7f8",
+      "claims_written": 1,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-19T21:33:39.908650+00:00",
+    "source": "tldv",
+    "action": "event_processed",
+    "data": {
+      "event_key": "tldv:event:69dcdab61846a7001344d7f8",
+      "content_key": "tldv:69dcdab61846a7001344d7f8:ac1ccb61f3c77da68d3187261b8646cd6e6875d77efe51c658135b46339d0492"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:33:39.910850+00:00",
+    "source": "tldv",
+    "action": "run_finished",
+    "data": {
+      "events_processed": 8,
+      "events_skipped": 0
+    }
+  },
+  {
+    "ts": "2026-04-19T21:39:01.743377+00:00",
+    "source": "tldv",
+    "action": "run_started",
+    "data": {
+      "last_seen_at": "2026-04-19T21:33:39.903802+00:00",
+      "wiki_v2_active": true
+    }
+  },
+  {
+    "ts": "2026-04-19T21:39:03.525208+00:00",
+    "source": "tldv",
+    "action": "run_finished",
+    "data": {
+      "events_processed": 0,
+      "events_skipped": 0
+    }
+  },
+  {
+    "ts": "2026-04-20T03:02:51.390287+00:00",
+    "source": "tldv",
+    "action": "run_started",
+    "data": {
+      "last_seen_at": null,
+      "wiki_v2_active": true
+    }
+  },
+  {
+    "ts": "2026-04-20T03:02:53.174662+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "8331bf08-7c2a-4b1e-b754-2a51dbb9aef0",
+      "blob_path": "memory/vault/claims/8331bf08-7c2a-4b1e-b754-2a51dbb9aef0.md",
+      "entity_id": "69e235dcf55c8200142fb060",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-20T03:02:53.180147+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "tldv:event:69e235dcf55c8200142fb060",
+      "claims_written": 1,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-20T03:02:53.189301+00:00",
+    "source": "tldv",
+    "action": "event_processed",
+    "data": {
+      "event_key": "tldv:event:69e235dcf55c8200142fb060",
+      "content_key": "tldv:69e235dcf55c8200142fb060:a62a9a24e91a01eb9d3e67895b1037a6c71b83d7bf871397f1bcfc439a0226eb"
+    }
+  },
+  {
+    "ts": "2026-04-20T03:02:53.994385+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "4341442e-37fa-4f93-86dd-897de8df89a4",
+      "blob_path": "memory/vault/claims/4341442e-37fa-4f93-86dd-897de8df89a4.md",
+      "entity_id": "69e220bbf55c8200142fab03",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-20T03:02:53.999894+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "tldv:event:69e220bbf55c8200142fab03",
+      "claims_written": 1,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-20T03:02:54.027707+00:00",
+    "source": "tldv",
+    "action": "event_processed",
+    "data": {
+      "event_key": "tldv:event:69e220bbf55c8200142fab03",
+      "content_key": "tldv:69e220bbf55c8200142fab03:251084a912116c3a01560904e286d0b4db84503538c0090ed17f2bfa4b2b13b5"
+    }
+  },
+  {
+    "ts": "2026-04-20T03:02:54.594119+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "4cc65ebb-e116-45cc-a157-e084f1ad863d",
+      "blob_path": "memory/vault/claims/4cc65ebb-e116-45cc-a157-e084f1ad863d.md",
+      "entity_id": "69e0cf369c64de0013f1a12d",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-20T03:02:54.597051+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "tldv:event:69e0cf369c64de0013f1a12d",
+      "claims_written": 1,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-20T03:02:54.614487+00:00",
+    "source": "tldv",
+    "action": "event_processed",
+    "data": {
+      "event_key": "tldv:event:69e0cf369c64de0013f1a12d",
+      "content_key": "tldv:69e0cf369c64de0013f1a12d:98cbc93c842dc27bea6c9a1c3741fe9eda6c8e268f0b9f8b179c4bbb90a6064b"
+    }
+  },
+  {
+    "ts": "2026-04-20T03:02:54.962940+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "bd142368-19e9-41a5-bf92-9d23217e68c5",
+      "blob_path": "memory/vault/claims/bd142368-19e9-41a5-bf92-9d23217e68c5.md",
+      "entity_id": "69dfd21503320100137f60fe",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-20T03:02:54.966725+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "tldv:event:69dfd21503320100137f60fe",
+      "claims_written": 1,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-20T03:02:54.975669+00:00",
+    "source": "tldv",
+    "action": "event_processed",
+    "data": {
+      "event_key": "tldv:event:69dfd21503320100137f60fe",
+      "content_key": "tldv:69dfd21503320100137f60fe:06e623b70d07f3aef1164d82482d64892f30ee82e828ab44128d6731c2e32cde"
+    }
+  },
+  {
+    "ts": "2026-04-20T03:02:55.455516+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "fd0e3224-5f13-4348-8cec-45ddffde74c3",
+      "blob_path": "memory/vault/claims/fd0e3224-5f13-4348-8cec-45ddffde74c3.md",
+      "entity_id": "69df7dbf65b9b10014f66f09",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-20T03:02:55.459938+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "tldv:event:69df7dbf65b9b10014f66f09",
+      "claims_written": 1,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-20T03:02:55.469246+00:00",
+    "source": "tldv",
+    "action": "event_processed",
+    "data": {
+      "event_key": "tldv:event:69df7dbf65b9b10014f66f09",
+      "content_key": "tldv:69df7dbf65b9b10014f66f09:9e1a8deb025b6800ec4761cbeb9ce3e9d407995c96018f7eefba193451e500de"
+    }
+  },
+  {
+    "ts": "2026-04-20T03:02:56.268350+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "4b039b82-7177-4743-aec3-53368d19c9f5",
+      "blob_path": "memory/vault/claims/4b039b82-7177-4743-aec3-53368d19c9f5.md",
+      "entity_id": "69de2c352642340014c0727f",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-20T03:02:56.270738+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "tldv:event:69de2c352642340014c0727f",
+      "claims_written": 1,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-20T03:02:56.281226+00:00",
+    "source": "tldv",
+    "action": "event_processed",
+    "data": {
+      "event_key": "tldv:event:69de2c352642340014c0727f",
+      "content_key": "tldv:69de2c352642340014c0727f:77493ad5ffa73d0c981e035af84e73f267842204fab0ce0c082b22ee03e3483f"
+    }
+  },
+  {
+    "ts": "2026-04-20T03:02:56.994704+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "88a6e6a0-ee9d-40f4-bb36-1e2c6d122ba5",
+      "blob_path": "memory/vault/claims/88a6e6a0-ee9d-40f4-bb36-1e2c6d122ba5.md",
+      "entity_id": "69dce9015ce47900135d41dc",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-20T03:02:57.006803+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "tldv:event:69dce9015ce47900135d41dc",
+      "claims_written": 1,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-20T03:02:57.058437+00:00",
+    "source": "tldv",
+    "action": "event_processed",
+    "data": {
+      "event_key": "tldv:event:69dce9015ce47900135d41dc",
+      "content_key": "tldv:69dce9015ce47900135d41dc:bff71ffa76bcc4c85b55cfbf0fb8783e0bd091a627972125032d444746c23e6e"
+    }
+  },
+  {
+    "ts": "2026-04-20T03:02:57.493419+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "ac0764f9-efd0-4fdf-ac65-fde9bf6b5b15",
+      "blob_path": "memory/vault/claims/ac0764f9-efd0-4fdf-ac65-fde9bf6b5b15.md",
+      "entity_id": "69dcdab61846a7001344d7f8",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-20T03:02:57.500597+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "tldv:event:69dcdab61846a7001344d7f8",
+      "claims_written": 1,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-20T03:02:57.554251+00:00",
+    "source": "tldv",
+    "action": "event_processed",
+    "data": {
+      "event_key": "tldv:event:69dcdab61846a7001344d7f8",
+      "content_key": "tldv:69dcdab61846a7001344d7f8:ac1ccb61f3c77da68d3187261b8646cd6e6875d77efe51c658135b46339d0492"
+    }
+  },
+  {
+    "ts": "2026-04-20T03:02:57.578904+00:00",
+    "source": "tldv",
+    "action": "run_finished",
+    "data": {
+      "events_processed": 8,
+      "events_skipped": 0
+    }
+  },
+  {
+    "ts": "2026-04-20T09:02:19.328405+00:00",
+    "source": "tldv",
+    "action": "run_started",
+    "data": {
+      "last_seen_at": "2026-04-20T03:02:57.540703+00:00",
+      "wiki_v2_active": true
+    }
+  },
+  {
+    "ts": "2026-04-20T09:02:20.114390+00:00",
+    "source": "tldv",
+    "action": "run_finished",
+    "data": {
+      "events_processed": 0,
+      "events_skipped": 0
+    }
+  },
+  {
+    "ts": "2026-04-20T15:04:05.634024+00:00",
+    "source": "tldv",
+    "action": "run_started",
+    "data": {
+      "last_seen_at": "2026-04-20T03:02:57.540703+00:00",
+      "wiki_v2_active": true
+    }
+  },
+  {
+    "ts": "2026-04-20T15:04:07.119302+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "e673ae5f-0f54-4c10-982f-75c814bf2889",
+      "blob_path": "memory/vault/claims/e673ae5f-0f54-4c10-982f-75c814bf2889.md",
+      "entity_id": "69e6153c34346b00137a5023",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-20T15:04:07.146296+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "tldv:event:69e6153c34346b00137a5023",
+      "claims_written": 1,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-20T15:04:07.215412+00:00",
+    "source": "tldv",
+    "action": "event_processed",
+    "data": {
+      "event_key": "tldv:event:69e6153c34346b00137a5023",
+      "content_key": "tldv:69e6153c34346b00137a5023:47d8bc057c0d862aac5a937186009d02095da136cacf774d0ecf036b65dc37e1"
+    }
+  },
+  {
+    "ts": "2026-04-20T15:04:07.222695+00:00",
+    "source": "tldv",
+    "action": "run_finished",
+    "data": {
+      "events_processed": 1,
+      "events_skipped": 0
+    }
+  },
+  {
+    "ts": "2026-04-20T21:03:13.065707+00:00",
+    "source": "tldv",
+    "action": "run_started",
+    "data": {
+      "last_seen_at": "2026-04-20T15:04:07.193646+00:00",
+      "wiki_v2_active": true
+    }
+  },
+  {
+    "ts": "2026-04-20T21:03:14.102054+00:00",
+    "source": "tldv",
+    "action": "run_finished",
+    "data": {
+      "events_processed": 0,
+      "events_skipped": 0
+    }
+  },
+  {
+    "ts": "2026-04-21T03:06:14.116483+00:00",
+    "source": "tldv",
+    "action": "run_started",
+    "data": {
+      "last_seen_at": "2026-04-20T15:04:07.193646+00:00",
+      "wiki_v2_active": true
+    }
+  },
+  {
+    "ts": "2026-04-21T03:06:15.929041+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "16eb30e3-f83b-4498-a589-980949b2bd36",
+      "blob_path": "memory/vault/claims/16eb30e3-f83b-4498-a589-980949b2bd36.md",
+      "entity_id": "69e68e93f3efa5001387e5e0",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-21T03:06:15.949418+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "tldv:event:69e68e93f3efa5001387e5e0",
+      "claims_written": 1,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-21T03:06:16.021844+00:00",
+    "source": "tldv",
+    "action": "event_processed",
+    "data": {
+      "event_key": "tldv:event:69e68e93f3efa5001387e5e0",
+      "content_key": "tldv:69e68e93f3efa5001387e5e0:1b3395c5eac51d45d65c6ec7323b2799f63ad5fdd3f77a75e02fc641b73e5b43"
+    }
+  },
+  {
+    "ts": "2026-04-21T03:06:16.027828+00:00",
+    "source": "tldv",
+    "action": "run_finished",
+    "data": {
+      "events_processed": 1,
+      "events_skipped": 0
+    }
+  },
+  {
+    "ts": "2026-04-21T10:01:43.016984+00:00",
+    "source": "tldv",
+    "action": "run_started",
+    "data": {
+      "last_seen_at": "2026-04-21T03:06:15.996659+00:00",
+      "wiki_v2_active": true
+    }
+  },
+  {
+    "ts": "2026-04-21T10:01:43.961602+00:00",
+    "source": "tldv",
+    "action": "run_finished",
+    "data": {
+      "events_processed": 0,
+      "events_skipped": 0
+    }
+  },
+  {
+    "ts": "2026-04-22T00:28:00.992188+00:00",
+    "source": "tldv",
+    "action": "run_started",
+    "data": {
+      "last_seen_at": "2026-04-21T03:06:15.996659+00:00",
+      "wiki_v2_active": true
+    }
+  },
+  {
+    "ts": "2026-04-22T00:28:02.952057+00:00",
+    "source": "tldv",
+    "action": "run_finished",
+    "data": {
+      "events_processed": 0,
+      "events_skipped": 0
+    }
+  },
+  {
+    "ts": "2026-04-22T00:28:15.215608+00:00",
+    "source": "tldv",
+    "action": "run_started",
+    "data": {
+      "last_seen_at": "2026-04-21T03:06:15.996659+00:00",
+      "wiki_v2_active": true
+    }
+  },
+  {
+    "ts": "2026-04-22T00:28:15.925662+00:00",
+    "source": "tldv",
+    "action": "run_finished",
+    "data": {
+      "events_processed": 0,
+      "events_skipped": 0
+    }
+  },
+  {
+    "ts": "2026-04-22T00:52:40.928054+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "044a6e13-e833-4fa2-9a26-793081fc42e9",
+      "blob_path": "memory/vault/claims/044a6e13-e833-4fa2-9a26-793081fc42e9.md",
+      "entity_id": "69e68e93f3efa5001387e5e0",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:52:40.929830+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "27e04e6f-6667-4cc9-8bc5-ec082271be8e",
+      "blob_path": "memory/vault/claims/27e04e6f-6667-4cc9-8bc5-ec082271be8e.md",
+      "entity_id": "69e68e93f3efa5001387e5e0",
+      "claim_type": "timeline_event"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:52:40.931502+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "fd4f3935-2e2f-4f4a-a741-32bc29029621",
+      "blob_path": "memory/vault/claims/fd4f3935-2e2f-4f4a-a741-32bc29029621.md",
+      "entity_id": "69e68e93f3efa5001387e5e0",
+      "claim_type": "timeline_event"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:53:20.010028+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "050080e0-c879-4f8a-855d-fc307d0f771d",
+      "blob_path": "memory/vault/claims/050080e0-c879-4f8a-855d-fc307d0f771d.md",
+      "entity_id": "69e68e93f3efa5001387e5e0",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:53:20.012036+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "e0add2ab-dd8f-48fa-adad-42c13bf4c384",
+      "blob_path": "memory/vault/claims/e0add2ab-dd8f-48fa-adad-42c13bf4c384.md",
+      "entity_id": "69e68e93f3efa5001387e5e0",
+      "claim_type": "timeline_event"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:53:20.013725+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "52f2df1a-9c02-4042-a8ba-226fa011fc9b",
+      "blob_path": "memory/vault/claims/52f2df1a-9c02-4042-a8ba-226fa011fc9b.md",
+      "entity_id": "69e68e93f3efa5001387e5e0",
+      "claim_type": "timeline_event"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:53:21.725465+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "16d469c4-e997-46b9-92dd-2a3bea13b496",
+      "blob_path": "memory/vault/claims/16d469c4-e997-46b9-92dd-2a3bea13b496.md",
+      "entity_id": "69e6153c34346b00137a5023",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:53:21.749566+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "a8830b5d-a109-4a1f-bcc3-697953125c28",
+      "blob_path": "memory/vault/claims/a8830b5d-a109-4a1f-bcc3-697953125c28.md",
+      "entity_id": "69e6153c34346b00137a5023",
+      "claim_type": "timeline_event"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:53:21.780034+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "7fcbb1be-6124-4025-9e9a-df6cefdf9cd2",
+      "blob_path": "memory/vault/claims/7fcbb1be-6124-4025-9e9a-df6cefdf9cd2.md",
+      "entity_id": "69e6153c34346b00137a5023",
+      "claim_type": "timeline_event"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:53:21.786046+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "fd60a744-901b-415d-8654-e29d42e77810",
+      "blob_path": "memory/vault/claims/fd60a744-901b-415d-8654-e29d42e77810.md",
+      "entity_id": "69e6153c34346b00137a5023",
+      "claim_type": "timeline_event"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:53:21.794044+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "7bd2ff30-f8ba-4bac-a661-4bf5ad30027f",
+      "blob_path": "memory/vault/claims/7bd2ff30-f8ba-4bac-a661-4bf5ad30027f.md",
+      "entity_id": "69e6153c34346b00137a5023",
+      "claim_type": "timeline_event"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:53:21.803565+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "4b8a1202-f1a7-4a1b-8859-b00eeea5af7d",
+      "blob_path": "memory/vault/claims/4b8a1202-f1a7-4a1b-8859-b00eeea5af7d.md",
+      "entity_id": "69e6153c34346b00137a5023",
+      "claim_type": "timeline_event"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:53:23.251577+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "1b3eccd0-4932-4153-ba3b-83dc33c66ac2",
+      "blob_path": "memory/vault/claims/1b3eccd0-4932-4153-ba3b-83dc33c66ac2.md",
+      "entity_id": "69dcdab61846a7001344d7f8",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:53:23.253487+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "ca978fed-69b5-4b4d-9022-88bb7c37599c",
+      "blob_path": "memory/vault/claims/ca978fed-69b5-4b4d-9022-88bb7c37599c.md",
+      "entity_id": "69dcdab61846a7001344d7f8",
+      "claim_type": "timeline_event"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:53:23.255384+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "9ae462df-43b0-4a39-8da5-d58251952d53",
+      "blob_path": "memory/vault/claims/9ae462df-43b0-4a39-8da5-d58251952d53.md",
+      "entity_id": "69dcdab61846a7001344d7f8",
+      "claim_type": "timeline_event"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:53:23.256790+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "46e57cf9-e300-4af4-985b-37d4b601a49b",
+      "blob_path": "memory/vault/claims/46e57cf9-e300-4af4-985b-37d4b601a49b.md",
+      "entity_id": "69dcdab61846a7001344d7f8",
+      "claim_type": "timeline_event"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:53:23.260572+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "01960a44-3371-4e26-9118-bca25789cc21",
+      "blob_path": "memory/vault/claims/01960a44-3371-4e26-9118-bca25789cc21.md",
+      "entity_id": "69dcdab61846a7001344d7f8",
+      "claim_type": "timeline_event"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:53:23.262204+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "1be802f4-c91e-4047-a5fa-a961cbcb41ff",
+      "blob_path": "memory/vault/claims/1be802f4-c91e-4047-a5fa-a961cbcb41ff.md",
+      "entity_id": "69dcdab61846a7001344d7f8",
+      "claim_type": "timeline_event"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:53:23.265666+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "82e9f744-b771-4cd0-a2d1-c9439fe2af63",
+      "blob_path": "memory/vault/claims/82e9f744-b771-4cd0-a2d1-c9439fe2af63.md",
+      "entity_id": "69dcdab61846a7001344d7f8",
+      "claim_type": "timeline_event"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:53:24.748042+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "4daaff52-ea76-478f-80ec-90324a18073a",
+      "blob_path": "memory/vault/claims/4daaff52-ea76-478f-80ec-90324a18073a.md",
+      "entity_id": "69dce9015ce47900135d41dc",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:53:24.759609+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "c7a9338a-d6bc-4d12-ac27-843dda5a0eca",
+      "blob_path": "memory/vault/claims/c7a9338a-d6bc-4d12-ac27-843dda5a0eca.md",
+      "entity_id": "69dce9015ce47900135d41dc",
+      "claim_type": "timeline_event"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:53:24.770736+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "faae5763-413f-46ee-ad07-f81a26b7744b",
+      "blob_path": "memory/vault/claims/faae5763-413f-46ee-ad07-f81a26b7744b.md",
+      "entity_id": "69dce9015ce47900135d41dc",
+      "claim_type": "timeline_event"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:53:24.777020+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "b1926f02-ea4e-4f6f-8549-af4a703d087d",
+      "blob_path": "memory/vault/claims/b1926f02-ea4e-4f6f-8549-af4a703d087d.md",
+      "entity_id": "69dce9015ce47900135d41dc",
+      "claim_type": "timeline_event"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:53:24.785821+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "819066a8-355c-4f24-9ec9-551a3cd003b4",
+      "blob_path": "memory/vault/claims/819066a8-355c-4f24-9ec9-551a3cd003b4.md",
+      "entity_id": "69dce9015ce47900135d41dc",
+      "claim_type": "timeline_event"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:53:24.793057+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "aaaca131-11e0-4b3c-b25f-6d4d8bbfbb8d",
+      "blob_path": "memory/vault/claims/aaaca131-11e0-4b3c-b25f-6d4d8bbfbb8d.md",
+      "entity_id": "69dce9015ce47900135d41dc",
+      "claim_type": "timeline_event"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:53:24.804212+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "027568cb-b2ae-4d2d-9181-4c055491e5d4",
+      "blob_path": "memory/vault/claims/027568cb-b2ae-4d2d-9181-4c055491e5d4.md",
+      "entity_id": "69dce9015ce47900135d41dc",
+      "claim_type": "timeline_event"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:53:24.812223+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "941ac595-92fc-4cfb-bb82-6fe607d5b7d5",
+      "blob_path": "memory/vault/claims/941ac595-92fc-4cfb-bb82-6fe607d5b7d5.md",
+      "entity_id": "69dce9015ce47900135d41dc",
+      "claim_type": "timeline_event"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:53:24.826793+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "a2d81ed9-2f44-4c67-93b9-7ce0d219a252",
+      "blob_path": "memory/vault/claims/a2d81ed9-2f44-4c67-93b9-7ce0d219a252.md",
+      "entity_id": "69dce9015ce47900135d41dc",
+      "claim_type": "timeline_event"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:53:24.833246+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "ae86cf50-6cab-46f9-9d98-e169675b48c9",
+      "blob_path": "memory/vault/claims/ae86cf50-6cab-46f9-9d98-e169675b48c9.md",
+      "entity_id": "69dce9015ce47900135d41dc",
+      "claim_type": "timeline_event"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:53:24.913404+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "12f70409-7901-4d5b-85ac-23be5db6cabc",
+      "blob_path": "memory/vault/claims/12f70409-7901-4d5b-85ac-23be5db6cabc.md",
+      "entity_id": "69dce9015ce47900135d41dc",
+      "claim_type": "decision"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:53:24.964604+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "f04750d6-d528-4c71-b640-11721de0bb7b",
+      "blob_path": "memory/vault/claims/f04750d6-d528-4c71-b640-11721de0bb7b.md",
+      "entity_id": "69dce9015ce47900135d41dc",
+      "claim_type": "decision"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:53:26.299698+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "f069ca5e-1e0f-481b-ae2e-2ef218cb3bbc",
+      "blob_path": "memory/vault/claims/f069ca5e-1e0f-481b-ae2e-2ef218cb3bbc.md",
+      "entity_id": "69de2c352642340014c0727f",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:53:26.301578+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "191b2f36-4755-4b8a-844e-06604c4043e0",
+      "blob_path": "memory/vault/claims/191b2f36-4755-4b8a-844e-06604c4043e0.md",
+      "entity_id": "69de2c352642340014c0727f",
+      "claim_type": "timeline_event"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:53:26.303285+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "17fe9b52-bf41-4022-b59b-5c45c5998ca6",
+      "blob_path": "memory/vault/claims/17fe9b52-bf41-4022-b59b-5c45c5998ca6.md",
+      "entity_id": "69de2c352642340014c0727f",
+      "claim_type": "timeline_event"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:53:26.305549+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "ca3b875f-4146-4e3c-b7c7-5b668e3265a0",
+      "blob_path": "memory/vault/claims/ca3b875f-4146-4e3c-b7c7-5b668e3265a0.md",
+      "entity_id": "69de2c352642340014c0727f",
+      "claim_type": "timeline_event"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:53:26.307633+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "1cd6c637-4590-4cf0-be95-63657220b7ff",
+      "blob_path": "memory/vault/claims/1cd6c637-4590-4cf0-be95-63657220b7ff.md",
+      "entity_id": "69de2c352642340014c0727f",
+      "claim_type": "timeline_event"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:53:26.309486+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "12480455-56ce-42c1-b709-cb72fddd7c6c",
+      "blob_path": "memory/vault/claims/12480455-56ce-42c1-b709-cb72fddd7c6c.md",
+      "entity_id": "69de2c352642340014c0727f",
+      "claim_type": "timeline_event"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:53:26.311744+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "b1727b43-3c3e-45b9-aaf3-6762000f6dbe",
+      "blob_path": "memory/vault/claims/b1727b43-3c3e-45b9-aaf3-6762000f6dbe.md",
+      "entity_id": "69de2c352642340014c0727f",
+      "claim_type": "timeline_event"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:53:26.314051+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "bf66b0d5-03f4-48f8-b24f-73fb6f4de6ba",
+      "blob_path": "memory/vault/claims/bf66b0d5-03f4-48f8-b24f-73fb6f4de6ba.md",
+      "entity_id": "69de2c352642340014c0727f",
+      "claim_type": "timeline_event"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:53:27.383087+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "3885ca59-ac53-40c3-8a1e-a57eb0aedbe4",
+      "blob_path": "memory/vault/claims/3885ca59-ac53-40c3-8a1e-a57eb0aedbe4.md",
+      "entity_id": "69df7dbf65b9b10014f66f09",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:53:27.388986+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "6eb2bc92-8748-448b-b669-009f93399da0",
+      "blob_path": "memory/vault/claims/6eb2bc92-8748-448b-b669-009f93399da0.md",
+      "entity_id": "69df7dbf65b9b10014f66f09",
+      "claim_type": "timeline_event"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:53:27.391539+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "8843d01c-b368-43ca-a484-7796484db6ca",
+      "blob_path": "memory/vault/claims/8843d01c-b368-43ca-a484-7796484db6ca.md",
+      "entity_id": "69df7dbf65b9b10014f66f09",
+      "claim_type": "timeline_event"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:53:27.394110+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "30cc414e-af66-4c26-a74d-09d1ef3ae86a",
+      "blob_path": "memory/vault/claims/30cc414e-af66-4c26-a74d-09d1ef3ae86a.md",
+      "entity_id": "69df7dbf65b9b10014f66f09",
+      "claim_type": "timeline_event"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:53:27.396838+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "099bef5d-9ed7-4d0c-b7a8-436119c1f5a1",
+      "blob_path": "memory/vault/claims/099bef5d-9ed7-4d0c-b7a8-436119c1f5a1.md",
+      "entity_id": "69df7dbf65b9b10014f66f09",
+      "claim_type": "timeline_event"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:53:27.399218+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "389f7b8e-0c18-4939-bbce-c237efa790e6",
+      "blob_path": "memory/vault/claims/389f7b8e-0c18-4939-bbce-c237efa790e6.md",
+      "entity_id": "69df7dbf65b9b10014f66f09",
+      "claim_type": "timeline_event"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:53:28.731660+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "da62f9be-f8e4-4a0e-837d-be3a3cde1bd2",
+      "blob_path": "memory/vault/claims/da62f9be-f8e4-4a0e-837d-be3a3cde1bd2.md",
+      "entity_id": "69dfd21503320100137f60fe",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:53:28.734411+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "11171d43-2d89-49c0-aea4-59b52fa993d1",
+      "blob_path": "memory/vault/claims/11171d43-2d89-49c0-aea4-59b52fa993d1.md",
+      "entity_id": "69dfd21503320100137f60fe",
+      "claim_type": "timeline_event"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:53:28.737280+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "aec55619-4453-46da-b247-d199d2c73898",
+      "blob_path": "memory/vault/claims/aec55619-4453-46da-b247-d199d2c73898.md",
+      "entity_id": "69dfd21503320100137f60fe",
+      "claim_type": "timeline_event"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:53:28.739661+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "e9598158-4367-4ff9-8d99-3dde6a8c3e0e",
+      "blob_path": "memory/vault/claims/e9598158-4367-4ff9-8d99-3dde6a8c3e0e.md",
+      "entity_id": "69dfd21503320100137f60fe",
+      "claim_type": "timeline_event"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:53:28.741903+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "8c666de4-919d-453a-a31c-c1465fe76a97",
+      "blob_path": "memory/vault/claims/8c666de4-919d-453a-a31c-c1465fe76a97.md",
+      "entity_id": "69dfd21503320100137f60fe",
+      "claim_type": "timeline_event"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:53:28.743677+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "59852026-5976-4840-b379-bcb1bbf8a63b",
+      "blob_path": "memory/vault/claims/59852026-5976-4840-b379-bcb1bbf8a63b.md",
+      "entity_id": "69dfd21503320100137f60fe",
+      "claim_type": "timeline_event"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:53:28.745403+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "ba65f127-e407-440f-9986-80c2507eb536",
+      "blob_path": "memory/vault/claims/ba65f127-e407-440f-9986-80c2507eb536.md",
+      "entity_id": "69dfd21503320100137f60fe",
+      "claim_type": "timeline_event"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:53:28.769771+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "999e29b4-550a-4813-bbd5-1505530cbca1",
+      "blob_path": "memory/vault/claims/999e29b4-550a-4813-bbd5-1505530cbca1.md",
+      "entity_id": "69dfd21503320100137f60fe",
+      "claim_type": "decision"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:53:30.127038+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "6cf08748-d271-4781-8413-1a50a35a9377",
+      "blob_path": "memory/vault/claims/6cf08748-d271-4781-8413-1a50a35a9377.md",
+      "entity_id": "69e0cf369c64de0013f1a12d",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:53:30.129395+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "8b55d3df-eea5-4484-81f0-2b5a22278562",
+      "blob_path": "memory/vault/claims/8b55d3df-eea5-4484-81f0-2b5a22278562.md",
+      "entity_id": "69e0cf369c64de0013f1a12d",
+      "claim_type": "timeline_event"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:53:30.131884+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "21fe0f05-4042-497d-b074-b563465ddc55",
+      "blob_path": "memory/vault/claims/21fe0f05-4042-497d-b074-b563465ddc55.md",
+      "entity_id": "69e0cf369c64de0013f1a12d",
+      "claim_type": "timeline_event"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:53:30.134171+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "b8f58f23-a395-4588-a041-123f94ca089c",
+      "blob_path": "memory/vault/claims/b8f58f23-a395-4588-a041-123f94ca089c.md",
+      "entity_id": "69e0cf369c64de0013f1a12d",
+      "claim_type": "timeline_event"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:53:30.136276+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "57f2ce7f-597e-41eb-9231-e866bf35072c",
+      "blob_path": "memory/vault/claims/57f2ce7f-597e-41eb-9231-e866bf35072c.md",
+      "entity_id": "69e0cf369c64de0013f1a12d",
+      "claim_type": "timeline_event"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:53:30.138494+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "c44066a6-6fc6-453d-8a01-78da2f1a016b",
+      "blob_path": "memory/vault/claims/c44066a6-6fc6-453d-8a01-78da2f1a016b.md",
+      "entity_id": "69e0cf369c64de0013f1a12d",
+      "claim_type": "timeline_event"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:53:30.141522+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "a7b537e5-5a69-4c02-848a-c0f9220f30e0",
+      "blob_path": "memory/vault/claims/a7b537e5-5a69-4c02-848a-c0f9220f30e0.md",
+      "entity_id": "69e0cf369c64de0013f1a12d",
+      "claim_type": "timeline_event"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:53:30.144200+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "d9f1c0b7-ca8b-488b-ae05-18353a8c7611",
+      "blob_path": "memory/vault/claims/d9f1c0b7-ca8b-488b-ae05-18353a8c7611.md",
+      "entity_id": "69e0cf369c64de0013f1a12d",
+      "claim_type": "timeline_event"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:53:30.146532+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "d830eb19-9cdf-44cd-97bd-b9c96e956404",
+      "blob_path": "memory/vault/claims/d830eb19-9cdf-44cd-97bd-b9c96e956404.md",
+      "entity_id": "69e0cf369c64de0013f1a12d",
+      "claim_type": "timeline_event"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:53:30.148585+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "08959a1a-efa4-4e77-a9e0-cef4e4e293fd",
+      "blob_path": "memory/vault/claims/08959a1a-efa4-4e77-a9e0-cef4e4e293fd.md",
+      "entity_id": "69e0cf369c64de0013f1a12d",
+      "claim_type": "timeline_event"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:53:30.150588+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "b5c00596-a3ff-4205-bb4d-7228bef7e19e",
+      "blob_path": "memory/vault/claims/b5c00596-a3ff-4205-bb4d-7228bef7e19e.md",
+      "entity_id": "69e0cf369c64de0013f1a12d",
+      "claim_type": "timeline_event"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:53:30.178886+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "9dd94e97-2940-4300-b126-ad5b8ecf4731",
+      "blob_path": "memory/vault/claims/9dd94e97-2940-4300-b126-ad5b8ecf4731.md",
+      "entity_id": "69e0cf369c64de0013f1a12d",
+      "claim_type": "decision"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:53:31.489759+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "bf9629cd-48e5-4d40-ba9c-ce9e199dce18",
+      "blob_path": "memory/vault/claims/bf9629cd-48e5-4d40-ba9c-ce9e199dce18.md",
+      "entity_id": "69e220bbf55c8200142fab03",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:53:31.491821+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "af3064b0-802d-49b8-88a7-908579faa8ff",
+      "blob_path": "memory/vault/claims/af3064b0-802d-49b8-88a7-908579faa8ff.md",
+      "entity_id": "69e220bbf55c8200142fab03",
+      "claim_type": "timeline_event"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:53:31.493979+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "5891349d-821a-4958-afb7-b269f563b3ee",
+      "blob_path": "memory/vault/claims/5891349d-821a-4958-afb7-b269f563b3ee.md",
+      "entity_id": "69e220bbf55c8200142fab03",
+      "claim_type": "timeline_event"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:53:31.496349+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "0c905e13-ee08-4186-be25-63de60e1e168",
+      "blob_path": "memory/vault/claims/0c905e13-ee08-4186-be25-63de60e1e168.md",
+      "entity_id": "69e220bbf55c8200142fab03",
+      "claim_type": "timeline_event"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:53:31.498826+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "66b8c30e-9b9f-4b7b-80af-169718df1521",
+      "blob_path": "memory/vault/claims/66b8c30e-9b9f-4b7b-80af-169718df1521.md",
+      "entity_id": "69e220bbf55c8200142fab03",
+      "claim_type": "timeline_event"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:53:31.501191+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "4be286cd-5dfd-43c0-82a3-fc2b13c6fbd8",
+      "blob_path": "memory/vault/claims/4be286cd-5dfd-43c0-82a3-fc2b13c6fbd8.md",
+      "entity_id": "69e220bbf55c8200142fab03",
+      "claim_type": "timeline_event"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:53:32.837517+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "03c0af23-7b62-4879-8825-7c77835d2b93",
+      "blob_path": "memory/vault/claims/03c0af23-7b62-4879-8825-7c77835d2b93.md",
+      "entity_id": "69e235dcf55c8200142fb060",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:53:32.839600+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "7bafc547-a08d-4429-bf41-29515663173c",
+      "blob_path": "memory/vault/claims/7bafc547-a08d-4429-bf41-29515663173c.md",
+      "entity_id": "69e235dcf55c8200142fb060",
+      "claim_type": "timeline_event"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:53:32.841286+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "1084f64e-2503-4cff-80ec-ac38251348df",
+      "blob_path": "memory/vault/claims/1084f64e-2503-4cff-80ec-ac38251348df.md",
+      "entity_id": "69e235dcf55c8200142fb060",
+      "claim_type": "timeline_event"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:53:32.842968+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "ea393cd8-97a7-4f8f-af3c-b0c3dc873db3",
+      "blob_path": "memory/vault/claims/ea393cd8-97a7-4f8f-af3c-b0c3dc873db3.md",
+      "entity_id": "69e235dcf55c8200142fb060",
+      "claim_type": "timeline_event"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:53:32.844781+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "c7e54208-7d8c-47c8-bc01-2c2b8e1875f8",
+      "blob_path": "memory/vault/claims/c7e54208-7d8c-47c8-bc01-2c2b8e1875f8.md",
+      "entity_id": "69e235dcf55c8200142fb060",
+      "claim_type": "timeline_event"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:53:32.846634+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "713ce5fc-8d75-4f41-b3d2-1ac571dc9ce0",
+      "blob_path": "memory/vault/claims/713ce5fc-8d75-4f41-b3d2-1ac571dc9ce0.md",
+      "entity_id": "69e235dcf55c8200142fb060",
+      "claim_type": "timeline_event"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:53:32.848497+00:00",
+    "source": "tldv",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "e743e787-ced5-4321-9672-b38e00a8af73",
+      "blob_path": "memory/vault/claims/e743e787-ced5-4321-9672-b38e00a8af73.md",
+      "entity_id": "69e235dcf55c8200142fb060",
+      "claim_type": "timeline_event"
+    }
+  }
+]

@@ -1,0 +1,12 @@
+# Claim fa5eadc4-89c5-42cb-a196-ecdefeb27620
+
+- source: github
+- entity_type: pull_request
+- entity_id: living/livy-memory-bot#42
+- claim_type: status
+- confidence: 0.800
+- event_timestamp: 2026-04-14T10:00:00Z
+- superseded_by: -
+
+## Text
+PR #42: PR #42 (merged 2026-04-14T10:00:00Z)

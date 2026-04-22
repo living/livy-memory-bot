@@ -1,5 +1,5 @@
 # Resumo Executivo Semanal — Living Consultoria
-_Gerado: 2026-04-18 14:10 UTC_
+_Gerado: 2026-04-20 10:02 UTC_
 
 ## Status dos Quick Wins
 - QW1 no-decisions: ✅
@@ -26,4 +26,4 @@ _Gerado: 2026-04-18 14:10 UTC_
 
 ## Alertas
 - **Total:** 10 de 27 reuniões enriquecidas
-- Projetos críticos: 16
+- Projetos críticos: 2

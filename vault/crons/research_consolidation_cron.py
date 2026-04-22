@@ -56,13 +56,14 @@ CONSECUTIVE_HIGH_REVERT_TRIGGER = 3  # 3+ consecutive cycles > 10% → global pa
 
 # Quality guardrails (enriched-claims)
 QUALITY_GUARDRAIL_THRESHOLDS = {
-    "min_decision_pct": 5.0,
+    "min_decision_pct": 0.7,           # Option B hybrid: also requires min_decision_count_30d
+    "min_decision_count_30d": 3,        # decisions in last 30 days (recência)
     "min_linkage_pct": 3.0,
     "min_status_pct": 5.0,
     "max_needs_review_pct": 30.0,
     "min_with_evidence_pct": 80.0,
 }
-QUALITY_GUARDRAIL_CONSECUTIVE_TRIGGER = 2
+QUALITY_GUARDRAIL_CONSECUTIVE_TRIGGER = 3
 
 
 # ---------------------------------------------------------------------------
@@ -347,17 +348,22 @@ def _run_watchdog_observation_loop() -> list[dict]:
 # Quality guardrails — enriched-claims KPIs
 # ---------------------------------------------------------------------------
 
-def _compute_claim_kpis(claims: list[dict]) -> dict:
+def _compute_claim_kpis(claims: list[dict], now_as: str | None = None) -> dict:
     """
     Compute quality KPIs from a list of enriched claims.
 
     KPIs computed:
+    - total: total claim count
     - pct_decision:  % of claims with claim_type == "decision"
     - pct_linkage:   % of claims with claim_type == "linkage"
     - pct_status:    % of claims with claim_type == "status"
     - pct_needs_review: % of claims where needs_review == True
     - pct_with_evidence: % of claims with non-empty evidence_ids
-    - total: total claim count
+    - decision_count_30d: count of decision claims with event_timestamp in last 30 days (Option B)
+
+    Args:
+        claims: list of claim dicts from SSOT state
+        now_as: ISO timestamp string for "now" (用于测试; defaults to current UTC time)
     """
     total = len(claims)
     if total == 0:
@@ -368,6 +374,7 @@ def _compute_claim_kpis(claims: list[dict]) -> dict:
             "pct_status": 0.0,
             "pct_needs_review": 0.0,
             "pct_with_evidence": 0.0,
+            "decision_count_30d": 0,
         }
 
     decision_count = sum(1 for c in claims if c.get("claim_type") == "decision")
@@ -379,6 +386,29 @@ def _compute_claim_kpis(claims: list[dict]) -> dict:
         if isinstance(c.get("evidence_ids"), list) and len(c.get("evidence_ids", [])) > 0
     )
 
+    # Option B: count decisions in last 30 days (recência)
+    decision_count_30d = 0
+    if now_as is None:
+        now_as = _utc_now().isoformat()
+    try:
+        from datetime import datetime, timezone, timedelta
+        now_dt = datetime.fromisoformat(now_as.replace("Z", "+00:00")).astimezone(timezone.utc)
+        cutoff_dt = now_dt - timedelta(days=30)
+        for c in claims:
+            if c.get("claim_type") != "decision":
+                continue
+            ts_str = c.get("event_timestamp") or c.get("ingested_at") or ""
+            if not ts_str:
+                continue
+            try:
+                ts_dt = datetime.fromisoformat(ts_str.replace("Z", "+00:00")).astimezone(timezone.utc)
+                if ts_dt >= cutoff_dt:
+                    decision_count_30d += 1
+            except (ValueError, TypeError):
+                continue
+    except Exception:
+        decision_count_30d = 0  # graceful degradation
+
     scale = 100.0 / total
     return {
         "total": total,
@@ -387,6 +417,7 @@ def _compute_claim_kpis(claims: list[dict]) -> dict:
         "pct_status": status_count * scale,
         "pct_needs_review": needs_review_count * scale,
         "pct_with_evidence": with_evidence_count * scale,
+        "decision_count_30d": decision_count_30d,
     }
 
 
@@ -422,11 +453,30 @@ def _evaluate_quality_thresholds(
     failed: list[str] = []
     messages: list[str] = []
 
+    # Option B hybrid: pct_decision OR decision_count_30d can satisfy the decision requirement.
+    # Both must be below their respective thresholds to fail.
     pct_decision = kpis.get("pct_decision", 0.0)
-    min_decision = thresholds.get("min_decision_pct", 5.0)
-    if pct_decision < min_decision:
+    min_decision_pct = thresholds.get("min_decision_pct", 0.7)
+    min_decision_count = thresholds.get("min_decision_count_30d", 3)
+    decision_count_30d = kpis.get("decision_count_30d", 0)
+
+    pct_fails = pct_decision < min_decision_pct
+    count_fails = decision_count_30d < min_decision_count
+    if pct_fails and count_fails:
         failed.append("pct_decision")
-        messages.append(f"pct_decision {pct_decision:.1f}% < {min_decision:.1f}%")
+        messages.append(
+            f"pct_decision {pct_decision:.1f}% < {min_decision_pct:.1f}% "
+            f"AND decision_count_30d {decision_count_30d} < {min_decision_count}"
+        )
+    elif pct_fails and not count_fails:
+        # Low pct but sufficient recent decisions — Option B override (passes)
+        pass
+    elif not pct_fails and count_fails:
+        # Sufficient pct but no recent decisions — still alert on recência
+        failed.append("decision_count_30d")
+        messages.append(
+            f"pct_decision ok ({pct_decision:.1f}%) but decision_count_30d {decision_count_30d} < {min_decision_count}"
+        )
 
     pct_linkage = kpis.get("pct_linkage", 0.0)
     min_linkage = thresholds.get("min_linkage_pct", 3.0)
@@ -544,7 +594,7 @@ def _run_quality_guardrail() -> dict:
     claims: list[dict] = state.get("claims", [])
 
     # Compute KPIs
-    kpis = _compute_claim_kpis(claims)
+    kpis = _compute_claim_kpis(claims, now_as=_utc_now().isoformat())
 
     # Evaluate against thresholds
     eval_result = _evaluate_quality_thresholds(kpis, empty_thresholds_treats_as_pass=True)

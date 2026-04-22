@@ -1,0 +1,12 @@
+# Claim 2edec2fc-1d3a-4c1e-befe-23a1b006c272
+
+- source: trello
+- entity_type: project
+- entity_id: 67a5fa21e87f160303bcf598
+- claim_type: status
+- confidence: 0.600
+- event_timestamp: 2025-08-15T18:38:46.377Z
+- superseded_by: -
+
+## Text
+Card 'Habilitar a visualização do log do event viewer das últimas 24 horas via tela da mediação (CRÍTICO, ERROR e WARNING)' está em '5d85185fbc76ca0a40d34f7b'

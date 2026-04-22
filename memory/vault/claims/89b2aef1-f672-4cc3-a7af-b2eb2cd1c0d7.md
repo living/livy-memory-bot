@@ -1,0 +1,12 @@
+# Claim 89b2aef1-f672-4cc3-a7af-b2eb2cd1c0d7
+
+- source: trello
+- entity_type: project
+- entity_id: 6697cdb1b388dea00a594cdc
+- claim_type: status
+- confidence: 0.800
+- event_timestamp: 2026-02-02T16:05:38.599Z
+- superseded_by: 85c21d11-d78d-456c-b029-daef8c3b7dd1
+
+## Text
+Card 'A Fazer' está em 'unknown'

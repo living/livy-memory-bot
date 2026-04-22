@@ -1,5 +1,5 @@
 # Reuniões Sem Decisão Explícita
-_Gerado: 2026-04-18 14:06 UTC_
+_Gerado: 2026-04-20 10:02 UTC_
 
 **Total:** 10 de 27 reuniões enriquecidas
 

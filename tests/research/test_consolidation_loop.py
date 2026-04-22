@@ -817,3 +817,153 @@ class TestWatchdogObservationLoop:
         out = capsys.readouterr().out
         assert "schema invalid" in out.lower()
         assert "skipping watchdog" in out.lower()
+
+
+# ---------------------------------------------------------------------------
+# Quality guardrail — Option B hybrid thresholds (pct + count)
+# ---------------------------------------------------------------------------
+
+from vault.crons.research_consolidation_cron import (
+    _compute_claim_kpis,
+    _evaluate_quality_thresholds,
+    QUALITY_GUARDRAIL_THRESHOLDS,
+)
+
+
+def _make_claim(claim_type: str, event_timestamp: str | None = None, **kwargs) -> dict:
+    """Helper: create a minimal claim dict with optional event_timestamp."""
+    c = {"claim_type": claim_type, "source": "tldv", "event_timestamp": event_timestamp or "2026-04-19T10:00:00Z", **kwargs}
+    return c
+
+
+class TestComputeClaimKpisHybrid:
+    """Option B: _compute_claim_kpis must expose decision_count_30d."""
+
+    def test_kpis_include_decision_count_30d(self):
+        """KPIs dict must include decision_count_30d key."""
+        now = "2026-04-22T00:00:00Z"
+        cutoff = "2026-03-23T00:00:00Z"  # 30 days before now
+        claims = [
+            _make_claim("decision", event_timestamp=now),              # recent decision → counts
+            _make_claim("decision", event_timestamp=cutoff),           # exactly at cutoff → counts (gte)
+            _make_claim("decision", event_timestamp="2026-03-01T00:00:00Z"),  # older → not counted
+            _make_claim("linkage", event_timestamp=now),
+            _make_claim("status", event_timestamp=now),
+        ]
+        kpis = _compute_claim_kpis(claims, now_as=now)
+        assert "decision_count_30d" in kpis, f"Expected decision_count_30d in KPIs, got {list(kpis.keys())}"
+
+    def test_decision_count_30d_excludes_older_than_30_days(self):
+        """decision_count_30d counts only decisions with event_timestamp >= 30 days ago."""
+        now = "2026-04-22T00:00:00Z"
+        cutoff = "2026-03-23T00:00:00Z"
+        claims = [
+            _make_claim("decision", event_timestamp="2026-04-22T00:00:00Z"),   # today → counts
+            _make_claim("decision", event_timestamp="2026-03-25T00:00:00Z"),  # 28d ago → counts
+            _make_claim("decision", event_timestamp="2026-03-20T00:00:00Z"),   # 33d ago → NOT counted
+            _make_claim("decision", event_timestamp="2026-02-01T00:00:00Z"),   # very old → NOT counted
+        ]
+        kpis = _compute_claim_kpis(claims, now_as=now)
+        # 2 recent decisions should be counted
+        assert kpis["decision_count_30d"] == 2, f"Expected 2, got {kpis['decision_count_30d']}"
+
+    def test_decision_count_30d_is_zero_when_no_recent_decisions(self):
+        """decision_count_30d is 0 when no decisions in last 30 days."""
+        now = "2026-04-22T00:00:00Z"
+        claims = [
+            _make_claim("decision", event_timestamp="2026-01-01T00:00:00Z"),  # old
+            _make_claim("decision", event_timestamp="2025-01-01T00:00:00Z"),  # very old
+        ]
+        kpis = _compute_claim_kpis(claims, now_as=now)
+        assert kpis["decision_count_30d"] == 0
+
+    def test_decision_count_30d_ignores_non_decision_claims(self):
+        """decision_count_30d only counts claim_type==decision in window."""
+        now = "2026-04-22T00:00:00Z"
+        claims = [
+            _make_claim("decision", event_timestamp=now),
+            _make_claim("decision", event_timestamp=now),
+            _make_claim("linkage", event_timestamp=now),
+            _make_claim("status", event_timestamp=now),
+        ]
+        kpis = _compute_claim_kpis(claims, now_as=now)
+        assert kpis["decision_count_30d"] == 2
+
+
+class TestEvaluateQualityThresholdsOptionB:
+    """Option B: guardrail passes when pct is low BUT count in last 30d is sufficient."""
+
+    def test_fails_when_both_pct_and_count_below_threshold(self):
+        """Fails when pct_decision < min AND decision_count_30d < min_count."""
+        kpis = {
+            "total": 527,
+            "pct_decision": 0.5,    # below 0.7%
+            "decision_count_30d": 1, # below 3
+            "pct_linkage": 4.0,
+            "pct_status": 82.0,
+            "pct_needs_review": 0.0,
+            "pct_with_evidence": 100.0,
+        }
+        result = _evaluate_quality_thresholds(kpis)
+        assert result["passed"] is False
+        assert "pct_decision" in result["failed_kpis"]
+
+    def test_passes_when_count_above_min_count_despite_low_pct(self):
+        """Option B core: passes if decision_count_30d >= min_decision_count even when pct is low."""
+        kpis = {
+            "total": 527,
+            "pct_decision": 0.5,     # below 0.7% — would fail old rule
+            "decision_count_30d": 8,  # above threshold — should pass
+            "pct_linkage": 4.0,
+            "pct_status": 82.0,
+            "pct_needs_review": 0.0,
+            "pct_with_evidence": 100.0,
+        }
+        result = _evaluate_quality_thresholds(kpis)
+        assert result["passed"] is True, f"Should pass with high recent count, got: {result}"
+        assert "pct_decision" not in result["failed_kpis"]
+
+    def test_fails_when_pct_ok_but_count_30d_zero(self):
+        """Still fails if pct is ok but no recent decisions (stale source)."""
+        kpis = {
+            "total": 100,
+            "pct_decision": 5.0,     # meets pct threshold
+            "decision_count_30d": 0,  # zero recent decisions
+            "pct_linkage": 5.0,
+            "pct_status": 90.0,
+            "pct_needs_review": 0.0,
+            "pct_with_evidence": 100.0,
+        }
+        result = _evaluate_quality_thresholds(kpis)
+        assert result["passed"] is False
+        assert "decision_count_30d" in result["failed_kpis"]
+
+    def test_passes_when_both_pct_and_count_satisfied(self):
+        """Passes when both pct and count thresholds are met."""
+        kpis = {
+            "total": 200,
+            "pct_decision": 5.0,
+            "decision_count_30d": 10,
+            "pct_linkage": 4.0,
+            "pct_status": 80.0,
+            "pct_needs_review": 0.0,
+            "pct_with_evidence": 100.0,
+        }
+        result = _evaluate_quality_thresholds(kpis)
+        assert result["passed"] is True
+
+    def test_current_state_with_backfill_passes_option_b(self):
+        """Current SSOT (decision=4 in 30d, linkage=4.17%) should pass Option B."""
+        kpis = {
+            "total": 527,
+            "pct_decision": 0.76,
+            "decision_count_30d": 4,
+            "pct_linkage": 4.17,
+            "pct_status": 82.92,
+            "pct_needs_review": 0.0,
+            "pct_with_evidence": 100.0,
+        }
+        result = _evaluate_quality_thresholds(kpis)
+        # Option B tuned thresholds: min_decision_pct=0.7, min_decision_count_30d=3
+        # Current state should pass all KPIs.
+        assert result["passed"] is True, f"Current state should pass Option B with tuned thresholds: {result}"

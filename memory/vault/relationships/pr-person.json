@@ -1,7 +1,37 @@
 {
   "edges": [
     {
+      "from_id": "pr:living/livy-memory-bot:17",
+      "to_id": "person:lincolnqjunior",
+      "role": "author",
+      "confidence": "high"
+    },
+    {
+      "from_id": "pr:living/livy-memory-bot:23",
+      "to_id": "person:lincolnqjunior",
+      "role": "author",
+      "confidence": "high"
+    },
+    {
       "from_id": "pr:living/livy-forge-platform:4",
+      "to_id": "person:lincolnqjunior",
+      "role": "author",
+      "confidence": "high"
+    },
+    {
+      "from_id": "pr:living/livy-memory-bot:16",
+      "to_id": "person:lincolnqjunior",
+      "role": "author",
+      "confidence": "high"
+    },
+    {
+      "from_id": "pr:living/livy-memory-bot:15",
+      "to_id": "person:lincolnqjunior",
+      "role": "author",
+      "confidence": "high"
+    },
+    {
+      "from_id": "pr:living/livy-memory-bot:20",
       "to_id": "person:lincolnqjunior",
       "role": "author",
       "confidence": "high"
@@ -79,6 +109,12 @@
       "confidence": "high"
     },
     {
+      "from_id": "pr:living/livy-memory-bot:18",
+      "to_id": "person:lincolnqjunior",
+      "role": "author",
+      "confidence": "high"
+    },
+    {
       "from_id": "pr:living/livy-bat-jobs:2",
       "to_id": "person:lincolnqjunior",
       "role": "author",
@@ -133,6 +169,12 @@
       "confidence": "high"
     },
     {
+      "from_id": "pr:living/livy-memory-bot:19",
+      "to_id": "person:lincolnqjunior",
+      "role": "author",
+      "confidence": "high"
+    },
+    {
       "from_id": "pr:living/livy-memory-bot:11",
       "to_id": "person:lincolnqjunior",
       "role": "author",
@@ -145,7 +187,25 @@
       "confidence": "high"
     },
     {
+      "from_id": "pr:living/livy-memory-bot:21",
+      "to_id": "person:lincolnqjunior",
+      "role": "author",
+      "confidence": "high"
+    },
+    {
       "from_id": "pr:living/livy-forge-platform:11",
+      "to_id": "person:lincolnqjunior",
+      "role": "author",
+      "confidence": "high"
+    },
+    {
+      "from_id": "pr:living/livy-memory-bot:13",
+      "to_id": "person:lincolnqjunior",
+      "role": "author",
+      "confidence": "high"
+    },
+    {
+      "from_id": "pr:living/livy-memory-bot:22",
       "to_id": "person:lincolnqjunior",
       "role": "author",
       "confidence": "high"
@@ -164,6 +224,12 @@
     },
     {
       "from_id": "pr:living/livy-tldv-jobs:4",
+      "to_id": "person:lincolnqjunior",
+      "role": "author",
+      "confidence": "high"
+    },
+    {
+      "from_id": "pr:living/livy-memory-bot:14",
       "to_id": "person:lincolnqjunior",
       "role": "author",
       "confidence": "high"

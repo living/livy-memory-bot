@@ -1,0 +1,12 @@
+# Claim f0c21d5b-fddc-4dbb-8c4e-92c9e31670ea
+
+- source: trello
+- entity_type: project
+- entity_id: 695a8c4e5e27b72cefe66644
+- claim_type: status
+- confidence: 0.600
+- event_timestamp: 2026-01-04T15:50:59.883Z
+- superseded_by: -
+
+## Text
+Card 'Hostinger - n8n' está em 'unknown'

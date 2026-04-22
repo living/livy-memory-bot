@@ -42,7 +42,7 @@ from vault.research.github_rich_client import GitHubRichClient, extract_github_r
 from vault.research.github_parsers import pr_to_claims
 from vault.research.trello_client import TrelloClient
 from vault.research.trello_parsers import parse_trello_card, card_to_claims
-from vault.research.tldv_client import TLDVClient
+from vault.research.tldv_client import TLDVClient, tldv_to_claims
 from vault.research.cadence_manager import record_budget_warning, record_healthy_run
 from vault.ops.rollback import is_wiki_v2_enabled
 from vault.memory_core.models import Claim, SourceRef, AuditTrail
@@ -881,32 +881,12 @@ class ResearchPipeline:
         if not meeting_id:
             return {"claims_written": 0, "claims_superseded": 0}
 
-        event_ts = str(
-            payload.get("event_at")
-            or payload.get("updated_at")
-            or payload.get("created_at")
-            or event.get("event_at")
-            or event.get("updated_at")
-            or datetime.now(timezone.utc).isoformat()
-        )
-        summary = str(payload.get("summary") or payload.get("name") or f"Meeting {meeting_id}")
-        source_ref = {
-            "source_id": meeting_id,
-            "url": payload.get("url") if isinstance(payload, dict) else None,
-        }
+        # Reuse canonical TLDV claim extraction (status + decision + linkage)
+        # from Task 5 implementation in tldv_client.py.
+        summaries = payload.get("_summaries") if isinstance(payload.get("_summaries"), list) else []
+        enrichment_context = payload.get("_enrichment_context") if isinstance(payload.get("_enrichment_context"), dict) else {}
 
-        claims_normalized = [
-            {
-                "source": "tldv",
-                "claim_type": "status",
-                "entity_type": "meeting",
-                "entity_id": meeting_id,
-                "text": summary,
-                "event_timestamp": event_ts,
-                "source_ref": source_ref,
-                "metadata": {"author": "system"},
-            }
-        ]
+        claims_normalized = tldv_to_claims(payload, summaries, enrichment_context)
 
         return self._fuse_and_persist_normalized_claims(event, claims_normalized)
 
@@ -941,6 +921,12 @@ class ResearchPipeline:
             if self.source == "tldv":
                 meeting_id = event.get("meeting_id")
                 payload = client.fetch_meeting(meeting_id) if meeting_id else event
+                if meeting_id and isinstance(payload, dict):
+                    # Enrich payload so wiki v2 TLDV path can generate decision/linkage claims.
+                    summaries = client.fetch_summaries(meeting_id)
+                    enrichment_context = client.fetch_enrichment_context(meeting_id)
+                    payload["_summaries"] = summaries if isinstance(summaries, list) else []
+                    payload["_enrichment_context"] = enrichment_context if isinstance(enrichment_context, dict) else {}
             elif self.source == "github":
                 pr_number = event.get("pr_number")
                 payload = client.fetch_pr(pr_number) if pr_number is not None else event

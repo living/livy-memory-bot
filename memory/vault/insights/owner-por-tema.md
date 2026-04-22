@@ -1,5 +1,5 @@
 # Owner por Tema de Reunião
-_Gerado: 2026-04-18 14:08 UTC_
+_Gerado: 2026-04-20 10:02 UTC_
 
 | Tema | Reuniões | Decisões | Pessoas |
 | --- | --- | --- | --- |

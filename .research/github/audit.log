@@ -1,0 +1,3420 @@
+[
+  {
+    "ts": "2026-04-19T16:51:52.597643+00:00",
+    "source": "github",
+    "action": "run_started",
+    "data": {
+      "last_seen_at": null,
+      "wiki_v2_active": false
+    }
+  },
+  {
+    "ts": "2026-04-19T16:52:22.226190+00:00",
+    "source": "github",
+    "action": "event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-bat-jobs#2",
+      "content_key": "github:2:71fb26e34acd381293a378c25f3e83da52cf02d1fcdc1bb79a701bc783f5ce27"
+    }
+  },
+  {
+    "ts": "2026-04-19T16:52:24.618451+00:00",
+    "source": "github",
+    "action": "event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-tldv-jobs#6",
+      "content_key": "github:6:9adb1b0921d310111b869efc3a177c16be40b0da48f63d01c93e6a2c1f38b763"
+    }
+  },
+  {
+    "ts": "2026-04-19T16:52:26.695861+00:00",
+    "source": "github",
+    "action": "event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-tldv-jobs#2",
+      "content_key": "github:2:325b963038f43b2b55e077c8bc170b9e14002cb6326a51d1eb5aafb0b824c9b9"
+    }
+  },
+  {
+    "ts": "2026-04-19T16:52:28.749695+00:00",
+    "source": "github",
+    "action": "event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-tldv-jobs#4",
+      "content_key": "github:4:038a47b02dfe4f25e54adac9fe02f361523a67f0a5cf19abf0fd5c56a4a35900"
+    }
+  },
+  {
+    "ts": "2026-04-19T16:52:30.781036+00:00",
+    "source": "github",
+    "action": "event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#2",
+      "content_key": "github:2:48073190490f9a9a1d6a60e8df5bb287e6af7c766e58a6da2365ce89f1a35a43"
+    }
+  },
+  {
+    "ts": "2026-04-19T16:52:32.684826+00:00",
+    "source": "github",
+    "action": "event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-tldv-jobs#13",
+      "content_key": "github:13:f4d89e55f4913c28b33a175c7b061e93d162d1b96d4ad80dab40c3cb3241a51d"
+    }
+  },
+  {
+    "ts": "2026-04-19T16:52:34.827367+00:00",
+    "source": "github",
+    "action": "event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#4",
+      "content_key": "github:4:4ee6ee5a94948e989cd48bb44d51905007bd65ba02a2f996d7fef5ee48313236"
+    }
+  },
+  {
+    "ts": "2026-04-19T16:52:36.717794+00:00",
+    "source": "github",
+    "action": "event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#5",
+      "content_key": "github:5:413d3889b0a3cbd7e8a2b4406e277f446ce61b100739e02046b1fa7a28747d8a"
+    }
+  },
+  {
+    "ts": "2026-04-19T16:52:38.777701+00:00",
+    "source": "github",
+    "action": "event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#6",
+      "content_key": "github:6:2c0290ccf9360773166f29164a8e7e571aaffb33dfa2ff2312a49e9d000b8f9a"
+    }
+  },
+  {
+    "ts": "2026-04-19T16:52:40.860555+00:00",
+    "source": "github",
+    "action": "event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#13",
+      "content_key": "github:13:07c703da475c3dab47917865cdf65a8edf6a2992790bd3f7245b65dc3fa7d4cd"
+    }
+  },
+  {
+    "ts": "2026-04-19T16:52:42.739856+00:00",
+    "source": "github",
+    "action": "event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#14",
+      "content_key": "github:14:90c7b4a58a498cc22ec62729f462a0fe409771d479daed4d1119e9f446da217f"
+    }
+  },
+  {
+    "ts": "2026-04-19T16:52:44.473545+00:00",
+    "source": "github",
+    "action": "event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#15",
+      "content_key": "github:15:a3be5d87f2238f8a8d9084db5adce3eaa8f2ba1dd842fc66f4afffc58e6940b7"
+    }
+  },
+  {
+    "ts": "2026-04-19T16:52:46.303499+00:00",
+    "source": "github",
+    "action": "event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#16",
+      "content_key": "github:16:b472e453a82b4eb6c3d0fc39824fca624802ca62f560eb41683ebcbb4b683f8f"
+    }
+  },
+  {
+    "ts": "2026-04-19T16:52:48.332685+00:00",
+    "source": "github",
+    "action": "event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#17",
+      "content_key": "github:17:f505a826911643eb045fdb21de8cb2c0445ece03049621aad572279b2c773615"
+    }
+  },
+  {
+    "ts": "2026-04-19T16:52:50.266092+00:00",
+    "source": "github",
+    "action": "event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#18",
+      "content_key": "github:18:7b5e7079f4cf3139c6a6a6fff73515c067b13c742c1d26145368276b5eb38c5e"
+    }
+  },
+  {
+    "ts": "2026-04-19T16:52:52.327709+00:00",
+    "source": "github",
+    "action": "event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#19",
+      "content_key": "github:19:74ddfd92cbbe9278558a2cd9de56238163bf95dc625e4153bb5345fe73f57881"
+    }
+  },
+  {
+    "ts": "2026-04-19T16:52:54.342628+00:00",
+    "source": "github",
+    "action": "event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#20",
+      "content_key": "github:20:8dae76be06f472a0a7b28297da9e04fcc18be51c0f78cdfc619de2f589b86b32"
+    }
+  },
+  {
+    "ts": "2026-04-19T16:52:54.343847+00:00",
+    "source": "github",
+    "action": "run_finished",
+    "data": {
+      "events_processed": 17,
+      "events_skipped": 0
+    }
+  },
+  {
+    "ts": "2026-04-19T16:58:37.267082+00:00",
+    "source": "github",
+    "action": "run_started",
+    "data": {
+      "last_seen_at": "2026-04-19T16:52:54.339682+00:00",
+      "wiki_v2_active": false
+    }
+  },
+  {
+    "ts": "2026-04-19T16:58:39.206138+00:00",
+    "source": "github",
+    "action": "run_finished",
+    "data": {
+      "events_processed": 0,
+      "events_skipped": 0
+    }
+  },
+  {
+    "ts": "2026-04-19T17:04:03.973201+00:00",
+    "source": "github",
+    "action": "run_started",
+    "data": {
+      "last_seen_at": "2026-04-19T16:52:54.339682+00:00",
+      "wiki_v2_active": true
+    }
+  },
+  {
+    "ts": "2026-04-19T17:04:05.985571+00:00",
+    "source": "github",
+    "action": "run_finished",
+    "data": {
+      "events_processed": 0,
+      "events_skipped": 0
+    }
+  },
+  {
+    "ts": "2026-04-19T17:09:58.832038+00:00",
+    "source": "github",
+    "action": "run_started",
+    "data": {
+      "last_seen_at": null,
+      "wiki_v2_active": true
+    }
+  },
+  {
+    "ts": "2026-04-19T17:10:28.202008+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "69f3badb-9ddc-4a50-bc13-5968b1c539c9",
+      "blob_path": "memory/vault/claims/69f3badb-9ddc-4a50-bc13-5968b1c539c9.md",
+      "entity_id": "living/livy-bat-jobs#2",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-19T17:10:28.204872+00:00",
+    "source": "github",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-bat-jobs#2",
+      "claims_written": 1,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-19T17:10:28.211303+00:00",
+    "source": "github",
+    "action": "event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-bat-jobs#2",
+      "content_key": "github:2:71fb26e34acd381293a378c25f3e83da52cf02d1fcdc1bb79a701bc783f5ce27"
+    }
+  },
+  {
+    "ts": "2026-04-19T17:10:30.151850+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "bf7d70af-b2f1-43d8-ae0b-b7f795d0869b",
+      "blob_path": "memory/vault/claims/bf7d70af-b2f1-43d8-ae0b-b7f795d0869b.md",
+      "entity_id": "living/livy-tldv-jobs#6",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-19T17:10:30.154467+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "6bcd3312-1689-4068-8ade-3b83fb2de3d0",
+      "blob_path": "memory/vault/claims/6bcd3312-1689-4068-8ade-3b83fb2de3d0.md",
+      "entity_id": "living/livy-tldv-jobs#6",
+      "claim_type": "linkage"
+    }
+  },
+  {
+    "ts": "2026-04-19T17:10:30.156164+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "e28f0cab-a180-4f5b-9455-f8688d85e684",
+      "blob_path": "memory/vault/claims/e28f0cab-a180-4f5b-9455-f8688d85e684.md",
+      "entity_id": "living/livy-tldv-jobs#6",
+      "claim_type": "linkage"
+    }
+  },
+  {
+    "ts": "2026-04-19T17:10:30.156853+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "583bf163-6c6c-42e1-9fe0-e3a45eadcf56",
+      "blob_path": "memory/vault/claims/583bf163-6c6c-42e1-9fe0-e3a45eadcf56.md",
+      "entity_id": "living/livy-tldv-jobs#6",
+      "claim_type": "timeline_event"
+    }
+  },
+  {
+    "ts": "2026-04-19T17:10:30.157902+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "b0dc0ded-7cc2-4d00-830c-3319a6c111b7",
+      "blob_path": "memory/vault/claims/b0dc0ded-7cc2-4d00-830c-3319a6c111b7.md",
+      "entity_id": "living/livy-tldv-jobs#6",
+      "claim_type": "timeline_event"
+    }
+  },
+  {
+    "ts": "2026-04-19T17:10:30.160828+00:00",
+    "source": "github",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-tldv-jobs#6",
+      "claims_written": 5,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-19T17:10:30.168378+00:00",
+    "source": "github",
+    "action": "event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-tldv-jobs#6",
+      "content_key": "github:6:9adb1b0921d310111b869efc3a177c16be40b0da48f63d01c93e6a2c1f38b763"
+    }
+  },
+  {
+    "ts": "2026-04-19T17:10:32.427828+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "a665ff09-81ca-46bf-a1fa-0f0dfaf253e1",
+      "blob_path": "memory/vault/claims/a665ff09-81ca-46bf-a1fa-0f0dfaf253e1.md",
+      "entity_id": "living/livy-tldv-jobs#2",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-19T17:10:32.436474+00:00",
+    "source": "github",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-tldv-jobs#2",
+      "claims_written": 1,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-19T17:10:32.456449+00:00",
+    "source": "github",
+    "action": "event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-tldv-jobs#2",
+      "content_key": "github:2:325b963038f43b2b55e077c8bc170b9e14002cb6326a51d1eb5aafb0b824c9b9"
+    }
+  },
+  {
+    "ts": "2026-04-19T17:10:34.817676+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "c33db9e4-427b-4717-b336-cdd27f46e3ef",
+      "blob_path": "memory/vault/claims/c33db9e4-427b-4717-b336-cdd27f46e3ef.md",
+      "entity_id": "living/livy-tldv-jobs#4",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-19T17:10:34.818562+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "d3e20cea-9611-4130-8c3b-daf6a421261d",
+      "blob_path": "memory/vault/claims/d3e20cea-9611-4130-8c3b-daf6a421261d.md",
+      "entity_id": "living/livy-tldv-jobs#4",
+      "claim_type": "linkage"
+    }
+  },
+  {
+    "ts": "2026-04-19T17:10:34.820692+00:00",
+    "source": "github",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-tldv-jobs#4",
+      "claims_written": 2,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-19T17:10:34.827380+00:00",
+    "source": "github",
+    "action": "event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-tldv-jobs#4",
+      "content_key": "github:4:038a47b02dfe4f25e54adac9fe02f361523a67f0a5cf19abf0fd5c56a4a35900"
+    }
+  },
+  {
+    "ts": "2026-04-19T17:10:36.827199+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "ff510ed4-8d3a-492f-95fc-1cdcd7ddc06b",
+      "blob_path": "memory/vault/claims/ff510ed4-8d3a-492f-95fc-1cdcd7ddc06b.md",
+      "entity_id": "living/livy-memory-bot#2",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-19T17:10:36.833748+00:00",
+    "source": "github",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#2",
+      "claims_written": 1,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-19T17:10:36.841012+00:00",
+    "source": "github",
+    "action": "event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#2",
+      "content_key": "github:2:48073190490f9a9a1d6a60e8df5bb287e6af7c766e58a6da2365ce89f1a35a43"
+    }
+  },
+  {
+    "ts": "2026-04-19T17:10:39.155834+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "6437cb6b-67a0-4da4-bc0d-0acb6b25836d",
+      "blob_path": "memory/vault/claims/6437cb6b-67a0-4da4-bc0d-0acb6b25836d.md",
+      "entity_id": "living/livy-tldv-jobs#13",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-19T17:10:39.159005+00:00",
+    "source": "github",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-tldv-jobs#13",
+      "claims_written": 1,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-19T17:10:39.167624+00:00",
+    "source": "github",
+    "action": "event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-tldv-jobs#13",
+      "content_key": "github:13:f4d89e55f4913c28b33a175c7b061e93d162d1b96d4ad80dab40c3cb3241a51d"
+    }
+  },
+  {
+    "ts": "2026-04-19T17:10:40.935869+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "9a3f2b2b-7bbf-42e2-b141-051d04da9ea4",
+      "blob_path": "memory/vault/claims/9a3f2b2b-7bbf-42e2-b141-051d04da9ea4.md",
+      "entity_id": "living/livy-memory-bot#4",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-19T17:10:40.939054+00:00",
+    "source": "github",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#4",
+      "claims_written": 1,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-19T17:10:40.947645+00:00",
+    "source": "github",
+    "action": "event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#4",
+      "content_key": "github:4:4ee6ee5a94948e989cd48bb44d51905007bd65ba02a2f996d7fef5ee48313236"
+    }
+  },
+  {
+    "ts": "2026-04-19T17:10:42.924467+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "1029cb0e-86ba-44f0-aee0-5176661d5bad",
+      "blob_path": "memory/vault/claims/1029cb0e-86ba-44f0-aee0-5176661d5bad.md",
+      "entity_id": "living/livy-memory-bot#5",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-19T17:10:42.925276+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "d66a8087-cf62-4e59-891d-c920d752e62e",
+      "blob_path": "memory/vault/claims/d66a8087-cf62-4e59-891d-c920d752e62e.md",
+      "entity_id": "living/livy-memory-bot#5",
+      "claim_type": "linkage"
+    }
+  },
+  {
+    "ts": "2026-04-19T17:10:42.926009+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "83eea99c-c19c-4f59-a220-4e29a620db40",
+      "blob_path": "memory/vault/claims/83eea99c-c19c-4f59-a220-4e29a620db40.md",
+      "entity_id": "living/livy-memory-bot#5",
+      "claim_type": "linkage"
+    }
+  },
+  {
+    "ts": "2026-04-19T17:10:42.928426+00:00",
+    "source": "github",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#5",
+      "claims_written": 3,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-19T17:10:42.934958+00:00",
+    "source": "github",
+    "action": "event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#5",
+      "content_key": "github:5:413d3889b0a3cbd7e8a2b4406e277f446ce61b100739e02046b1fa7a28747d8a"
+    }
+  },
+  {
+    "ts": "2026-04-19T17:10:45.039769+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "b205b085-d679-4466-b7bf-bbcfaf7b530d",
+      "blob_path": "memory/vault/claims/b205b085-d679-4466-b7bf-bbcfaf7b530d.md",
+      "entity_id": "living/livy-memory-bot#6",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-19T17:10:45.044918+00:00",
+    "source": "github",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#6",
+      "claims_written": 1,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-19T17:10:45.057864+00:00",
+    "source": "github",
+    "action": "event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#6",
+      "content_key": "github:6:2c0290ccf9360773166f29164a8e7e571aaffb33dfa2ff2312a49e9d000b8f9a"
+    }
+  },
+  {
+    "ts": "2026-04-19T17:10:47.262837+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "1efec9d5-126d-45c4-883d-04c094404889",
+      "blob_path": "memory/vault/claims/1efec9d5-126d-45c4-883d-04c094404889.md",
+      "entity_id": "living/livy-memory-bot#13",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-19T17:10:47.264099+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "7cb21abe-27db-4c5e-bbe6-116994817a6a",
+      "blob_path": "memory/vault/claims/7cb21abe-27db-4c5e-bbe6-116994817a6a.md",
+      "entity_id": "living/livy-memory-bot#13",
+      "claim_type": "linkage"
+    }
+  },
+  {
+    "ts": "2026-04-19T17:10:47.267310+00:00",
+    "source": "github",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#13",
+      "claims_written": 2,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-19T17:10:47.274722+00:00",
+    "source": "github",
+    "action": "event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#13",
+      "content_key": "github:13:07c703da475c3dab47917865cdf65a8edf6a2992790bd3f7245b65dc3fa7d4cd"
+    }
+  },
+  {
+    "ts": "2026-04-19T17:10:49.210159+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "de3e9174-1fb1-4acf-9dff-07acd035b89f",
+      "blob_path": "memory/vault/claims/de3e9174-1fb1-4acf-9dff-07acd035b89f.md",
+      "entity_id": "living/livy-memory-bot#14",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-19T17:10:49.218439+00:00",
+    "source": "github",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#14",
+      "claims_written": 1,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-19T17:10:49.236200+00:00",
+    "source": "github",
+    "action": "event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#14",
+      "content_key": "github:14:90c7b4a58a498cc22ec62729f462a0fe409771d479daed4d1119e9f446da217f"
+    }
+  },
+  {
+    "ts": "2026-04-19T17:10:51.831028+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "1a0565dc-62c9-494e-afb0-df27f2ad7f5e",
+      "blob_path": "memory/vault/claims/1a0565dc-62c9-494e-afb0-df27f2ad7f5e.md",
+      "entity_id": "living/livy-memory-bot#15",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-19T17:10:51.840472+00:00",
+    "source": "github",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#15",
+      "claims_written": 1,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-19T17:10:51.860216+00:00",
+    "source": "github",
+    "action": "event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#15",
+      "content_key": "github:15:a3be5d87f2238f8a8d9084db5adce3eaa8f2ba1dd842fc66f4afffc58e6940b7"
+    }
+  },
+  {
+    "ts": "2026-04-19T17:10:53.831746+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "9cb0847a-9a56-4d6c-b033-9499854bd95e",
+      "blob_path": "memory/vault/claims/9cb0847a-9a56-4d6c-b033-9499854bd95e.md",
+      "entity_id": "living/livy-memory-bot#16",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-19T17:10:53.832661+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "a08df6a6-990d-4a22-b9b0-5caf81610c79",
+      "blob_path": "memory/vault/claims/a08df6a6-990d-4a22-b9b0-5caf81610c79.md",
+      "entity_id": "living/livy-memory-bot#16",
+      "claim_type": "linkage"
+    }
+  },
+  {
+    "ts": "2026-04-19T17:10:53.833580+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "82117327-3152-4f1c-9756-7790005c7871",
+      "blob_path": "memory/vault/claims/82117327-3152-4f1c-9756-7790005c7871.md",
+      "entity_id": "living/livy-memory-bot#16",
+      "claim_type": "linkage"
+    }
+  },
+  {
+    "ts": "2026-04-19T17:10:53.834378+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "976f314e-d9c7-48de-9acd-629e5ee6ae1c",
+      "blob_path": "memory/vault/claims/976f314e-d9c7-48de-9acd-629e5ee6ae1c.md",
+      "entity_id": "living/livy-memory-bot#16",
+      "claim_type": "linkage"
+    }
+  },
+  {
+    "ts": "2026-04-19T17:10:53.836957+00:00",
+    "source": "github",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#16",
+      "claims_written": 4,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-19T17:10:53.843547+00:00",
+    "source": "github",
+    "action": "event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#16",
+      "content_key": "github:16:b472e453a82b4eb6c3d0fc39824fca624802ca62f560eb41683ebcbb4b683f8f"
+    }
+  },
+  {
+    "ts": "2026-04-19T17:10:55.924546+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "d4c78f54-333d-4695-a908-756166deab7d",
+      "blob_path": "memory/vault/claims/d4c78f54-333d-4695-a908-756166deab7d.md",
+      "entity_id": "living/livy-memory-bot#17",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-19T17:10:55.927370+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "488a7b5c-a38c-45c4-9c8c-027329b3f1d6",
+      "blob_path": "memory/vault/claims/488a7b5c-a38c-45c4-9c8c-027329b3f1d6.md",
+      "entity_id": "living/livy-memory-bot#17",
+      "claim_type": "linkage"
+    }
+  },
+  {
+    "ts": "2026-04-19T17:10:55.928907+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "3f2ae25f-5410-4ce7-93bd-c7888dbd64db",
+      "blob_path": "memory/vault/claims/3f2ae25f-5410-4ce7-93bd-c7888dbd64db.md",
+      "entity_id": "living/livy-memory-bot#17",
+      "claim_type": "linkage"
+    }
+  },
+  {
+    "ts": "2026-04-19T17:10:55.933967+00:00",
+    "source": "github",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#17",
+      "claims_written": 3,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-19T17:10:55.943282+00:00",
+    "source": "github",
+    "action": "event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#17",
+      "content_key": "github:17:f505a826911643eb045fdb21de8cb2c0445ece03049621aad572279b2c773615"
+    }
+  },
+  {
+    "ts": "2026-04-19T17:10:57.771154+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "70ca3eb2-1c9a-4879-b06f-8a5b0d123fa3",
+      "blob_path": "memory/vault/claims/70ca3eb2-1c9a-4879-b06f-8a5b0d123fa3.md",
+      "entity_id": "living/livy-memory-bot#18",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-19T17:10:57.773964+00:00",
+    "source": "github",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#18",
+      "claims_written": 1,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-19T17:10:57.783179+00:00",
+    "source": "github",
+    "action": "event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#18",
+      "content_key": "github:18:7b5e7079f4cf3139c6a6a6fff73515c067b13c742c1d26145368276b5eb38c5e"
+    }
+  },
+  {
+    "ts": "2026-04-19T17:10:59.646655+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "882632fb-9985-4b86-9fb9-dbbdfb63c32d",
+      "blob_path": "memory/vault/claims/882632fb-9985-4b86-9fb9-dbbdfb63c32d.md",
+      "entity_id": "living/livy-memory-bot#19",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-19T17:10:59.648267+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "8e88a1f6-732a-47ab-aca9-c7413d07988d",
+      "blob_path": "memory/vault/claims/8e88a1f6-732a-47ab-aca9-c7413d07988d.md",
+      "entity_id": "living/livy-memory-bot#19",
+      "claim_type": "linkage"
+    }
+  },
+  {
+    "ts": "2026-04-19T17:10:59.649605+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "7f5b7ecf-c54a-44d7-90af-9c99a09972db",
+      "blob_path": "memory/vault/claims/7f5b7ecf-c54a-44d7-90af-9c99a09972db.md",
+      "entity_id": "living/livy-memory-bot#19",
+      "claim_type": "linkage"
+    }
+  },
+  {
+    "ts": "2026-04-19T17:10:59.651266+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "e1e37a90-7f0d-47e4-be9f-a5871e8f98ff",
+      "blob_path": "memory/vault/claims/e1e37a90-7f0d-47e4-be9f-a5871e8f98ff.md",
+      "entity_id": "living/livy-memory-bot#19",
+      "claim_type": "linkage"
+    }
+  },
+  {
+    "ts": "2026-04-19T17:10:59.663401+00:00",
+    "source": "github",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#19",
+      "claims_written": 4,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-19T17:10:59.673686+00:00",
+    "source": "github",
+    "action": "event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#19",
+      "content_key": "github:19:74ddfd92cbbe9278558a2cd9de56238163bf95dc625e4153bb5345fe73f57881"
+    }
+  },
+  {
+    "ts": "2026-04-19T17:11:01.769414+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "cb2eaf1c-2bf0-40d3-b9e3-be4ea7ecc5fe",
+      "blob_path": "memory/vault/claims/cb2eaf1c-2bf0-40d3-b9e3-be4ea7ecc5fe.md",
+      "entity_id": "living/livy-memory-bot#20",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-19T17:11:01.773137+00:00",
+    "source": "github",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#20",
+      "claims_written": 1,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-19T17:11:01.782657+00:00",
+    "source": "github",
+    "action": "event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#20",
+      "content_key": "github:20:8dae76be06f472a0a7b28297da9e04fcc18be51c0f78cdfc619de2f589b86b32"
+    }
+  },
+  {
+    "ts": "2026-04-19T17:11:01.786093+00:00",
+    "source": "github",
+    "action": "run_finished",
+    "data": {
+      "events_processed": 17,
+      "events_skipped": 0
+    }
+  },
+  {
+    "ts": "2026-04-19T21:04:00.673120+00:00",
+    "source": "github",
+    "action": "run_started",
+    "data": {
+      "last_seen_at": null,
+      "wiki_v2_active": true
+    }
+  },
+  {
+    "ts": "2026-04-19T21:04:34.317138+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "7e86a581-3a6b-445e-becf-2b6902e55497",
+      "blob_path": "memory/vault/claims/7e86a581-3a6b-445e-becf-2b6902e55497.md",
+      "entity_id": "living/livy-bat-jobs#2",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:04:34.321757+00:00",
+    "source": "github",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-bat-jobs#2",
+      "claims_written": 1,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-19T21:04:34.329173+00:00",
+    "source": "github",
+    "action": "event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-bat-jobs#2",
+      "content_key": "github:2:71fb26e34acd381293a378c25f3e83da52cf02d1fcdc1bb79a701bc783f5ce27"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:04:36.472563+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "10bd505b-ec01-41a4-8383-d3a79ea5b1cb",
+      "blob_path": "memory/vault/claims/10bd505b-ec01-41a4-8383-d3a79ea5b1cb.md",
+      "entity_id": "living/livy-tldv-jobs#6",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:04:36.478911+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "179b614f-774b-42a4-9b08-dd466df419db",
+      "blob_path": "memory/vault/claims/179b614f-774b-42a4-9b08-dd466df419db.md",
+      "entity_id": "living/livy-tldv-jobs#6",
+      "claim_type": "linkage"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:04:36.481408+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "4523b8c9-14ad-45ec-b0a9-b585780dda78",
+      "blob_path": "memory/vault/claims/4523b8c9-14ad-45ec-b0a9-b585780dda78.md",
+      "entity_id": "living/livy-tldv-jobs#6",
+      "claim_type": "linkage"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:04:36.482775+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "cc62d776-bac6-4d35-9a45-b78d69bd0780",
+      "blob_path": "memory/vault/claims/cc62d776-bac6-4d35-9a45-b78d69bd0780.md",
+      "entity_id": "living/livy-tldv-jobs#6",
+      "claim_type": "timeline_event"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:04:36.484509+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "fc0f198f-0298-44e2-8800-e27fc33f42ec",
+      "blob_path": "memory/vault/claims/fc0f198f-0298-44e2-8800-e27fc33f42ec.md",
+      "entity_id": "living/livy-tldv-jobs#6",
+      "claim_type": "timeline_event"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:04:36.488463+00:00",
+    "source": "github",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-tldv-jobs#6",
+      "claims_written": 5,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-19T21:04:36.497601+00:00",
+    "source": "github",
+    "action": "event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-tldv-jobs#6",
+      "content_key": "github:6:9adb1b0921d310111b869efc3a177c16be40b0da48f63d01c93e6a2c1f38b763"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:04:38.870420+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "4119b0a6-4afa-40da-b7f7-3eca079979a9",
+      "blob_path": "memory/vault/claims/4119b0a6-4afa-40da-b7f7-3eca079979a9.md",
+      "entity_id": "living/livy-tldv-jobs#2",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:04:38.874616+00:00",
+    "source": "github",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-tldv-jobs#2",
+      "claims_written": 1,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-19T21:04:38.881735+00:00",
+    "source": "github",
+    "action": "event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-tldv-jobs#2",
+      "content_key": "github:2:325b963038f43b2b55e077c8bc170b9e14002cb6326a51d1eb5aafb0b824c9b9"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:04:40.877800+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "da0acd0c-854a-4d24-af46-d9469cf0b37d",
+      "blob_path": "memory/vault/claims/da0acd0c-854a-4d24-af46-d9469cf0b37d.md",
+      "entity_id": "living/livy-tldv-jobs#4",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:04:40.878938+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "91bf6dbf-3670-441b-aece-58e8e1cc6b55",
+      "blob_path": "memory/vault/claims/91bf6dbf-3670-441b-aece-58e8e1cc6b55.md",
+      "entity_id": "living/livy-tldv-jobs#4",
+      "claim_type": "linkage"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:04:40.882146+00:00",
+    "source": "github",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-tldv-jobs#4",
+      "claims_written": 2,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-19T21:04:40.892172+00:00",
+    "source": "github",
+    "action": "event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-tldv-jobs#4",
+      "content_key": "github:4:038a47b02dfe4f25e54adac9fe02f361523a67f0a5cf19abf0fd5c56a4a35900"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:04:42.966145+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "f7357558-48e5-482e-a947-6947fc32fc52",
+      "blob_path": "memory/vault/claims/f7357558-48e5-482e-a947-6947fc32fc52.md",
+      "entity_id": "living/livy-memory-bot#2",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:04:42.971658+00:00",
+    "source": "github",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#2",
+      "claims_written": 1,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-19T21:04:42.979682+00:00",
+    "source": "github",
+    "action": "event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#2",
+      "content_key": "github:2:48073190490f9a9a1d6a60e8df5bb287e6af7c766e58a6da2365ce89f1a35a43"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:04:45.000096+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "1a267051-ddfa-42cd-9186-c95b951e3b28",
+      "blob_path": "memory/vault/claims/1a267051-ddfa-42cd-9186-c95b951e3b28.md",
+      "entity_id": "living/livy-tldv-jobs#13",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:04:45.008916+00:00",
+    "source": "github",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-tldv-jobs#13",
+      "claims_written": 1,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-19T21:04:45.038002+00:00",
+    "source": "github",
+    "action": "event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-tldv-jobs#13",
+      "content_key": "github:13:f4d89e55f4913c28b33a175c7b061e93d162d1b96d4ad80dab40c3cb3241a51d"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:04:47.533434+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "54e174ff-e8b0-4061-88e4-2dd4199a4a48",
+      "blob_path": "memory/vault/claims/54e174ff-e8b0-4061-88e4-2dd4199a4a48.md",
+      "entity_id": "living/livy-memory-bot#4",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:04:47.539573+00:00",
+    "source": "github",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#4",
+      "claims_written": 1,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-19T21:04:47.551153+00:00",
+    "source": "github",
+    "action": "event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#4",
+      "content_key": "github:4:4ee6ee5a94948e989cd48bb44d51905007bd65ba02a2f996d7fef5ee48313236"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:04:49.738427+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "2da1cd66-aace-4ee1-a6a7-d96d6a539b2c",
+      "blob_path": "memory/vault/claims/2da1cd66-aace-4ee1-a6a7-d96d6a539b2c.md",
+      "entity_id": "living/livy-memory-bot#5",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:04:49.740016+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "7e554076-d0da-4280-af04-ef63cfa3dc4e",
+      "blob_path": "memory/vault/claims/7e554076-d0da-4280-af04-ef63cfa3dc4e.md",
+      "entity_id": "living/livy-memory-bot#5",
+      "claim_type": "linkage"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:04:49.741838+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "5a5c8c52-6d3f-418d-a5f7-72723c643701",
+      "blob_path": "memory/vault/claims/5a5c8c52-6d3f-418d-a5f7-72723c643701.md",
+      "entity_id": "living/livy-memory-bot#5",
+      "claim_type": "linkage"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:04:49.747169+00:00",
+    "source": "github",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#5",
+      "claims_written": 3,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-19T21:04:49.754600+00:00",
+    "source": "github",
+    "action": "event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#5",
+      "content_key": "github:5:413d3889b0a3cbd7e8a2b4406e277f446ce61b100739e02046b1fa7a28747d8a"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:04:51.644830+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "dc834175-113a-46c8-a152-ea5806e58f17",
+      "blob_path": "memory/vault/claims/dc834175-113a-46c8-a152-ea5806e58f17.md",
+      "entity_id": "living/livy-memory-bot#6",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:04:51.647923+00:00",
+    "source": "github",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#6",
+      "claims_written": 1,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-19T21:04:51.656914+00:00",
+    "source": "github",
+    "action": "event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#6",
+      "content_key": "github:6:2c0290ccf9360773166f29164a8e7e571aaffb33dfa2ff2312a49e9d000b8f9a"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:04:53.699152+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "eff944a1-49f9-425c-956f-e2c9aeedc99f",
+      "blob_path": "memory/vault/claims/eff944a1-49f9-425c-956f-e2c9aeedc99f.md",
+      "entity_id": "living/livy-memory-bot#13",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:04:53.701162+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "0c7f3999-6eb3-4d52-b608-062a66ac54c9",
+      "blob_path": "memory/vault/claims/0c7f3999-6eb3-4d52-b608-062a66ac54c9.md",
+      "entity_id": "living/livy-memory-bot#13",
+      "claim_type": "linkage"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:04:53.708375+00:00",
+    "source": "github",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#13",
+      "claims_written": 2,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-19T21:04:53.725570+00:00",
+    "source": "github",
+    "action": "event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#13",
+      "content_key": "github:13:07c703da475c3dab47917865cdf65a8edf6a2992790bd3f7245b65dc3fa7d4cd"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:04:55.676301+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "083d2a2c-899b-41f1-a5f2-42f291235d25",
+      "blob_path": "memory/vault/claims/083d2a2c-899b-41f1-a5f2-42f291235d25.md",
+      "entity_id": "living/livy-memory-bot#14",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:04:55.687365+00:00",
+    "source": "github",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#14",
+      "claims_written": 1,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-19T21:04:55.700397+00:00",
+    "source": "github",
+    "action": "event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#14",
+      "content_key": "github:14:90c7b4a58a498cc22ec62729f462a0fe409771d479daed4d1119e9f446da217f"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:04:57.918858+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "1c765b50-67a9-42b0-ac28-3db3e4d2eca6",
+      "blob_path": "memory/vault/claims/1c765b50-67a9-42b0-ac28-3db3e4d2eca6.md",
+      "entity_id": "living/livy-memory-bot#15",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:04:57.928509+00:00",
+    "source": "github",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#15",
+      "claims_written": 1,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-19T21:04:57.953966+00:00",
+    "source": "github",
+    "action": "event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#15",
+      "content_key": "github:15:a3be5d87f2238f8a8d9084db5adce3eaa8f2ba1dd842fc66f4afffc58e6940b7"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:05:00.244722+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "6d2bba17-eb99-4530-904d-f14eec6a8d10",
+      "blob_path": "memory/vault/claims/6d2bba17-eb99-4530-904d-f14eec6a8d10.md",
+      "entity_id": "living/livy-memory-bot#16",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:05:00.260143+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "cd5151db-9ed8-4fdd-ba47-0562406ede1a",
+      "blob_path": "memory/vault/claims/cd5151db-9ed8-4fdd-ba47-0562406ede1a.md",
+      "entity_id": "living/livy-memory-bot#16",
+      "claim_type": "linkage"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:05:00.263813+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "3fb96b06-bf02-4882-84fc-8eafb43aece4",
+      "blob_path": "memory/vault/claims/3fb96b06-bf02-4882-84fc-8eafb43aece4.md",
+      "entity_id": "living/livy-memory-bot#16",
+      "claim_type": "linkage"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:05:00.269682+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "4f5e8be1-a87b-473c-b414-4e2da8503519",
+      "blob_path": "memory/vault/claims/4f5e8be1-a87b-473c-b414-4e2da8503519.md",
+      "entity_id": "living/livy-memory-bot#16",
+      "claim_type": "linkage"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:05:00.278612+00:00",
+    "source": "github",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#16",
+      "claims_written": 4,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-19T21:05:00.308095+00:00",
+    "source": "github",
+    "action": "event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#16",
+      "content_key": "github:16:b472e453a82b4eb6c3d0fc39824fca624802ca62f560eb41683ebcbb4b683f8f"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:05:03.492612+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "a9b0bfc7-0b6f-4b7f-bb99-90331f700de5",
+      "blob_path": "memory/vault/claims/a9b0bfc7-0b6f-4b7f-bb99-90331f700de5.md",
+      "entity_id": "living/livy-memory-bot#17",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:05:03.494060+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "ab39f7df-8b95-48f1-abd3-e71b53a10f18",
+      "blob_path": "memory/vault/claims/ab39f7df-8b95-48f1-abd3-e71b53a10f18.md",
+      "entity_id": "living/livy-memory-bot#17",
+      "claim_type": "linkage"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:05:03.495603+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "f8d43a66-404d-43ff-a6c2-845d2908d1af",
+      "blob_path": "memory/vault/claims/f8d43a66-404d-43ff-a6c2-845d2908d1af.md",
+      "entity_id": "living/livy-memory-bot#17",
+      "claim_type": "linkage"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:05:03.500674+00:00",
+    "source": "github",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#17",
+      "claims_written": 3,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-19T21:05:03.514572+00:00",
+    "source": "github",
+    "action": "event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#17",
+      "content_key": "github:17:f505a826911643eb045fdb21de8cb2c0445ece03049621aad572279b2c773615"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:05:05.590028+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "e2639c0a-315e-4622-ac1b-fc894ac0decf",
+      "blob_path": "memory/vault/claims/e2639c0a-315e-4622-ac1b-fc894ac0decf.md",
+      "entity_id": "living/livy-memory-bot#18",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:05:05.594868+00:00",
+    "source": "github",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#18",
+      "claims_written": 1,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-19T21:05:05.605838+00:00",
+    "source": "github",
+    "action": "event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#18",
+      "content_key": "github:18:7b5e7079f4cf3139c6a6a6fff73515c067b13c742c1d26145368276b5eb38c5e"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:05:07.738133+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "c3eb5603-339b-43aa-837b-3879f1db8d89",
+      "blob_path": "memory/vault/claims/c3eb5603-339b-43aa-837b-3879f1db8d89.md",
+      "entity_id": "living/livy-memory-bot#19",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:05:07.746277+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "3fe2db88-31ab-4cb6-9511-f048be59a538",
+      "blob_path": "memory/vault/claims/3fe2db88-31ab-4cb6-9511-f048be59a538.md",
+      "entity_id": "living/livy-memory-bot#19",
+      "claim_type": "linkage"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:05:07.748521+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "31d72965-36b3-4add-b042-4cdfb00bd9fb",
+      "blob_path": "memory/vault/claims/31d72965-36b3-4add-b042-4cdfb00bd9fb.md",
+      "entity_id": "living/livy-memory-bot#19",
+      "claim_type": "linkage"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:05:07.751122+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "ddbac77c-3e47-4b50-8414-37a96b7383a6",
+      "blob_path": "memory/vault/claims/ddbac77c-3e47-4b50-8414-37a96b7383a6.md",
+      "entity_id": "living/livy-memory-bot#19",
+      "claim_type": "linkage"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:05:07.764487+00:00",
+    "source": "github",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#19",
+      "claims_written": 4,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-19T21:05:07.791735+00:00",
+    "source": "github",
+    "action": "event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#19",
+      "content_key": "github:19:74ddfd92cbbe9278558a2cd9de56238163bf95dc625e4153bb5345fe73f57881"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:05:10.044368+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "77d39a94-551c-4646-acb5-35e70d3280ae",
+      "blob_path": "memory/vault/claims/77d39a94-551c-4646-acb5-35e70d3280ae.md",
+      "entity_id": "living/livy-memory-bot#20",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:05:10.053554+00:00",
+    "source": "github",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#20",
+      "claims_written": 1,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-19T21:05:10.067197+00:00",
+    "source": "github",
+    "action": "event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#20",
+      "content_key": "github:20:8dae76be06f472a0a7b28297da9e04fcc18be51c0f78cdfc619de2f589b86b32"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:05:11.922467+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "f1a4dd94-3f24-4043-9c9e-b8593a089347",
+      "blob_path": "memory/vault/claims/f1a4dd94-3f24-4043-9c9e-b8593a089347.md",
+      "entity_id": "living/livy-memory-bot#21",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:05:11.924174+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "8e910ce9-3fb1-4649-91ba-8cc61af240cb",
+      "blob_path": "memory/vault/claims/8e910ce9-3fb1-4649-91ba-8cc61af240cb.md",
+      "entity_id": "living/livy-memory-bot#21",
+      "claim_type": "linkage"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:05:11.927583+00:00",
+    "source": "github",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#21",
+      "claims_written": 2,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-19T21:05:11.936226+00:00",
+    "source": "github",
+    "action": "event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#21",
+      "content_key": "github:21:c56324c1a276b59b42af6a6b8fbd0769adab37afe290edb019ec83c50849ca49"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:05:13.791933+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "e6eaa9ec-d214-45ca-9be7-a9ea2cf84ca9",
+      "blob_path": "memory/vault/claims/e6eaa9ec-d214-45ca-9be7-a9ea2cf84ca9.md",
+      "entity_id": "living/livy-memory-bot#22",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:05:13.801481+00:00",
+    "source": "github",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#22",
+      "claims_written": 1,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-19T21:05:13.828940+00:00",
+    "source": "github",
+    "action": "event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#22",
+      "content_key": "github:22:6cf41b8abd32037fe3b3288eed17df6cd192bc84f5ebcd809fa8198e800e64c2"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:05:13.835220+00:00",
+    "source": "github",
+    "action": "run_finished",
+    "data": {
+      "events_processed": 19,
+      "events_skipped": 0
+    }
+  },
+  {
+    "ts": "2026-04-19T21:33:34.771666+00:00",
+    "source": "github",
+    "action": "run_started",
+    "data": {
+      "last_seen_at": null,
+      "wiki_v2_active": true
+    }
+  },
+  {
+    "ts": "2026-04-19T21:34:11.686625+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "c10a9f6c-9f90-42dc-a133-9e195154eeef",
+      "blob_path": "memory/vault/claims/c10a9f6c-9f90-42dc-a133-9e195154eeef.md",
+      "entity_id": "living/livy-bat-jobs#2",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:34:11.707779+00:00",
+    "source": "github",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-bat-jobs#2",
+      "claims_written": 1,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-19T21:34:11.773896+00:00",
+    "source": "github",
+    "action": "event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-bat-jobs#2",
+      "content_key": "github:2:71fb26e34acd381293a378c25f3e83da52cf02d1fcdc1bb79a701bc783f5ce27"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:34:14.274414+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "a4d3ee88-3ec3-4c13-a39a-21d00a426efd",
+      "blob_path": "memory/vault/claims/a4d3ee88-3ec3-4c13-a39a-21d00a426efd.md",
+      "entity_id": "living/livy-tldv-jobs#6",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:34:14.276224+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "c5e973ac-4bce-411b-8ce7-9638e1f1ed44",
+      "blob_path": "memory/vault/claims/c5e973ac-4bce-411b-8ce7-9638e1f1ed44.md",
+      "entity_id": "living/livy-tldv-jobs#6",
+      "claim_type": "linkage"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:34:14.278168+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "9ad80f6f-ef27-433c-a42b-957c6c1eaf85",
+      "blob_path": "memory/vault/claims/9ad80f6f-ef27-433c-a42b-957c6c1eaf85.md",
+      "entity_id": "living/livy-tldv-jobs#6",
+      "claim_type": "linkage"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:34:14.280061+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "58050f58-e056-4d40-99ec-ea41c05620a1",
+      "blob_path": "memory/vault/claims/58050f58-e056-4d40-99ec-ea41c05620a1.md",
+      "entity_id": "living/livy-tldv-jobs#6",
+      "claim_type": "timeline_event"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:34:14.281597+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "9268c84c-f315-4761-9f43-6e046959531d",
+      "blob_path": "memory/vault/claims/9268c84c-f315-4761-9f43-6e046959531d.md",
+      "entity_id": "living/livy-tldv-jobs#6",
+      "claim_type": "timeline_event"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:34:14.295477+00:00",
+    "source": "github",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-tldv-jobs#6",
+      "claims_written": 5,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-19T21:34:14.337945+00:00",
+    "source": "github",
+    "action": "event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-tldv-jobs#6",
+      "content_key": "github:6:9adb1b0921d310111b869efc3a177c16be40b0da48f63d01c93e6a2c1f38b763"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:34:16.483968+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "48be46df-9419-437d-ba43-68bc9681520c",
+      "blob_path": "memory/vault/claims/48be46df-9419-437d-ba43-68bc9681520c.md",
+      "entity_id": "living/livy-tldv-jobs#2",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:34:16.496926+00:00",
+    "source": "github",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-tldv-jobs#2",
+      "claims_written": 1,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-19T21:34:16.552110+00:00",
+    "source": "github",
+    "action": "event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-tldv-jobs#2",
+      "content_key": "github:2:325b963038f43b2b55e077c8bc170b9e14002cb6326a51d1eb5aafb0b824c9b9"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:34:19.068053+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "73f75797-e1d3-48cd-97af-be8f5948b4f3",
+      "blob_path": "memory/vault/claims/73f75797-e1d3-48cd-97af-be8f5948b4f3.md",
+      "entity_id": "living/livy-tldv-jobs#4",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:34:19.070621+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "b9b8b519-f92d-4900-98c4-2850cf02ae63",
+      "blob_path": "memory/vault/claims/b9b8b519-f92d-4900-98c4-2850cf02ae63.md",
+      "entity_id": "living/livy-tldv-jobs#4",
+      "claim_type": "linkage"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:34:19.089031+00:00",
+    "source": "github",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-tldv-jobs#4",
+      "claims_written": 2,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-19T21:34:19.158122+00:00",
+    "source": "github",
+    "action": "event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-tldv-jobs#4",
+      "content_key": "github:4:038a47b02dfe4f25e54adac9fe02f361523a67f0a5cf19abf0fd5c56a4a35900"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:34:21.194598+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "1e00b1ca-d8f2-4c11-9f3c-f7bee905f351",
+      "blob_path": "memory/vault/claims/1e00b1ca-d8f2-4c11-9f3c-f7bee905f351.md",
+      "entity_id": "living/livy-memory-bot#2",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:34:21.224914+00:00",
+    "source": "github",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#2",
+      "claims_written": 1,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-19T21:34:21.266005+00:00",
+    "source": "github",
+    "action": "event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#2",
+      "content_key": "github:2:48073190490f9a9a1d6a60e8df5bb287e6af7c766e58a6da2365ce89f1a35a43"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:34:23.623669+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "934cf9ee-d7c8-41b3-9185-ecf2caab435d",
+      "blob_path": "memory/vault/claims/934cf9ee-d7c8-41b3-9185-ecf2caab435d.md",
+      "entity_id": "living/livy-tldv-jobs#13",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:34:23.641519+00:00",
+    "source": "github",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-tldv-jobs#13",
+      "claims_written": 1,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-19T21:34:23.702271+00:00",
+    "source": "github",
+    "action": "event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-tldv-jobs#13",
+      "content_key": "github:13:f4d89e55f4913c28b33a175c7b061e93d162d1b96d4ad80dab40c3cb3241a51d"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:34:25.580920+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "2d8ac638-7eeb-4f29-b73c-36604498ad6f",
+      "blob_path": "memory/vault/claims/2d8ac638-7eeb-4f29-b73c-36604498ad6f.md",
+      "entity_id": "living/livy-memory-bot#4",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:34:25.603749+00:00",
+    "source": "github",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#4",
+      "claims_written": 1,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-19T21:34:25.664940+00:00",
+    "source": "github",
+    "action": "event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#4",
+      "content_key": "github:4:4ee6ee5a94948e989cd48bb44d51905007bd65ba02a2f996d7fef5ee48313236"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:34:27.629491+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "f6d259f4-37ce-408c-8777-e2184668363d",
+      "blob_path": "memory/vault/claims/f6d259f4-37ce-408c-8777-e2184668363d.md",
+      "entity_id": "living/livy-memory-bot#5",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:34:27.631408+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "a51f0461-e2d1-4ca2-ba4a-3c674cbf430b",
+      "blob_path": "memory/vault/claims/a51f0461-e2d1-4ca2-ba4a-3c674cbf430b.md",
+      "entity_id": "living/livy-memory-bot#5",
+      "claim_type": "linkage"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:34:27.633102+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "09e24642-38e2-407e-b104-9d5f967613cf",
+      "blob_path": "memory/vault/claims/09e24642-38e2-407e-b104-9d5f967613cf.md",
+      "entity_id": "living/livy-memory-bot#5",
+      "claim_type": "linkage"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:34:27.649189+00:00",
+    "source": "github",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#5",
+      "claims_written": 3,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-19T21:34:27.701818+00:00",
+    "source": "github",
+    "action": "event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#5",
+      "content_key": "github:5:413d3889b0a3cbd7e8a2b4406e277f446ce61b100739e02046b1fa7a28747d8a"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:34:29.650828+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "58c70b5c-688b-4dc5-9569-eb3a51882955",
+      "blob_path": "memory/vault/claims/58c70b5c-688b-4dc5-9569-eb3a51882955.md",
+      "entity_id": "living/livy-memory-bot#6",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:34:29.670784+00:00",
+    "source": "github",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#6",
+      "claims_written": 1,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-19T21:34:29.734941+00:00",
+    "source": "github",
+    "action": "event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#6",
+      "content_key": "github:6:2c0290ccf9360773166f29164a8e7e571aaffb33dfa2ff2312a49e9d000b8f9a"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:34:31.704792+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "0e630bc6-0b73-4940-a774-17b66df1e187",
+      "blob_path": "memory/vault/claims/0e630bc6-0b73-4940-a774-17b66df1e187.md",
+      "entity_id": "living/livy-memory-bot#13",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:34:31.711133+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "31c94f77-81a7-47d7-af08-ffa1e200d3fe",
+      "blob_path": "memory/vault/claims/31c94f77-81a7-47d7-af08-ffa1e200d3fe.md",
+      "entity_id": "living/livy-memory-bot#13",
+      "claim_type": "linkage"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:34:31.743820+00:00",
+    "source": "github",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#13",
+      "claims_written": 2,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-19T21:34:31.817300+00:00",
+    "source": "github",
+    "action": "event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#13",
+      "content_key": "github:13:07c703da475c3dab47917865cdf65a8edf6a2992790bd3f7245b65dc3fa7d4cd"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:34:33.756666+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "9a8ea8d1-b870-4feb-8821-3f73b2092450",
+      "blob_path": "memory/vault/claims/9a8ea8d1-b870-4feb-8821-3f73b2092450.md",
+      "entity_id": "living/livy-memory-bot#14",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:34:33.780928+00:00",
+    "source": "github",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#14",
+      "claims_written": 1,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-19T21:34:33.845611+00:00",
+    "source": "github",
+    "action": "event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#14",
+      "content_key": "github:14:90c7b4a58a498cc22ec62729f462a0fe409771d479daed4d1119e9f446da217f"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:34:35.877315+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "09a1dc59-669c-464e-aea6-717fa0cc2a32",
+      "blob_path": "memory/vault/claims/09a1dc59-669c-464e-aea6-717fa0cc2a32.md",
+      "entity_id": "living/livy-memory-bot#15",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:34:35.896684+00:00",
+    "source": "github",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#15",
+      "claims_written": 1,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-19T21:34:35.963964+00:00",
+    "source": "github",
+    "action": "event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#15",
+      "content_key": "github:15:a3be5d87f2238f8a8d9084db5adce3eaa8f2ba1dd842fc66f4afffc58e6940b7"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:34:38.280635+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "0bd20047-473e-4767-a1db-94ff9837a173",
+      "blob_path": "memory/vault/claims/0bd20047-473e-4767-a1db-94ff9837a173.md",
+      "entity_id": "living/livy-memory-bot#16",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:34:38.282572+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "84484cf0-78fc-40c3-b0be-3d6a392dbf33",
+      "blob_path": "memory/vault/claims/84484cf0-78fc-40c3-b0be-3d6a392dbf33.md",
+      "entity_id": "living/livy-memory-bot#16",
+      "claim_type": "linkage"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:34:38.284445+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "e33c84a7-52b3-490f-8d4a-52066e2d8c6e",
+      "blob_path": "memory/vault/claims/e33c84a7-52b3-490f-8d4a-52066e2d8c6e.md",
+      "entity_id": "living/livy-memory-bot#16",
+      "claim_type": "linkage"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:34:38.286594+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "122191f1-1c82-4099-ad07-1884efa5208b",
+      "blob_path": "memory/vault/claims/122191f1-1c82-4099-ad07-1884efa5208b.md",
+      "entity_id": "living/livy-memory-bot#16",
+      "claim_type": "linkage"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:34:38.314356+00:00",
+    "source": "github",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#16",
+      "claims_written": 4,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-19T21:34:38.421779+00:00",
+    "source": "github",
+    "action": "event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#16",
+      "content_key": "github:16:b472e453a82b4eb6c3d0fc39824fca624802ca62f560eb41683ebcbb4b683f8f"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:34:40.600370+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "992cc8f0-ecc1-4c22-af4d-988d5f0d61d5",
+      "blob_path": "memory/vault/claims/992cc8f0-ecc1-4c22-af4d-988d5f0d61d5.md",
+      "entity_id": "living/livy-memory-bot#17",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:34:40.602743+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "eb9c2a30-7e3c-4726-a4a6-cfcd60add335",
+      "blob_path": "memory/vault/claims/eb9c2a30-7e3c-4726-a4a6-cfcd60add335.md",
+      "entity_id": "living/livy-memory-bot#17",
+      "claim_type": "linkage"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:34:40.604874+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "c30d1edd-6fde-4beb-bfae-918302f4a7f7",
+      "blob_path": "memory/vault/claims/c30d1edd-6fde-4beb-bfae-918302f4a7f7.md",
+      "entity_id": "living/livy-memory-bot#17",
+      "claim_type": "linkage"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:34:40.627541+00:00",
+    "source": "github",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#17",
+      "claims_written": 3,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-19T21:34:40.716518+00:00",
+    "source": "github",
+    "action": "event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#17",
+      "content_key": "github:17:f505a826911643eb045fdb21de8cb2c0445ece03049621aad572279b2c773615"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:34:42.573148+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "e63b4981-fe55-42bb-954d-73c8bc5596e0",
+      "blob_path": "memory/vault/claims/e63b4981-fe55-42bb-954d-73c8bc5596e0.md",
+      "entity_id": "living/livy-memory-bot#18",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:34:42.592201+00:00",
+    "source": "github",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#18",
+      "claims_written": 1,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-19T21:34:42.651753+00:00",
+    "source": "github",
+    "action": "event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#18",
+      "content_key": "github:18:7b5e7079f4cf3139c6a6a6fff73515c067b13c742c1d26145368276b5eb38c5e"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:34:44.917159+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "2bfdd278-c8af-4fbe-a5be-1747bac78c32",
+      "blob_path": "memory/vault/claims/2bfdd278-c8af-4fbe-a5be-1747bac78c32.md",
+      "entity_id": "living/livy-memory-bot#19",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:34:44.919504+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "5237d619-afaf-4d83-b21f-9c4fcc34fa1a",
+      "blob_path": "memory/vault/claims/5237d619-afaf-4d83-b21f-9c4fcc34fa1a.md",
+      "entity_id": "living/livy-memory-bot#19",
+      "claim_type": "linkage"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:34:44.921497+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "e8abc41b-b5a3-49d1-bfd1-45ef20fbdb65",
+      "blob_path": "memory/vault/claims/e8abc41b-b5a3-49d1-bfd1-45ef20fbdb65.md",
+      "entity_id": "living/livy-memory-bot#19",
+      "claim_type": "linkage"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:34:44.923734+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "18e39f49-8516-4309-b8c5-3e85900c1f50",
+      "blob_path": "memory/vault/claims/18e39f49-8516-4309-b8c5-3e85900c1f50.md",
+      "entity_id": "living/livy-memory-bot#19",
+      "claim_type": "linkage"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:34:44.941058+00:00",
+    "source": "github",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#19",
+      "claims_written": 4,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-19T21:34:45.004732+00:00",
+    "source": "github",
+    "action": "event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#19",
+      "content_key": "github:19:74ddfd92cbbe9278558a2cd9de56238163bf95dc625e4153bb5345fe73f57881"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:34:47.028815+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "a60319b6-287c-45e9-8885-248735021c5e",
+      "blob_path": "memory/vault/claims/a60319b6-287c-45e9-8885-248735021c5e.md",
+      "entity_id": "living/livy-memory-bot#20",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:34:47.049909+00:00",
+    "source": "github",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#20",
+      "claims_written": 1,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-19T21:34:47.122686+00:00",
+    "source": "github",
+    "action": "event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#20",
+      "content_key": "github:20:8dae76be06f472a0a7b28297da9e04fcc18be51c0f78cdfc619de2f589b86b32"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:34:49.006745+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "0e3fb850-3014-49d7-9aed-737ec24b311f",
+      "blob_path": "memory/vault/claims/0e3fb850-3014-49d7-9aed-737ec24b311f.md",
+      "entity_id": "living/livy-memory-bot#21",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:34:49.009514+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "26fecf3c-c1d1-47b9-85a4-d8f47080a5e9",
+      "blob_path": "memory/vault/claims/26fecf3c-c1d1-47b9-85a4-d8f47080a5e9.md",
+      "entity_id": "living/livy-memory-bot#21",
+      "claim_type": "linkage"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:34:49.030800+00:00",
+    "source": "github",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#21",
+      "claims_written": 2,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-19T21:34:49.123727+00:00",
+    "source": "github",
+    "action": "event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#21",
+      "content_key": "github:21:c56324c1a276b59b42af6a6b8fbd0769adab37afe290edb019ec83c50849ca49"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:34:50.997975+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "0f6af295-4998-4dab-8d80-f0e06e667ff1",
+      "blob_path": "memory/vault/claims/0f6af295-4998-4dab-8d80-f0e06e667ff1.md",
+      "entity_id": "living/livy-memory-bot#22",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:34:51.025450+00:00",
+    "source": "github",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#22",
+      "claims_written": 1,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-19T21:34:51.100794+00:00",
+    "source": "github",
+    "action": "event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#22",
+      "content_key": "github:22:6cf41b8abd32037fe3b3288eed17df6cd192bc84f5ebcd809fa8198e800e64c2"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:34:53.030170+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "8635e70f-29fe-4e93-89c6-2a8904ff30e5",
+      "blob_path": "memory/vault/claims/8635e70f-29fe-4e93-89c6-2a8904ff30e5.md",
+      "entity_id": "living/livy-memory-bot#23",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:34:53.055501+00:00",
+    "source": "github",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#23",
+      "claims_written": 1,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-19T21:34:53.153697+00:00",
+    "source": "github",
+    "action": "event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#23",
+      "content_key": "github:23:a2f70995381e5b4bbb5ceb42e624fbee64c26791251ddaa0be7c6e3d3e3be98e"
+    }
+  },
+  {
+    "ts": "2026-04-19T21:34:53.164708+00:00",
+    "source": "github",
+    "action": "run_finished",
+    "data": {
+      "events_processed": 20,
+      "events_skipped": 0
+    }
+  },
+  {
+    "ts": "2026-04-19T21:38:29.887555+00:00",
+    "source": "github",
+    "action": "run_started",
+    "data": {
+      "last_seen_at": "2026-04-19T21:34:53.126801+00:00",
+      "wiki_v2_active": true
+    }
+  },
+  {
+    "ts": "2026-04-19T21:38:31.652083+00:00",
+    "source": "github",
+    "action": "run_finished",
+    "data": {
+      "events_processed": 0,
+      "events_skipped": 0
+    }
+  },
+  {
+    "ts": "2026-04-20T03:03:18.433080+00:00",
+    "source": "github",
+    "action": "run_started",
+    "data": {
+      "last_seen_at": null,
+      "wiki_v2_active": true
+    }
+  },
+  {
+    "ts": "2026-04-20T03:03:29.097419+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "4a5c1396-063d-4b62-9693-7eaa9dda7848",
+      "blob_path": "memory/vault/claims/4a5c1396-063d-4b62-9693-7eaa9dda7848.md",
+      "entity_id": "living/livy-memory-bot#13",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-20T03:03:29.104292+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "ad1ff2a4-9430-49ce-858d-8ca04a8b5bf5",
+      "blob_path": "memory/vault/claims/ad1ff2a4-9430-49ce-858d-8ca04a8b5bf5.md",
+      "entity_id": "living/livy-memory-bot#13",
+      "claim_type": "linkage"
+    }
+  },
+  {
+    "ts": "2026-04-20T03:03:29.121808+00:00",
+    "source": "github",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#13",
+      "claims_written": 2,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-20T03:03:29.143738+00:00",
+    "source": "github",
+    "action": "event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#13",
+      "content_key": "github:13:07c703da475c3dab47917865cdf65a8edf6a2992790bd3f7245b65dc3fa7d4cd"
+    }
+  },
+  {
+    "ts": "2026-04-20T03:03:31.118824+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "ef79e11d-16c6-4dd9-b40c-8cef5a453d61",
+      "blob_path": "memory/vault/claims/ef79e11d-16c6-4dd9-b40c-8cef5a453d61.md",
+      "entity_id": "living/livy-memory-bot#14",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-20T03:03:31.126269+00:00",
+    "source": "github",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#14",
+      "claims_written": 1,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-20T03:03:31.150147+00:00",
+    "source": "github",
+    "action": "event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#14",
+      "content_key": "github:14:90c7b4a58a498cc22ec62729f462a0fe409771d479daed4d1119e9f446da217f"
+    }
+  },
+  {
+    "ts": "2026-04-20T03:03:32.976028+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "269ee78e-a566-47db-956f-15f3d75316db",
+      "blob_path": "memory/vault/claims/269ee78e-a566-47db-956f-15f3d75316db.md",
+      "entity_id": "living/livy-memory-bot#15",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-20T03:03:32.982492+00:00",
+    "source": "github",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#15",
+      "claims_written": 1,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-20T03:03:32.991752+00:00",
+    "source": "github",
+    "action": "event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#15",
+      "content_key": "github:15:a3be5d87f2238f8a8d9084db5adce3eaa8f2ba1dd842fc66f4afffc58e6940b7"
+    }
+  },
+  {
+    "ts": "2026-04-20T03:03:34.919225+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "2d683474-68b1-4d75-a999-e5c0fb8cbf52",
+      "blob_path": "memory/vault/claims/2d683474-68b1-4d75-a999-e5c0fb8cbf52.md",
+      "entity_id": "living/livy-memory-bot#16",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-20T03:03:34.921569+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "25887991-8b83-4d6f-9bf1-d4f9e24be832",
+      "blob_path": "memory/vault/claims/25887991-8b83-4d6f-9bf1-d4f9e24be832.md",
+      "entity_id": "living/livy-memory-bot#16",
+      "claim_type": "linkage"
+    }
+  },
+  {
+    "ts": "2026-04-20T03:03:34.923762+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "90201b42-c124-4bfe-a9f9-2460334611c3",
+      "blob_path": "memory/vault/claims/90201b42-c124-4bfe-a9f9-2460334611c3.md",
+      "entity_id": "living/livy-memory-bot#16",
+      "claim_type": "linkage"
+    }
+  },
+  {
+    "ts": "2026-04-20T03:03:34.926026+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "6d11e7e8-6093-4f9b-b53c-1a7232a613bc",
+      "blob_path": "memory/vault/claims/6d11e7e8-6093-4f9b-b53c-1a7232a613bc.md",
+      "entity_id": "living/livy-memory-bot#16",
+      "claim_type": "linkage"
+    }
+  },
+  {
+    "ts": "2026-04-20T03:03:34.931419+00:00",
+    "source": "github",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#16",
+      "claims_written": 4,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-20T03:03:34.941401+00:00",
+    "source": "github",
+    "action": "event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#16",
+      "content_key": "github:16:b472e453a82b4eb6c3d0fc39824fca624802ca62f560eb41683ebcbb4b683f8f"
+    }
+  },
+  {
+    "ts": "2026-04-20T03:03:36.863273+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "12cf57b8-44f0-4f55-a804-87dae7eba278",
+      "blob_path": "memory/vault/claims/12cf57b8-44f0-4f55-a804-87dae7eba278.md",
+      "entity_id": "living/livy-memory-bot#17",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-20T03:03:36.867275+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "f88f2162-8781-4b44-81a3-cb9a267f42cf",
+      "blob_path": "memory/vault/claims/f88f2162-8781-4b44-81a3-cb9a267f42cf.md",
+      "entity_id": "living/livy-memory-bot#17",
+      "claim_type": "linkage"
+    }
+  },
+  {
+    "ts": "2026-04-20T03:03:36.872110+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "19415a8f-f1f3-47f4-b8af-9a8f9de77bc2",
+      "blob_path": "memory/vault/claims/19415a8f-f1f3-47f4-b8af-9a8f9de77bc2.md",
+      "entity_id": "living/livy-memory-bot#17",
+      "claim_type": "linkage"
+    }
+  },
+  {
+    "ts": "2026-04-20T03:03:36.885865+00:00",
+    "source": "github",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#17",
+      "claims_written": 3,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-20T03:03:36.911743+00:00",
+    "source": "github",
+    "action": "event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#17",
+      "content_key": "github:17:f505a826911643eb045fdb21de8cb2c0445ece03049621aad572279b2c773615"
+    }
+  },
+  {
+    "ts": "2026-04-20T03:03:38.938789+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "cf508617-2364-483b-8dd4-e31cc782cdcd",
+      "blob_path": "memory/vault/claims/cf508617-2364-483b-8dd4-e31cc782cdcd.md",
+      "entity_id": "living/livy-memory-bot#18",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-20T03:03:38.943886+00:00",
+    "source": "github",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#18",
+      "claims_written": 1,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-20T03:03:38.954251+00:00",
+    "source": "github",
+    "action": "event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#18",
+      "content_key": "github:18:7b5e7079f4cf3139c6a6a6fff73515c067b13c742c1d26145368276b5eb38c5e"
+    }
+  },
+  {
+    "ts": "2026-04-20T03:03:40.934975+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "e667e543-89d4-4537-80e4-a799e185992c",
+      "blob_path": "memory/vault/claims/e667e543-89d4-4537-80e4-a799e185992c.md",
+      "entity_id": "living/livy-memory-bot#19",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-20T03:03:40.938384+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "705938d4-780b-4b61-bb87-b4d54eea8771",
+      "blob_path": "memory/vault/claims/705938d4-780b-4b61-bb87-b4d54eea8771.md",
+      "entity_id": "living/livy-memory-bot#19",
+      "claim_type": "linkage"
+    }
+  },
+  {
+    "ts": "2026-04-20T03:03:40.941397+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "7a029352-dd39-4732-a8a8-3cf4a74f7239",
+      "blob_path": "memory/vault/claims/7a029352-dd39-4732-a8a8-3cf4a74f7239.md",
+      "entity_id": "living/livy-memory-bot#19",
+      "claim_type": "linkage"
+    }
+  },
+  {
+    "ts": "2026-04-20T03:03:40.944547+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "9477ae2b-e1b9-4805-976f-5abb3f6c9b1c",
+      "blob_path": "memory/vault/claims/9477ae2b-e1b9-4805-976f-5abb3f6c9b1c.md",
+      "entity_id": "living/livy-memory-bot#19",
+      "claim_type": "linkage"
+    }
+  },
+  {
+    "ts": "2026-04-20T03:03:40.949775+00:00",
+    "source": "github",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#19",
+      "claims_written": 4,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-20T03:03:40.961731+00:00",
+    "source": "github",
+    "action": "event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#19",
+      "content_key": "github:19:74ddfd92cbbe9278558a2cd9de56238163bf95dc625e4153bb5345fe73f57881"
+    }
+  },
+  {
+    "ts": "2026-04-20T03:03:43.133214+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "0c786f02-da62-44e2-a983-bf9a3db54ba5",
+      "blob_path": "memory/vault/claims/0c786f02-da62-44e2-a983-bf9a3db54ba5.md",
+      "entity_id": "living/livy-memory-bot#20",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-20T03:03:43.145079+00:00",
+    "source": "github",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#20",
+      "claims_written": 1,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-20T03:03:43.165518+00:00",
+    "source": "github",
+    "action": "event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#20",
+      "content_key": "github:20:8dae76be06f472a0a7b28297da9e04fcc18be51c0f78cdfc619de2f589b86b32"
+    }
+  },
+  {
+    "ts": "2026-04-20T03:03:45.361293+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "406f26ab-0acd-4c1e-bcf0-c0f8638a7f8c",
+      "blob_path": "memory/vault/claims/406f26ab-0acd-4c1e-bcf0-c0f8638a7f8c.md",
+      "entity_id": "living/livy-memory-bot#21",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-20T03:03:45.365188+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "ccc71056-1590-4982-8719-8a66e90012b6",
+      "blob_path": "memory/vault/claims/ccc71056-1590-4982-8719-8a66e90012b6.md",
+      "entity_id": "living/livy-memory-bot#21",
+      "claim_type": "linkage"
+    }
+  },
+  {
+    "ts": "2026-04-20T03:03:45.370424+00:00",
+    "source": "github",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#21",
+      "claims_written": 2,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-20T03:03:45.386781+00:00",
+    "source": "github",
+    "action": "event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#21",
+      "content_key": "github:21:c56324c1a276b59b42af6a6b8fbd0769adab37afe290edb019ec83c50849ca49"
+    }
+  },
+  {
+    "ts": "2026-04-20T03:03:47.160106+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "84368ad9-c09f-464c-8e07-fa3f2902f05d",
+      "blob_path": "memory/vault/claims/84368ad9-c09f-464c-8e07-fa3f2902f05d.md",
+      "entity_id": "living/livy-memory-bot#22",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-20T03:03:47.167895+00:00",
+    "source": "github",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#22",
+      "claims_written": 1,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-20T03:03:47.179688+00:00",
+    "source": "github",
+    "action": "event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#22",
+      "content_key": "github:22:6cf41b8abd32037fe3b3288eed17df6cd192bc84f5ebcd809fa8198e800e64c2"
+    }
+  },
+  {
+    "ts": "2026-04-20T03:03:49.321087+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "af956451-2ae1-41dd-8884-56a353943ecc",
+      "blob_path": "memory/vault/claims/af956451-2ae1-41dd-8884-56a353943ecc.md",
+      "entity_id": "living/livy-memory-bot#23",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-20T03:03:49.327464+00:00",
+    "source": "github",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#23",
+      "claims_written": 1,
+      "claims_superseded": 0
+    }
+  },
+  {
+    "ts": "2026-04-20T03:03:49.344292+00:00",
+    "source": "github",
+    "action": "event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#23",
+      "content_key": "github:23:dc2e6c8eb14a8745f36a28db539ec6e556fc53d00270d75cbf2747d577b74033"
+    }
+  },
+  {
+    "ts": "2026-04-20T03:03:49.350461+00:00",
+    "source": "github",
+    "action": "run_finished",
+    "data": {
+      "events_processed": 11,
+      "events_skipped": 0
+    }
+  },
+  {
+    "ts": "2026-04-20T09:02:48.703932+00:00",
+    "source": "github",
+    "action": "run_started",
+    "data": {
+      "last_seen_at": "2026-04-20T03:03:49.336486+00:00",
+      "wiki_v2_active": true
+    }
+  },
+  {
+    "ts": "2026-04-20T09:02:51.043175+00:00",
+    "source": "github",
+    "action": "run_finished",
+    "data": {
+      "events_processed": 0,
+      "events_skipped": 0
+    }
+  },
+  {
+    "ts": "2026-04-20T15:21:52.551408+00:00",
+    "source": "github",
+    "action": "run_started",
+    "data": {
+      "last_seen_at": "2026-04-20T03:03:49.336486+00:00",
+      "wiki_v2_active": true
+    }
+  },
+  {
+    "ts": "2026-04-20T15:21:54.957842+00:00",
+    "source": "github",
+    "action": "run_finished",
+    "data": {
+      "events_processed": 0,
+      "events_skipped": 0
+    }
+  },
+  {
+    "ts": "2026-04-20T21:03:43.752596+00:00",
+    "source": "github",
+    "action": "run_started",
+    "data": {
+      "last_seen_at": "2026-04-20T03:03:49.336486+00:00",
+      "wiki_v2_active": true
+    }
+  },
+  {
+    "ts": "2026-04-20T21:03:45.874771+00:00",
+    "source": "github",
+    "action": "run_finished",
+    "data": {
+      "events_processed": 0,
+      "events_skipped": 0
+    }
+  },
+  {
+    "ts": "2026-04-21T10:01:43.968427+00:00",
+    "source": "github",
+    "action": "run_started",
+    "data": {
+      "last_seen_at": "2026-04-20T03:03:49.336486+00:00",
+      "wiki_v2_active": true
+    }
+  },
+  {
+    "ts": "2026-04-21T10:01:46.184288+00:00",
+    "source": "github",
+    "action": "run_finished",
+    "data": {
+      "events_processed": 0,
+      "events_skipped": 0
+    }
+  },
+  {
+    "ts": "2026-04-21T15:02:54.614919+00:00",
+    "source": "github",
+    "action": "run_started",
+    "data": {
+      "last_seen_at": "2026-04-20T03:03:49.336486+00:00",
+      "wiki_v2_active": true
+    }
+  },
+  {
+    "ts": "2026-04-21T15:02:57.080359+00:00",
+    "source": "github",
+    "action": "run_finished",
+    "data": {
+      "events_processed": 0,
+      "events_skipped": 0
+    }
+  },
+  {
+    "ts": "2026-04-21T21:03:17.920414+00:00",
+    "source": "github",
+    "action": "run_started",
+    "data": {
+      "last_seen_at": "2026-04-20T03:03:49.336486+00:00",
+      "wiki_v2_active": true
+    }
+  },
+  {
+    "ts": "2026-04-21T21:03:19.692777+00:00",
+    "source": "github",
+    "action": "run_finished",
+    "data": {
+      "events_processed": 0,
+      "events_skipped": 0
+    }
+  },
+  {
+    "ts": "2026-04-22T00:28:01.038865+00:00",
+    "source": "github",
+    "action": "run_started",
+    "data": {
+      "last_seen_at": "2026-04-20T03:03:49.336486+00:00",
+      "wiki_v2_active": true
+    }
+  },
+  {
+    "ts": "2026-04-22T00:28:06.351017+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "907962e9-f8f5-4b89-a7be-2a7858aaafc6",
+      "blob_path": "memory/vault/claims/907962e9-f8f5-4b89-a7be-2a7858aaafc6.md",
+      "entity_id": "living/livy-memory-bot#24",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:28:06.377584+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "1b8452a2-9f1f-4292-8b4b-c716ca359840",
+      "blob_path": "memory/vault/claims/1b8452a2-9f1f-4292-8b4b-c716ca359840.md",
+      "entity_id": "living/livy-memory-bot#24",
+      "claim_type": "linkage"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:28:06.392715+00:00",
+    "source": "github",
+    "action": "wiki_v2_event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#24",
+      "claims_written": 2,
+      "claims_superseded": 0,
+      "decision_keys_persisted": 0,
+      "linkage_keys_persisted": 1
+    }
+  },
+  {
+    "ts": "2026-04-22T00:28:06.462052+00:00",
+    "source": "github",
+    "action": "event_processed",
+    "data": {
+      "event_key": "github:pr_merged:living/livy-memory-bot#24",
+      "content_key": "github:24:27f688483cca11a5e4e8da64eefa03627c6de985a87d808ceb741b19c5ffaced"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:28:06.468852+00:00",
+    "source": "github",
+    "action": "run_finished",
+    "data": {
+      "events_processed": 1,
+      "events_skipped": 0
+    }
+  },
+  {
+    "ts": "2026-04-22T00:28:15.930537+00:00",
+    "source": "github",
+    "action": "run_started",
+    "data": {
+      "last_seen_at": "2026-04-22T00:28:06.438025+00:00",
+      "wiki_v2_active": true
+    }
+  },
+  {
+    "ts": "2026-04-22T00:28:17.628608+00:00",
+    "source": "github",
+    "action": "run_finished",
+    "data": {
+      "events_processed": 0,
+      "events_skipped": 0
+    }
+  },
+  {
+    "ts": "2026-04-22T00:59:05.203147+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "931bf141-71d8-49cb-ae2c-e9e407901f5d",
+      "blob_path": "memory/vault/claims/931bf141-71d8-49cb-ae2c-e9e407901f5d.md",
+      "entity_id": "living/livy-memory-bot#24",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:59:05.226870+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "334d80b8-fa33-42f3-9f2f-8f1debd49cc8",
+      "blob_path": "memory/vault/claims/334d80b8-fa33-42f3-9f2f-8f1debd49cc8.md",
+      "entity_id": "living/livy-memory-bot#24",
+      "claim_type": "linkage"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:59:07.723580+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "92de7853-e946-42fc-b507-36a998f9769c",
+      "blob_path": "memory/vault/claims/92de7853-e946-42fc-b507-36a998f9769c.md",
+      "entity_id": "living/livy-memory-bot#23",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:59:07.726293+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "fe37a0d9-fd0e-4b10-a1d4-ce6d600ccdbe",
+      "blob_path": "memory/vault/claims/fe37a0d9-fd0e-4b10-a1d4-ce6d600ccdbe.md",
+      "entity_id": "living/livy-memory-bot#23",
+      "claim_type": "timeline_event"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:59:10.032286+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "066afd03-6ae9-4416-965f-77ca9fef99d3",
+      "blob_path": "memory/vault/claims/066afd03-6ae9-4416-965f-77ca9fef99d3.md",
+      "entity_id": "living/livy-memory-bot#22",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:59:12.585187+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "094f4841-e300-46db-950d-1637b01f9e58",
+      "blob_path": "memory/vault/claims/094f4841-e300-46db-950d-1637b01f9e58.md",
+      "entity_id": "living/livy-memory-bot#21",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:59:12.621125+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "824133d4-55b6-4e05-bac1-b7ca8eb2c845",
+      "blob_path": "memory/vault/claims/824133d4-55b6-4e05-bac1-b7ca8eb2c845.md",
+      "entity_id": "living/livy-memory-bot#21",
+      "claim_type": "linkage"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:59:15.240552+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "3e1baa41-203e-4147-bb59-a8a8e091f796",
+      "blob_path": "memory/vault/claims/3e1baa41-203e-4147-bb59-a8a8e091f796.md",
+      "entity_id": "living/livy-memory-bot#20",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:59:18.076389+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "3edd3409-a773-441b-a3bd-d438b14a2ac7",
+      "blob_path": "memory/vault/claims/3edd3409-a773-441b-a3bd-d438b14a2ac7.md",
+      "entity_id": "living/livy-memory-bot#19",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:59:18.108908+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "54a2f117-92c1-4295-aa50-1d7cd88263d9",
+      "blob_path": "memory/vault/claims/54a2f117-92c1-4295-aa50-1d7cd88263d9.md",
+      "entity_id": "living/livy-memory-bot#19",
+      "claim_type": "linkage"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:59:18.118195+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "d97f2488-2441-451d-9cc2-1224e5319412",
+      "blob_path": "memory/vault/claims/d97f2488-2441-451d-9cc2-1224e5319412.md",
+      "entity_id": "living/livy-memory-bot#19",
+      "claim_type": "linkage"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:59:18.123502+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "cf48f969-f73b-4bf3-b5f6-1a6d839fa44e",
+      "blob_path": "memory/vault/claims/cf48f969-f73b-4bf3-b5f6-1a6d839fa44e.md",
+      "entity_id": "living/livy-memory-bot#19",
+      "claim_type": "linkage"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:59:20.572449+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "34cb38ba-aacc-4545-9cf4-674bb8f0e63a",
+      "blob_path": "memory/vault/claims/34cb38ba-aacc-4545-9cf4-674bb8f0e63a.md",
+      "entity_id": "living/livy-memory-bot#18",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:59:23.270149+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "db44d31d-f4e7-4c76-9db7-c161cb83b989",
+      "blob_path": "memory/vault/claims/db44d31d-f4e7-4c76-9db7-c161cb83b989.md",
+      "entity_id": "living/livy-memory-bot#17",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:59:23.347187+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "b70dd14b-9c65-4169-9662-a69bfe7d57d8",
+      "blob_path": "memory/vault/claims/b70dd14b-9c65-4169-9662-a69bfe7d57d8.md",
+      "entity_id": "living/livy-memory-bot#17",
+      "claim_type": "linkage"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:59:23.351610+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "2bb801fa-ad33-4689-91d6-ee1519d4f94e",
+      "blob_path": "memory/vault/claims/2bb801fa-ad33-4689-91d6-ee1519d4f94e.md",
+      "entity_id": "living/livy-memory-bot#17",
+      "claim_type": "linkage"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:59:26.175964+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "3bfa5861-4da0-4722-bf1b-30fdb5dba99e",
+      "blob_path": "memory/vault/claims/3bfa5861-4da0-4722-bf1b-30fdb5dba99e.md",
+      "entity_id": "living/livy-memory-bot#16",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:59:26.204732+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "b68e38e6-df31-4d46-8548-ba05f9a442af",
+      "blob_path": "memory/vault/claims/b68e38e6-df31-4d46-8548-ba05f9a442af.md",
+      "entity_id": "living/livy-memory-bot#16",
+      "claim_type": "linkage"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:59:26.208445+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "cffa963f-7730-4682-8746-ecedf086966b",
+      "blob_path": "memory/vault/claims/cffa963f-7730-4682-8746-ecedf086966b.md",
+      "entity_id": "living/livy-memory-bot#16",
+      "claim_type": "linkage"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:59:26.211829+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "8e4206bd-8c72-4ea7-a4f5-8f6bc8e723fa",
+      "blob_path": "memory/vault/claims/8e4206bd-8c72-4ea7-a4f5-8f6bc8e723fa.md",
+      "entity_id": "living/livy-memory-bot#16",
+      "claim_type": "linkage"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:59:28.634681+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "8f45764c-3232-43f6-b525-e9d8c1b49fe1",
+      "blob_path": "memory/vault/claims/8f45764c-3232-43f6-b525-e9d8c1b49fe1.md",
+      "entity_id": "living/livy-memory-bot#15",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:59:31.204120+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "0800449a-0a6e-415b-9dd4-b899d77e6d45",
+      "blob_path": "memory/vault/claims/0800449a-0a6e-415b-9dd4-b899d77e6d45.md",
+      "entity_id": "living/livy-memory-bot#14",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:59:33.723180+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "347e5680-b9d2-4491-b086-0a01f1af5eaa",
+      "blob_path": "memory/vault/claims/347e5680-b9d2-4491-b086-0a01f1af5eaa.md",
+      "entity_id": "living/livy-memory-bot#13",
+      "claim_type": "status"
+    }
+  },
+  {
+    "ts": "2026-04-22T00:59:33.768056+00:00",
+    "source": "github",
+    "action": "wiki_v2_claim_written",
+    "data": {
+      "claim_id": "2215895e-e18a-42db-920d-32110db942c5",
+      "blob_path": "memory/vault/claims/2215895e-e18a-42db-920d-32110db942c5.md",
+      "entity_id": "living/livy-memory-bot#13",
+      "claim_type": "linkage"
+    }
+  }
+]
