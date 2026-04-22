@@ -21,10 +21,11 @@ DEFAULT_STATE = {
     "version": 1,
 }
 
-DECISION_KEY_MIN_CONFIDENCE = 0.7
-
 # Alert threshold for pending_conflicts entries (>200 → alert)
 PENDING_CONFLICTS_ALERT_THRESHOLD = 200
+
+# Minimum confidence to persist a decision_key (decisions below this are skipped)
+DECISION_KEY_MIN_CONFIDENCE = 0.7
 
 DEFAULT_STATE_PATH = Path("state/identity-graph/state.json")
 
@@ -106,15 +107,9 @@ def load_state(state_path: str | Path = DEFAULT_STATE_PATH) -> dict[str, Any]:
         raw["version"] = 1
 
     # Retroactively add trello source to legacy state files.
-    for section in (
-        "processed_event_keys",
-        "processed_content_keys",
-        "processed_decision_keys",
-        "processed_linkage_keys",
-        "last_seen_at",
-    ):
+    for section in ("processed_event_keys", "processed_content_keys", "processed_decision_keys", "processed_linkage_keys", "last_seen_at"):
         if section in raw and "trello" not in raw[section]:
-            raw[section]["trello"] = [] if section != "last_seen_at" else None
+            raw[section]["trello"] = [] if section in {"processed_event_keys", "processed_content_keys", "processed_decision_keys", "processed_linkage_keys"} else None
 
     # Retroactively add pending_conflicts to legacy state files.
     if "pending_conflicts" not in raw:
@@ -192,32 +187,24 @@ def upsert_processed_content_key(
 def upsert_processed_decision_key(
     source: str,
     decision_key: str,
-    entity_id: str,
-    claim_id: str,
-    confidence: float,
     event_at: datetime | str,
+    confidence: float,
     state_path: str | Path = DEFAULT_STATE_PATH,
 ) -> dict[str, Any]:
-    """Store a decision_key when confidence is high enough (>= 0.7).
+    """Store a decision_key in SSOT when confidence clears threshold.
 
-    Idempotent on decision_key.
+    Decision dedupe is confidence-gated to avoid over-collapsing weak signals.
     """
-    state = load_state(state_path)
     if confidence < DECISION_KEY_MIN_CONFIDENCE:
-        return state
+        return load_state(state_path)
 
+    state = load_state(state_path)
     processed = state.setdefault("processed_decision_keys", {})
     entries = processed.setdefault(source, [])
 
     existing = any(item.get("key") == decision_key for item in entries if isinstance(item, dict))
     if not existing:
-        entries.append({
-            "key": decision_key,
-            "entity_id": entity_id,
-            "claim_id": claim_id,
-            "confidence": confidence,
-            "event_at": _to_iso(event_at),
-        })
+        entries.append({"key": decision_key, "event_at": _to_iso(event_at), "confidence": float(confidence)})
 
     save_state(state, state_path)
     return state
@@ -226,16 +213,12 @@ def upsert_processed_decision_key(
 def upsert_processed_linkage_key(
     source: str,
     linkage_key: str,
-    entity_id: str,
-    source_entity_id: str,
-    target_entity_id: str,
-    linkage_type: str,
     event_at: datetime | str,
     state_path: str | Path = DEFAULT_STATE_PATH,
 ) -> dict[str, Any]:
-    """Store a linkage_key regardless of confidence.
+    """Store a linkage_key in SSOT.
 
-    Idempotent on linkage_key.
+    Linkage dedupe is unconditional (no confidence gate).
     """
     state = load_state(state_path)
     processed = state.setdefault("processed_linkage_keys", {})
@@ -243,14 +226,7 @@ def upsert_processed_linkage_key(
 
     existing = any(item.get("key") == linkage_key for item in entries if isinstance(item, dict))
     if not existing:
-        entries.append({
-            "key": linkage_key,
-            "entity_id": entity_id,
-            "source_entity_id": source_entity_id,
-            "target_entity_id": target_entity_id,
-            "linkage_type": linkage_type,
-            "event_at": _to_iso(event_at),
-        })
+        entries.append({"key": linkage_key, "event_at": _to_iso(event_at)})
 
     save_state(state, state_path)
     return state
@@ -313,18 +289,12 @@ def state_metrics(state_path: str | Path = DEFAULT_STATE_PATH) -> dict[str, dict
     decision_sections = state.get("processed_decision_keys", {})
     linkage_sections = state.get("processed_linkage_keys", {})
 
-    all_sources = (
-        set(event_sections.keys())
-        | set(content_sections.keys())
-        | set(decision_sections.keys())
-        | set(linkage_sections.keys())
-    )
+    all_sources = set(event_sections.keys()) | set(content_sections.keys()) | set(decision_sections.keys()) | set(linkage_sections.keys())
     for source in all_sources:
         event_entries = event_sections.get(source, [])
         content_entries = content_sections.get(source, [])
         decision_entries = decision_sections.get(source, [])
         linkage_entries = linkage_sections.get(source, [])
-
         event_payload = json.dumps(event_entries, ensure_ascii=False)
         content_payload = json.dumps(content_entries, ensure_ascii=False)
         decision_payload = json.dumps(decision_entries, ensure_ascii=False)

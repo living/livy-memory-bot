@@ -96,6 +96,8 @@ class TestTrelloWikiV2Production:
         with patch("vault.research.pipeline.TrelloClient") as mock_trello:
             mock_client = MagicMock()
             mock_client.fetch_events_since.return_value = [event]
+            mock_client.get_card_comments.return_value = []
+            mock_client.get_card_checklists.return_value = []
             mock_trello.return_value = mock_client
 
             result = pipeline.run()
@@ -150,6 +152,8 @@ class TestTrelloWikiV2Production:
         with patch("vault.research.pipeline.TrelloClient") as mock_trello:
             mock_client = MagicMock()
             mock_client.fetch_events_since.return_value = [event]
+            mock_client.get_card_comments.return_value = []
+            mock_client.get_card_checklists.return_value = []
             mock_trello.return_value = mock_client
 
             result = pipeline.run()
@@ -225,6 +229,8 @@ class TestTrelloWikiV2Production:
         with patch("vault.research.pipeline.TrelloClient") as mock_trello:
             mock_client = MagicMock()
             mock_client.fetch_events_since.return_value = [event]
+            mock_client.get_card_comments.return_value = []
+            mock_client.get_card_checklists.return_value = []
             mock_trello.return_value = mock_client
 
             result = pipeline.run()

@@ -13,11 +13,14 @@ from vault.research.state_store import (
     save_state,
     upsert_processed_event_key,
     upsert_processed_content_key,
+    upsert_processed_decision_key,
+    upsert_processed_linkage_key,
     compact_processed_keys,
     monthly_snapshot,
     state_metrics,
     DEFAULT_STATE,
     PENDING_CONFLICTS_ALERT_THRESHOLD,
+    DECISION_KEY_MIN_CONFIDENCE,
     get_pending_conflicts,
     add_pending_conflict,
     resolve_pending_conflicts,
@@ -31,6 +34,8 @@ from vault.research.state_store import (
 FULL_STATE = {
     "processed_event_keys": {"github": [], "tldv": [], "trello": []},
     "processed_content_keys": {"github": [], "tldv": [], "trello": []},
+    "processed_decision_keys": {"github": [], "tldv": [], "trello": []},
+    "processed_linkage_keys": {"github": [], "tldv": [], "trello": []},
     "last_seen_at": {"github": None, "tldv": None, "trello": None},
     "pending_conflicts": [],
     "version": 1,
@@ -51,12 +56,16 @@ def tmp_state_file(tmp_path):
 
 
 def test_default_state_has_trello_sources():
-    """Trello must be present in processed_event_keys/content_keys and last_seen_at."""
+    """Trello must be present in processed key sections and last_seen_at."""
     assert "trello" in DEFAULT_STATE["processed_event_keys"]
     assert "trello" in DEFAULT_STATE["processed_content_keys"]
+    assert "trello" in DEFAULT_STATE["processed_decision_keys"]
+    assert "trello" in DEFAULT_STATE["processed_linkage_keys"]
     assert "trello" in DEFAULT_STATE["last_seen_at"]
     assert DEFAULT_STATE["processed_event_keys"]["trello"] == []
     assert DEFAULT_STATE["processed_content_keys"]["trello"] == []
+    assert DEFAULT_STATE["processed_decision_keys"]["trello"] == []
+    assert DEFAULT_STATE["processed_linkage_keys"]["trello"] == []
     assert DEFAULT_STATE["last_seen_at"]["trello"] is None
 
 
@@ -132,6 +141,24 @@ def test_load_state_adds_pending_conflicts_if_missing(tmp_path):
     assert state["pending_conflicts"] == []
 
 
+def test_load_state_adds_decision_and_linkage_sections_if_missing(tmp_path):
+    """Legacy state without decision/linkage sections should get them added on load."""
+    legacy = {
+        "processed_event_keys": {"github": [], "tldv": [], "trello": []},
+        "processed_content_keys": {"github": [], "tldv": [], "trello": []},
+        "last_seen_at": {"github": None, "tldv": None, "trello": None},
+        "pending_conflicts": [],
+        "version": 1,
+    }
+    p = tmp_path / "state.json"
+    p.write_text(json.dumps(legacy))
+    state = load_state(p)
+    assert "processed_decision_keys" in state
+    assert "processed_linkage_keys" in state
+    assert state["processed_decision_keys"] == {"github": [], "tldv": [], "trello": []}
+    assert state["processed_linkage_keys"] == {"github": [], "tldv": [], "trello": []}
+
+
 # ---------------------------------------------------------------------------
 # save_state
 # ---------------------------------------------------------------------------
@@ -192,6 +219,58 @@ def test_upsert_trello_source(tmp_state_file):
     state = upsert_processed_event_key("trello", "trello:card:42", event_at, tmp_state_file)
     keys = [e["key"] for e in state["processed_event_keys"]["trello"]]
     assert "trello:card:42" in keys
+
+
+# ---------------------------------------------------------------------------
+# upsert_processed_decision_key
+# ---------------------------------------------------------------------------
+
+
+def test_decision_key_gate_below_threshold_is_skipped(tmp_state_file):
+    """Decision key below DECISION_KEY_MIN_CONFIDENCE is not persisted."""
+    event_at = datetime(2026, 4, 18, 12, 0, 0, tzinfo=timezone.utc)
+    state = upsert_processed_decision_key("github", "decision:github:42:abc", event_at, 0.5, tmp_state_file)
+    keys = [e["key"] for e in state["processed_decision_keys"]["github"]]
+    assert "decision:github:42:abc" not in keys
+
+
+def test_decision_key_gate_at_threshold_is_persisted(tmp_state_file):
+    """Decision key at exactly DECISION_KEY_MIN_CONFIDENCE is persisted."""
+    event_at = datetime(2026, 4, 18, 12, 0, 0, tzinfo=timezone.utc)
+    state = upsert_processed_decision_key("github", "decision:github:42:abc", event_at, DECISION_KEY_MIN_CONFIDENCE, tmp_state_file)
+    keys = [e["key"] for e in state["processed_decision_keys"]["github"]]
+    assert "decision:github:42:abc" in keys
+
+
+def test_decision_key_is_idempotent(tmp_state_file):
+    """Duplicate decision_key entries are not created."""
+    event_at = datetime(2026, 4, 18, 12, 0, 0, tzinfo=timezone.utc)
+    upsert_processed_decision_key("github", "decision:github:99:def", event_at, 0.9, tmp_state_file)
+    state = upsert_processed_decision_key("github", "decision:github:99:def", event_at, 0.9, tmp_state_file)
+    keys = [e["key"] for e in state["processed_decision_keys"]["github"]]
+    assert keys.count("decision:github:99:def") == 1
+
+
+# ---------------------------------------------------------------------------
+# upsert_processed_linkage_key
+# ---------------------------------------------------------------------------
+
+
+def test_linkage_key_is_persisted_unconditionally(tmp_state_file):
+    """Linkage key has no confidence gate and is always persisted."""
+    event_at = datetime(2026, 4, 18, 12, 0, 0, tzinfo=timezone.utc)
+    state = upsert_processed_linkage_key("github", "linkage:github:42:xyz", event_at, tmp_state_file)
+    keys = [e["key"] for e in state["processed_linkage_keys"]["github"]]
+    assert "linkage:github:42:xyz" in keys
+
+
+def test_linkage_key_is_idempotent(tmp_state_file):
+    """Duplicate linkage_key entries are not created."""
+    event_at = datetime(2026, 4, 18, 12, 0, 0, tzinfo=timezone.utc)
+    upsert_processed_linkage_key("github", "linkage:github:99:uvw", event_at, tmp_state_file)
+    state = upsert_processed_linkage_key("github", "linkage:github:99:uvw", event_at, tmp_state_file)
+    keys = [e["key"] for e in state["processed_linkage_keys"]["github"]]
+    assert keys.count("linkage:github:99:uvw") == 1
 
 
 # ---------------------------------------------------------------------------

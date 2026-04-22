@@ -27,7 +27,16 @@ from typing import Any
 
 from vault.research.event_key import build_event_key
 from vault.research.identity_resolver import resolve_identity
-from vault.research.state_store import DEFAULT_STATE, load_state, save_state, upsert_processed_event_key, upsert_processed_content_key
+from vault.research.state_store import (
+    DEFAULT_STATE,
+    DECISION_KEY_MIN_CONFIDENCE,
+    load_state,
+    save_state,
+    upsert_processed_event_key,
+    upsert_processed_content_key,
+    upsert_processed_decision_key,
+    upsert_processed_linkage_key,
+)
 from vault.research.github_client import GitHubClient
 from vault.research.github_rich_client import GitHubRichClient, extract_github_refs, extract_trello_urls
 from vault.research.github_parsers import pr_to_claims
@@ -166,6 +175,19 @@ class ResearchPipeline:
             if isinstance(item, dict) and isinstance(item.get("key"), str)
         }
 
+        decision_entries = self.state.get("processed_decision_keys", {}).get(self.source, [])
+        self.processed_decision_keys = {
+            item.get("key")
+            for item in decision_entries
+            if isinstance(item, dict) and isinstance(item.get("key"), str)
+        }
+
+        linkage_entries = self.state.get("processed_linkage_keys", {}).get(self.source, [])
+        self.processed_linkage_keys = {
+            item.get("key")
+            for item in linkage_entries
+            if isinstance(item, dict) and isinstance(item.get("key"), str)
+        }
 
     @staticmethod
     def _parse_iso(iso_value: str | None) -> datetime | None:
@@ -329,6 +351,27 @@ class ResearchPipeline:
         canonical = json.dumps(base_content, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
         content_hash = self._compute_content_hash(canonical)
         return f"{self.source}:{source_id}:{content_hash}"
+
+    def _build_decision_key(self, normalized_claim: dict[str, Any]) -> str:
+        """Build decision key from a normalized claim dict.
+
+        Decision key = SHA256 of (entity_id + claim.text), used for semantic
+        deduplication of decision claims (confidence-gated at 0.7).
+        """
+        entity_id = str(normalized_claim.get("entity_id", ""))
+        text = str(normalized_claim.get("text", ""))
+        return f"decision:{self.source}:{entity_id}:{_hash16(text)}"
+
+    def _build_linkage_key(self, normalized_claim: dict[str, Any]) -> str:
+        """Build linkage key from a normalized claim dict.
+
+        Linkage key = SHA256 of (entity_id + link_url), used for semantic
+        deduplication of linkage claims (no confidence gate).
+        """
+        entity_id = str(normalized_claim.get("entity_id", ""))
+        metadata = normalized_claim.get("metadata", {}) or {}
+        link_url = str(metadata.get("link_url", ""))
+        return f"linkage:{self.source}:{entity_id}:{_hash16(link_url)}"
 
     def _is_duplicate(self, event: dict[str, Any]) -> bool:
         return self._calculate_event_key(event) in self.processed_event_keys
@@ -553,6 +596,8 @@ class ResearchPipeline:
             "last_seen_at": ssot.get("last_seen_at", {}).get(self.source),
             "processed_event_keys": ssot.get("processed_event_keys", {}).get(self.source, []),
             "processed_content_keys": ssot.get("processed_content_keys", {}).get(self.source, []),
+            "processed_decision_keys": ssot.get("processed_decision_keys", {}).get(self.source, []),
+            "processed_linkage_keys": ssot.get("processed_linkage_keys", {}).get(self.source, []),
         }
         cache_path = self.research_dir / "state.json"
         cache_path.write_text(json.dumps(cache, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -705,8 +750,11 @@ class ResearchPipeline:
                     existing_claims.append(c)
 
         event_key = self._calculate_event_key(event)
+        event_at = self._event_at(event)
         superseded_total = 0
         written = 0
+        decision_keys_persisted = 0
+        linkage_keys_persisted = 0
 
         for idx, normalized in enumerate(claims_normalized):
             new_claim = self._new_claim_from_normalized(normalized, event_key, idx)
@@ -723,6 +771,22 @@ class ResearchPipeline:
             claims_raw.append(self._claim_to_state_dict(result.fused_claim))
             existing_claims.append(result.fused_claim)
             blob_path = self._write_claim_blob(result.fused_claim)
+
+            claim_type = str(normalized.get("claim_type", "")).lower()
+            if claim_type == "decision":
+                decision_key = self._build_decision_key(normalized)
+                confidence = float(getattr(result.fused_claim, "confidence", 0.0) or 0.0)
+                if confidence >= DECISION_KEY_MIN_CONFIDENCE and decision_key not in self.processed_decision_keys:
+                    upsert_processed_decision_key(self.source, decision_key, event_at, confidence, self.state_path)
+                    self.processed_decision_keys.add(decision_key)
+                    decision_keys_persisted += 1
+            elif claim_type == "linkage":
+                linkage_key = self._build_linkage_key(normalized)
+                if linkage_key not in self.processed_linkage_keys:
+                    upsert_processed_linkage_key(self.source, linkage_key, event_at, self.state_path)
+                    self.processed_linkage_keys.add(linkage_key)
+                    linkage_keys_persisted += 1
+
             self._log_audit(
                 "wiki_v2_claim_written",
                 {
@@ -736,7 +800,12 @@ class ResearchPipeline:
 
         state["claims"] = claims_raw
         save_state(state, self.state_path)
-        return {"claims_written": written, "claims_superseded": superseded_total}
+        return {
+            "claims_written": written,
+            "claims_superseded": superseded_total,
+            "decision_keys_persisted": decision_keys_persisted,
+            "linkage_keys_persisted": linkage_keys_persisted,
+        }
 
     def _process_wiki_v2_github_event(self, event: dict[str, Any], payload: dict[str, Any]) -> dict[str, Any]:
         pr_number = payload.get("pr_number") or event.get("pr_number")
@@ -767,7 +836,7 @@ class ResearchPipeline:
         claims_normalized = pr_to_claims(pr_payload, payload.get("reviews", []) if isinstance(payload, dict) else [])
         return self._fuse_and_persist_normalized_claims(event, claims_normalized)
 
-    def _process_wiki_v2_trello_event(self, event: dict[str, Any]) -> dict[str, Any]:
+    def _process_wiki_v2_trello_event(self, event: dict[str, Any], payload: dict[str, Any]) -> dict[str, Any]:
         card_id = str(event.get("card_id", ""))
         if not card_id:
             return {"claims_written": 0, "claims_superseded": 0}
@@ -777,12 +846,14 @@ class ResearchPipeline:
             "name": event.get("card_name", ""),
             "url": event.get("card_url", f"https://trello.com/c/{card_id}"),
             "idBoard": event.get("board_id", ""),
-            "desc": "\n".join(event.get("github_links", [])) if isinstance(event.get("github_links"), list) else "",
-            "labels": event.get("labels", []) if isinstance(event.get("labels"), list) else [],
-            "due": event.get("due_date"),
-            "dateLastActivity": event.get("timestamp") or event.get("event_at"),
+            "desc": str(payload.get("desc") or ""),
+            "labels": payload.get("labels", []) if isinstance(payload.get("labels"), list) else [],
+            "due": payload.get("due") or event.get("due_date"),
+            "dateLastActivity": payload.get("dateLastActivity") or event.get("timestamp") or event.get("event_at"),
+            "_comments": payload.get("_comments", []) if isinstance(payload.get("_comments"), list) else [],
+            "_checklists": payload.get("_checklists", []) if isinstance(payload.get("_checklists"), list) else [],
         }
-        list_name = str(event.get("list_id") or "unknown")
+        list_name = str(event.get("list_name") or payload.get("list_name") or event.get("list_id") or "unknown")
         parsed = parse_trello_card(card_payload, list_name=list_name)
         claims_normalized = card_to_claims(parsed)
         return self._fuse_and_persist_normalized_claims(event, claims_normalized)
@@ -859,7 +930,13 @@ class ResearchPipeline:
                 if pr_number is not None and repo:
                     payload = rich_client.normalize_rich_event(pr_number, repo)
             else:
-                payload = event  # Trello events are already normalized
+                payload = dict(event)  # Trello events are normalized; enrich with card details for wiki v2
+                card_id = payload.get("card_id")
+                if self.wiki_v2_active and card_id:
+                    comments = client.get_card_comments(card_id)
+                    checklists = client.get_card_checklists(card_id)
+                    payload["_comments"] = comments if isinstance(comments, list) else []
+                    payload["_checklists"] = checklists if isinstance(checklists, list) else []
 
             _ = self._build_context(payload)
 
@@ -937,7 +1014,7 @@ class ResearchPipeline:
                 if self.source == "github" and isinstance(payload, dict):
                     v2_stats = self._process_wiki_v2_github_event(event, payload)
                 elif self.source == "trello":
-                    v2_stats = self._process_wiki_v2_trello_event(event)
+                    v2_stats = self._process_wiki_v2_trello_event(event, payload)
                 elif self.source == "tldv" and isinstance(payload, dict):
                     v2_stats = self._process_wiki_v2_tldv_event(event, payload)
 
