@@ -14,6 +14,8 @@ from typing import Any
 DEFAULT_STATE = {
     "processed_event_keys": {"github": [], "tldv": [], "trello": []},
     "processed_content_keys": {"github": [], "tldv": [], "trello": []},
+    "processed_decision_keys": {"github": [], "tldv": [], "trello": []},
+    "processed_linkage_keys": {"github": [], "tldv": [], "trello": []},
     "last_seen_at": {"github": None, "tldv": None, "trello": None},
     "pending_conflicts": [],
     "version": 1,
@@ -21,6 +23,9 @@ DEFAULT_STATE = {
 
 # Alert threshold for pending_conflicts entries (>200 → alert)
 PENDING_CONFLICTS_ALERT_THRESHOLD = 200
+
+# Minimum confidence to persist a decision_key (decisions below this are skipped)
+DECISION_KEY_MIN_CONFIDENCE = 0.7
 
 DEFAULT_STATE_PATH = Path("state/identity-graph/state.json")
 
@@ -92,15 +97,19 @@ def load_state(state_path: str | Path = DEFAULT_STATE_PATH) -> dict[str, Any]:
         raw["processed_event_keys"] = {"github": [], "tldv": [], "trello": []}
     if "processed_content_keys" not in raw:
         raw["processed_content_keys"] = {"github": [], "tldv": [], "trello": []}
+    if "processed_decision_keys" not in raw:
+        raw["processed_decision_keys"] = {"github": [], "tldv": [], "trello": []}
+    if "processed_linkage_keys" not in raw:
+        raw["processed_linkage_keys"] = {"github": [], "tldv": [], "trello": []}
     if "last_seen_at" not in raw:
         raw["last_seen_at"] = {"github": None, "tldv": None, "trello": None}
     if "version" not in raw:
         raw["version"] = 1
 
     # Retroactively add trello source to legacy state files.
-    for section in ("processed_event_keys", "processed_content_keys", "last_seen_at"):
+    for section in ("processed_event_keys", "processed_content_keys", "processed_decision_keys", "processed_linkage_keys", "last_seen_at"):
         if section in raw and "trello" not in raw[section]:
-            raw[section]["trello"] = [] if section in {"processed_event_keys", "processed_content_keys"} else None
+            raw[section]["trello"] = [] if section in {"processed_event_keys", "processed_content_keys", "processed_decision_keys", "processed_linkage_keys"} else None
 
     # Retroactively add pending_conflicts to legacy state files.
     if "pending_conflicts" not in raw:
@@ -175,6 +184,54 @@ def upsert_processed_content_key(
     return state
 
 
+def upsert_processed_decision_key(
+    source: str,
+    decision_key: str,
+    event_at: datetime | str,
+    confidence: float,
+    state_path: str | Path = DEFAULT_STATE_PATH,
+) -> dict[str, Any]:
+    """Store a decision_key in SSOT when confidence clears threshold.
+
+    Decision dedupe is confidence-gated to avoid over-collapsing weak signals.
+    """
+    if confidence < DECISION_KEY_MIN_CONFIDENCE:
+        return load_state(state_path)
+
+    state = load_state(state_path)
+    processed = state.setdefault("processed_decision_keys", {})
+    entries = processed.setdefault(source, [])
+
+    existing = any(item.get("key") == decision_key for item in entries if isinstance(item, dict))
+    if not existing:
+        entries.append({"key": decision_key, "event_at": _to_iso(event_at), "confidence": float(confidence)})
+
+    save_state(state, state_path)
+    return state
+
+
+def upsert_processed_linkage_key(
+    source: str,
+    linkage_key: str,
+    event_at: datetime | str,
+    state_path: str | Path = DEFAULT_STATE_PATH,
+) -> dict[str, Any]:
+    """Store a linkage_key in SSOT.
+
+    Linkage dedupe is unconditional (no confidence gate).
+    """
+    state = load_state(state_path)
+    processed = state.setdefault("processed_linkage_keys", {})
+    entries = processed.setdefault(source, [])
+
+    existing = any(item.get("key") == linkage_key for item in entries if isinstance(item, dict))
+    if not existing:
+        entries.append({"key": linkage_key, "event_at": _to_iso(event_at)})
+
+    save_state(state, state_path)
+    return state
+
+
 def compact_processed_keys(
     retention_days: int = 180,
     state_path: str | Path = DEFAULT_STATE_PATH,
@@ -202,6 +259,8 @@ def compact_processed_keys(
 
     _compact_section("processed_event_keys")
     _compact_section("processed_content_keys")
+    _compact_section("processed_decision_keys")
+    _compact_section("processed_linkage_keys")
 
     save_state(state, state_path)
     return state
@@ -215,6 +274,8 @@ def monthly_snapshot(state_path: str | Path = DEFAULT_STATE_PATH) -> dict[str, A
         "last_seen_at": copy.deepcopy(state.get("last_seen_at", {})),
         "processed_event_keys": copy.deepcopy(state.get("processed_event_keys", {})),
         "processed_content_keys": copy.deepcopy(state.get("processed_content_keys", {})),
+        "processed_decision_keys": copy.deepcopy(state.get("processed_decision_keys", {})),
+        "processed_linkage_keys": copy.deepcopy(state.get("processed_linkage_keys", {})),
     }
     return snapshot
 
@@ -225,19 +286,29 @@ def state_metrics(state_path: str | Path = DEFAULT_STATE_PATH) -> dict[str, dict
 
     event_sections = state.get("processed_event_keys", {})
     content_sections = state.get("processed_content_keys", {})
+    decision_sections = state.get("processed_decision_keys", {})
+    linkage_sections = state.get("processed_linkage_keys", {})
 
-    all_sources = set(event_sections.keys()) | set(content_sections.keys())
+    all_sources = set(event_sections.keys()) | set(content_sections.keys()) | set(decision_sections.keys()) | set(linkage_sections.keys())
     for source in all_sources:
         event_entries = event_sections.get(source, [])
         content_entries = content_sections.get(source, [])
+        decision_entries = decision_sections.get(source, [])
+        linkage_entries = linkage_sections.get(source, [])
         event_payload = json.dumps(event_entries, ensure_ascii=False)
         content_payload = json.dumps(content_entries, ensure_ascii=False)
+        decision_payload = json.dumps(decision_entries, ensure_ascii=False)
+        linkage_payload = json.dumps(linkage_entries, ensure_ascii=False)
 
         result[source] = {
             "key_count": len(event_entries),
             "size_bytes": len(event_payload.encode("utf-8")),
             "content_key_count": len(content_entries),
             "content_size_bytes": len(content_payload.encode("utf-8")),
+            "decision_key_count": len(decision_entries),
+            "decision_size_bytes": len(decision_payload.encode("utf-8")),
+            "linkage_key_count": len(linkage_entries),
+            "linkage_size_bytes": len(linkage_payload.encode("utf-8")),
         }
 
     return result

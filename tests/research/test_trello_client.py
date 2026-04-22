@@ -228,3 +228,31 @@ def test_fetch_events_since_uses_env_vars(mocker):
 
     # Should have made 2 calls (one per board)
     assert mock_get.call_count == 2
+
+
+def test_get_card_comments_calls_comment_card_endpoint(mocker):
+    mock_get = mocker.patch("requests.get")
+    mock_get.return_value.status_code = 200
+    mock_get.return_value.json.return_value = [{"id": "a1"}]
+
+    client = TrelloClient(api_key="k", token="t", board_ids=[])
+    out = client.get_card_comments("card-123")
+
+    assert out == [{"id": "a1"}]
+    args, kwargs = mock_get.call_args
+    assert args[0].endswith("/cards/card-123/actions")
+    assert kwargs["params"]["filter"] == "commentCard"
+
+
+def test_get_card_checklists_calls_card_checklists_endpoint(mocker):
+    mock_get = mocker.patch("requests.get")
+    mock_get.return_value.status_code = 200
+    mock_get.return_value.json.return_value = [{"id": "chk-1"}]
+
+    client = TrelloClient(api_key="k", token="t", board_ids=[])
+    out = client.get_card_checklists("card-123")
+
+    assert out == [{"id": "chk-1"}]
+    args, kwargs = mock_get.call_args
+    assert args[0].endswith("/cards/card-123/checklists")
+    assert "filter" not in kwargs["params"]

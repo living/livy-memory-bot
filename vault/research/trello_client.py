@@ -174,6 +174,47 @@ class TrelloClient:
 
         return normalized_cards
 
+    def get_card_comments(self, card_id: str) -> list[dict[str, Any]]:
+        """Fetch commentCard actions for a card.
+
+        Returns a list of dicts with at least {id, date, data: {text, creator: {fullName}}}.
+        """
+        params: dict[str, Any] = {
+            "key": self.api_key,
+            "token": self.token,
+            "filter": "commentCard",
+        }
+        url = f"{TRELLO_API_BASE}/cards/{card_id}/actions"
+        try:
+            response = requests.get(url, params=params, timeout=30)
+            if response.status_code != 200:
+                logger.warning("Failed to fetch comments for card %s: HTTP %s", card_id, response.status_code)
+                return []
+            return response.json() or []
+        except Exception as exc:
+            logger.warning("Exception fetching comments for card %s: %s", card_id, exc)
+            return []
+
+    def get_card_checklists(self, card_id: str) -> list[dict[str, Any]]:
+        """Fetch checklists for a card.
+
+        Returns a list of dicts with {id, name, checkItems: [{id, name, state}]}.
+        """
+        params: dict[str, Any] = {
+            "key": self.api_key,
+            "token": self.token,
+        }
+        url = f"{TRELLO_API_BASE}/cards/{card_id}/checklists"
+        try:
+            response = requests.get(url, params=params, timeout=30)
+            if response.status_code != 200:
+                logger.warning("Failed to fetch checklists for card %s: HTTP %s", card_id, response.status_code)
+                return []
+            return response.json() or []
+        except Exception as exc:
+            logger.warning("Exception fetching checklists for card %s: %s", card_id, exc)
+            return []
+
     def _fetch_list_name(self, list_id: str) -> str:
         """Fetch Trello list name from list id."""
         if not list_id:
