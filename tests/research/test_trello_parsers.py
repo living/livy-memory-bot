@@ -354,6 +354,14 @@ class TestTrelloCompletionListDecision:
         assert dec["entity_id"] == "card-concluido-test"
         assert "concluido" in dec["text"].lower() or "concluído" in dec["text"].lower()
 
+    def test_concluido_card_also_produces_linkage_to_delivery_stage(self):
+        """Completion-list cards should produce linkage claim to delivery stage."""
+        card = _make_concluido_card("Concluído 🎉 (Entregue)")
+        claims = card_to_claims(card)
+        linkage = [c for c in claims if c["claim_type"] == "linkage"]
+        assert len(linkage) >= 1
+        assert any(c.get("metadata", {}).get("link_type") == "trello_delivery_stage" for c in linkage)
+
 
 # =============================================================================
 # QUICK WIN: github_links already work as linkage — validate existing behavior
@@ -388,7 +396,7 @@ class TestTrelloGithubLinkage:
     def test_github_links_in_metadata(self):
         card = _make_card_with_gh_links(["https://github.com/living/repo/pull/99"])
         claims = card_to_claims(card)
-        link = next((c for c in claims if c["claim_type"] == "linkage"), None)
-        assert link is not None
-        assert link["metadata"]["link_url"] == "https://github.com/living/repo/pull/99"
-        assert link["metadata"]["link_type"] == "github"
+        gh_link = next((c for c in claims if c["claim_type"] == "linkage" and c["metadata"].get("link_type") == "github"), None)
+        assert gh_link is not None, f"Expected github linkage in {claims}"
+        assert gh_link["metadata"]["link_url"] == "https://github.com/living/repo/pull/99"
+        assert gh_link["metadata"]["link_type"] == "github"

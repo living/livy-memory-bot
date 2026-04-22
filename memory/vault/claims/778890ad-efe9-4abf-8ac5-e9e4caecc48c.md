@@ -1,0 +1,12 @@
+# Claim 778890ad-efe9-4abf-8ac5-e9e4caecc48c
+
+- source: trello
+- entity_type: project
+- entity_id: 683da7140941754740199c16
+- claim_type: linkage
+- confidence: 0.300
+- event_timestamp: 2025-07-09T18:34:50.990Z
+- superseded_by: -
+
+## Text
+Card vinculado ao estágio de entrega: Concluído 🎉 (Entregue)

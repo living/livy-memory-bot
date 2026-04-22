@@ -636,3 +636,28 @@ QUALITY_GUARDRAIL_CONSECUTIVE_TRIGGER = 3   # era 2
 
 ---
 
+## 2026-04-22 02:10 UTC — Quick Win #2: Trello completion → linkage claim
+
+### O que foi feito
+- Quick win #1 já fez decision coverage subir para 25.62%
+- Gap restante: pct_linkage = 2.16% (threshold 3.0%)
+- Regra: cards em completion list também geram linkage claim (delivery_stage)
+- TDD: RED → GREEN em test_trello_parsers.py
+
+### Resultado
+| Métrica | Antes | Depois |
+|---|---|---|
+| total | 1296 | 1974 |
+| decision | 304 | 530 |
+| linkage | 28 | 254 |
+| coverage | 25.62% | 39.72% |
+
+### Guardrail Option B
+- passed: True ✅
+- pct_decision: 26.85% ✅ (threshold 0.7%)
+- pct_linkage: 12.87% ✅ (threshold 3.0%)
+- decision_count_30d: 46 ✅
+- consecutive_bad_cycles: 0 ✅
+
+---
+

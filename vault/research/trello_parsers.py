@@ -180,6 +180,24 @@ def card_to_claims(card: ParsedTrelloCard) -> list[dict[str, Any]]:
                 "confidence": 0.70,
             }
         )
+        claims.append(
+            {
+                "source": "trello",
+                "claim_type": "linkage",
+                "entity_type": "project",
+                "entity_id": card.card_id,
+                "text": f"Card vinculado ao estágio de entrega: {card.list_name}",
+                "event_timestamp": card.last_activity,
+                "source_ref": {"source_id": card.card_id, "url": card.card_url},
+                "metadata": {
+                    "link_type": "trello_delivery_stage",
+                    "target": "delivery_stage",
+                    "list_name": card.list_name,
+                    "board_id": card.board_id,
+                },
+                "confidence": 0.65,
+            }
+        )
 
     for github_link in card.github_links:
         claims.append(
