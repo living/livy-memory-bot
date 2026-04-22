@@ -187,13 +187,16 @@ def upsert_processed_content_key(
 def upsert_processed_decision_key(
     source: str,
     decision_key: str,
-    event_at: datetime | str,
+    entity_id: str,
+    claim_id: str,
     confidence: float,
+    event_at: datetime | str,
     state_path: str | Path = DEFAULT_STATE_PATH,
 ) -> dict[str, Any]:
     """Store a decision_key in SSOT when confidence clears threshold.
 
     Decision dedupe is confidence-gated to avoid over-collapsing weak signals.
+    Entries store full metadata for traceability.
     """
     if confidence < DECISION_KEY_MIN_CONFIDENCE:
         return load_state(state_path)
@@ -204,7 +207,13 @@ def upsert_processed_decision_key(
 
     existing = any(item.get("key") == decision_key for item in entries if isinstance(item, dict))
     if not existing:
-        entries.append({"key": decision_key, "event_at": _to_iso(event_at), "confidence": float(confidence)})
+        entries.append({
+            "key": decision_key,
+            "entity_id": entity_id,
+            "claim_id": claim_id,
+            "confidence": float(confidence),
+            "event_at": _to_iso(event_at),
+        })
 
     save_state(state, state_path)
     return state
@@ -213,12 +222,17 @@ def upsert_processed_decision_key(
 def upsert_processed_linkage_key(
     source: str,
     linkage_key: str,
+    entity_id: str,
+    source_entity_id: str,
+    target_entity_id: str,
+    linkage_type: str,
     event_at: datetime | str,
     state_path: str | Path = DEFAULT_STATE_PATH,
 ) -> dict[str, Any]:
     """Store a linkage_key in SSOT.
 
     Linkage dedupe is unconditional (no confidence gate).
+    Entries store full metadata for traceability.
     """
     state = load_state(state_path)
     processed = state.setdefault("processed_linkage_keys", {})
@@ -226,7 +240,14 @@ def upsert_processed_linkage_key(
 
     existing = any(item.get("key") == linkage_key for item in entries if isinstance(item, dict))
     if not existing:
-        entries.append({"key": linkage_key, "event_at": _to_iso(event_at)})
+        entries.append({
+            "key": linkage_key,
+            "entity_id": entity_id,
+            "source_entity_id": source_entity_id,
+            "target_entity_id": target_entity_id,
+            "linkage_type": linkage_type,
+            "event_at": _to_iso(event_at),
+        })
 
     save_state(state, state_path)
     return state

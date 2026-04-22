@@ -229,7 +229,15 @@ def test_upsert_trello_source(tmp_state_file):
 def test_decision_key_gate_below_threshold_is_skipped(tmp_state_file):
     """Decision key below DECISION_KEY_MIN_CONFIDENCE is not persisted."""
     event_at = datetime(2026, 4, 18, 12, 0, 0, tzinfo=timezone.utc)
-    state = upsert_processed_decision_key("github", "decision:github:42:abc", event_at, 0.5, tmp_state_file)
+    state = upsert_processed_decision_key(
+        source="github",
+        decision_key="decision:github:42:abc",
+        entity_id="entity-42",
+        claim_id="claim-42",
+        confidence=0.5,
+        event_at=event_at,
+        state_path=tmp_state_file,
+    )
     keys = [e["key"] for e in state["processed_decision_keys"]["github"]]
     assert "decision:github:42:abc" not in keys
 
@@ -237,7 +245,15 @@ def test_decision_key_gate_below_threshold_is_skipped(tmp_state_file):
 def test_decision_key_gate_at_threshold_is_persisted(tmp_state_file):
     """Decision key at exactly DECISION_KEY_MIN_CONFIDENCE is persisted."""
     event_at = datetime(2026, 4, 18, 12, 0, 0, tzinfo=timezone.utc)
-    state = upsert_processed_decision_key("github", "decision:github:42:abc", event_at, DECISION_KEY_MIN_CONFIDENCE, tmp_state_file)
+    state = upsert_processed_decision_key(
+        source="github",
+        decision_key="decision:github:42:abc",
+        entity_id="entity-42",
+        claim_id="claim-42",
+        confidence=DECISION_KEY_MIN_CONFIDENCE,
+        event_at=event_at,
+        state_path=tmp_state_file,
+    )
     keys = [e["key"] for e in state["processed_decision_keys"]["github"]]
     assert "decision:github:42:abc" in keys
 
@@ -245,8 +261,24 @@ def test_decision_key_gate_at_threshold_is_persisted(tmp_state_file):
 def test_decision_key_is_idempotent(tmp_state_file):
     """Duplicate decision_key entries are not created."""
     event_at = datetime(2026, 4, 18, 12, 0, 0, tzinfo=timezone.utc)
-    upsert_processed_decision_key("github", "decision:github:99:def", event_at, 0.9, tmp_state_file)
-    state = upsert_processed_decision_key("github", "decision:github:99:def", event_at, 0.9, tmp_state_file)
+    upsert_processed_decision_key(
+        source="github",
+        decision_key="decision:github:99:def",
+        entity_id="entity-99",
+        claim_id="claim-99",
+        confidence=0.9,
+        event_at=event_at,
+        state_path=tmp_state_file,
+    )
+    state = upsert_processed_decision_key(
+        source="github",
+        decision_key="decision:github:99:def",
+        entity_id="entity-99",
+        claim_id="claim-99",
+        confidence=0.9,
+        event_at=event_at,
+        state_path=tmp_state_file,
+    )
     keys = [e["key"] for e in state["processed_decision_keys"]["github"]]
     assert keys.count("decision:github:99:def") == 1
 
@@ -259,7 +291,16 @@ def test_decision_key_is_idempotent(tmp_state_file):
 def test_linkage_key_is_persisted_unconditionally(tmp_state_file):
     """Linkage key has no confidence gate and is always persisted."""
     event_at = datetime(2026, 4, 18, 12, 0, 0, tzinfo=timezone.utc)
-    state = upsert_processed_linkage_key("github", "linkage:github:42:xyz", event_at, tmp_state_file)
+    state = upsert_processed_linkage_key(
+        source="github",
+        linkage_key="linkage:github:42:xyz",
+        entity_id="entity-42",
+        source_entity_id="from-42",
+        target_entity_id="to-42",
+        linkage_type="mentions",
+        event_at=event_at,
+        state_path=tmp_state_file,
+    )
     keys = [e["key"] for e in state["processed_linkage_keys"]["github"]]
     assert "linkage:github:42:xyz" in keys
 
@@ -267,8 +308,26 @@ def test_linkage_key_is_persisted_unconditionally(tmp_state_file):
 def test_linkage_key_is_idempotent(tmp_state_file):
     """Duplicate linkage_key entries are not created."""
     event_at = datetime(2026, 4, 18, 12, 0, 0, tzinfo=timezone.utc)
-    upsert_processed_linkage_key("github", "linkage:github:99:uvw", event_at, tmp_state_file)
-    state = upsert_processed_linkage_key("github", "linkage:github:99:uvw", event_at, tmp_state_file)
+    upsert_processed_linkage_key(
+        source="github",
+        linkage_key="linkage:github:99:uvw",
+        entity_id="entity-99",
+        source_entity_id="from-99",
+        target_entity_id="to-99",
+        linkage_type="mentions",
+        event_at=event_at,
+        state_path=tmp_state_file,
+    )
+    state = upsert_processed_linkage_key(
+        source="github",
+        linkage_key="linkage:github:99:uvw",
+        entity_id="entity-99",
+        source_entity_id="from-99",
+        target_entity_id="to-99",
+        linkage_type="mentions",
+        event_at=event_at,
+        state_path=tmp_state_file,
+    )
     keys = [e["key"] for e in state["processed_linkage_keys"]["github"]]
     assert keys.count("linkage:github:99:uvw") == 1
 

@@ -777,13 +777,31 @@ class ResearchPipeline:
                 decision_key = self._build_decision_key(normalized)
                 confidence = float(getattr(result.fused_claim, "confidence", 0.0) or 0.0)
                 if confidence >= DECISION_KEY_MIN_CONFIDENCE and decision_key not in self.processed_decision_keys:
-                    upsert_processed_decision_key(self.source, decision_key, event_at, confidence, self.state_path)
+                    upsert_processed_decision_key(
+                        source=self.source,
+                        decision_key=decision_key,
+                        entity_id=str(normalized.get("entity_id", "")),
+                        claim_id=str(result.fused_claim.claim_id),
+                        confidence=confidence,
+                        event_at=event_at,
+                        state_path=self.state_path,
+                    )
                     self.processed_decision_keys.add(decision_key)
                     decision_keys_persisted += 1
             elif claim_type == "linkage":
                 linkage_key = self._build_linkage_key(normalized)
                 if linkage_key not in self.processed_linkage_keys:
-                    upsert_processed_linkage_key(self.source, linkage_key, event_at, self.state_path)
+                    metadata = normalized.get("metadata", {}) or {}
+                    upsert_processed_linkage_key(
+                        source=self.source,
+                        linkage_key=linkage_key,
+                        entity_id=str(normalized.get("entity_id", "")),
+                        source_entity_id=str(metadata.get("from_entity") or normalized.get("entity_id", "")),
+                        target_entity_id=str(metadata.get("to_entity") or metadata.get("link_url", "")),
+                        linkage_type=str(metadata.get("relation") or metadata.get("link_type") or "linkage"),
+                        event_at=event_at,
+                        state_path=self.state_path,
+                    )
                     self.processed_linkage_keys.add(linkage_key)
                     linkage_keys_persisted += 1
 
