@@ -291,4 +291,35 @@ Review attention points documentados no docstring de `apply_merge_to_ssot`:
 
 Topic file: `memory/curated/livy-memory-agent.md`
 
-_Last updated: 2026-04-19_
+### 2026-04-22 — PR #24 mergeada: Enriched Claims Rollout (Tasks 1–9)
+
+Merge da evolução de claims com o pipeline de research v1. Decisões técnicas e linkages agoraходят com `needs_review`/`review_reason`, deduplicação semântica via `decision_key`/`linkage_key`, guardrails de qualidade, e consolidação expandida com KPIs.
+
+**Commit:** `fd0f9ac` (squash merge PR #24) | Branch: `feature/enriched-claims-impl`
+
+**Validação pós-merge:**
+- `PYTHONPATH=. pytest tests/research/ -q` → **545 passed**
+- `PYTHONPATH=. pytest tests/vault/ -q` → **140 passed**
+- 4 crons smoke: github/tldv/trello/consolidation → todos `status=success`
+- claim distribution: `status:97.4% / linkage:2.6% / decision:0%` (baseline SSOT pré-existente)
+- quality guardrail: `pct_decision=0`, `pct_linkage=2.6` — abaixo do threshold `>=40%` combinado; 1º ciclo de alerta, sem emissão (threshold: 2 ciclos consecutivos)
+
+**Arquitetura entregue:**
+- `vault/memory_core/models.py` — `needs_review: bool`, `review_reason: str|None` em `Claim`
+- `vault/research/trello_client.py` — `get_card_comments()`, `get_card_checklists()`
+- `vault/research/trello_parsers.py` — extração de decision via linguagem normativa + comments/checklists
+- `vault/research/github_parsers.py` — linkage `from/to_entity` + decisões por linguagem normativa restritiva
+- `vault/research/tldv_client.py` — extraction de `summaries.decisions` + regex fallback
+- `vault/fusion_engine/confidence.py` — `+0.15` por `evidence_ids`, `-0.10` por regex fallback, `needs_review` calibrado
+- `vault/fusion_engine/supersession.py` — proteção decision→decision por similaridade textual `>0.7` ou `supersession_reason` explícito; bloqueia `status→decision`
+- `vault/research/state_store.py` — `decision_key` + `linkage_key` como gates secundários de deduplicação (complementares a `content_key`)
+- `vault/crons/research_consolidation_cron.py` — KPIs `%decision`, `%linkage`, `%needs_review`, `%with_evidence`; alerta após 2 ciclos ruins consecutivos
+- `tests/vault/test_claim_model.py`, `tests/vault/ops/test_quality_guardrails.py`, `tests/research/test_semantic_dedupe_keys.py` — 26+ testes novos
+
+**Gaps esperados (não bloqueantes):**
+- Claim distribution `decision:0%` + `linkage:2.6%` — abaixo da meta `>=40%` combinado. Quality guardrail ativado após 2 ciclos ruins. Baseline reflete SSOT pré-existente sem enriquecimento de decisões/linkages; o próximo ciclo de cron com dados novos vai começar a preencher.
+- `decision_key`/`linkage_key` counts = 0 no state compaction — as chaves foram populadas nos runs de smoke mas não nos dados históricos do SSOT (comportamento esperado para base legada)
+
+Topic file: `memory/curated/livy-memory-agent.md`
+
+_Last updated: 2026-04-22_

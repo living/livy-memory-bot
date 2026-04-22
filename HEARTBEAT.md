@@ -1,6 +1,6 @@
 # HEARTBEAT — Livy Memory Agent
 
-_Atualizado: 2026-04-19 21:45 UTC (18:45 BRT)_
+_Atualizado: 2026-04-22 00:31 UTC (21:31 BRT)_
 
 ## Jobs Ativos — 21 crons
 
@@ -43,6 +43,20 @@ _Atualizado: 2026-04-19 21:45 UTC (18:45 BRT)_
 | ✅ | **PR #17 mergeada — Evo Wiki Research Phase 2** | merge `842852c` squash; 15 commits; 321 testes; 2 bloqueantes corrigidos (namespace event_key + untrack metrics) |
 | ✅ | **PR #23 mergeada — Self-Healing Apply V2** | merge `cea58c8` squash; apply_decision v2 + apply_merge_to_ssot + circuit breaker v2 + rollback append-only; 50 testes passando; E2E validado |
 | ✅ | **Hotfix `e645c42` — GitHub search cross-repo noise** | `repo:` + `org:` no search vazava PRs de outros repos; filtro defensivo por `repository_url` normalizado; suíte research 476 passing |
+| ✅ | **PR #24 mergeada — Enriched Claims Rollout** | merge `fd0f9ac` squash; tasks 1–9 entregues (needs_review/review_reason, semantic keys, quality guardrails); validação: 545 tests/research + 140 tests/vault |
+
+## Qualidade de Claims (Enriched Claims)
+
+| Métrica | Valor atual | Threshold spec | Status |
+|---|---:|---:|---:|
+| `%decision` | 0.0% | >= 20% (proxy para meta combinada) | 🔴 abaixo |
+| `%linkage` | 2.6% | >= 20% (proxy para meta combinada) | 🔴 abaixo |
+| `%decision + %linkage` | 2.6% | >= 40% | 🔴 abaixo |
+| `%status` | 97.4% | <= 80% (desejado) | 🟡 alto |
+| `%with_evidence` | 100.0% | >= 70% | ✅ ok |
+| `%needs_review` | 0.0% | <= 35% | ✅ ok |
+
+**Observação:** quality guardrail ativo — emite alerta após **2 ciclos consecutivos** ruins. Heartbeat atual registra **1º ciclo ruim** pós-merge PR #24.
 
 ## Mudanças desde Último HEARTBEAT
 
@@ -63,14 +77,16 @@ _Atualizado: 2026-04-19 21:45 UTC (18:45 BRT)_
 | ✅ **PR #17 mergeada — Evo Wiki Research Phase 2** | merge `842852c` squash; Trello stream + circuit breaker + self-healing write-mode; 2 bloqueantes corrigidos (namespace event_key + untrack metrics); 321 testes passing |
 | ✅ **PR #23 mergeada — Self-Healing Apply V2** | merge `cea58c8` squash; política v2 + lock/idempotência/prune; 50 testes passando |
 | ✅ **Hotfix `e645c42` — GitHub search cross-repo noise** | remove `org:living` da query + filtro por `repository_url`; elimina 404 de pull lookup cross-repo |
+| ✅ **PR #24 mergeada — Enriched Claims Rollout** | merge `fd0f9ac` squash; tasks 1–9 entregue; validação: 545 tests/research + 140 tests/vault; quality guardrail 1º ciclo ruim registrado |
+| ✅ **Sincronização + validação pós-merge PR #24** | master sincronizada, 4 crons smoke OK; coverage decision/linkage baixo no baseline legados |
 
 ## Memória
 
 | Camada | Estado |
 |---|---|
 | Observations (claude-mem) | ✅ worker 37777 ativo |
-| Curated (topic files) | ✅ atualizado com Vault Insights + PRs #13/#14/#15/#17/#18/#19 + hotfix `8e1bc76` |
-| Operational (crons) | ✅ 3 novos jobs operacionais adicionados |
+| Curated (topic files) | ✅ atualizado com PR #24; MEMORY.md + livy-memory-agent.md + HEARTBEAT.md |
+| Operational (crons) | ✅ 18/21 jobs ok |
 
 ## Incident Playbook
 
@@ -134,20 +150,15 @@ gh api graphql -f query='{ marketplacePurchases(first:5) { nodes { plan { name }
 
 ## Última Consolidação
 
-- Sessão de implementação/documentação: 2026-04-18
-- Alterações aplicadas: merge PRs #13, #14, #15 + criação de 3 crons de research (tldv/github/consolidation)
-- Próxima consolidação: 2026-04-19 07:00 BRT
+- Sessão de implementação/documentação: 2026-04-22 00:31 BRT
+- Alterações aplicadas: PR #24 merge + sincronização + validação + docs STM/LTM/napkin
+- Próxima consolidação: 2026-04-23 07:00 BRT
 
-## Mudanças desde Último HEARTBEAT (2026-04-19 02:50 UTC)
+## Mudanças desde Último HEARTBEAT (2026-04-22 00:31 UTC)
 
 | Mudança | Impacto |
 |---|---|
-| ✅ **PR #19 mergeada — GitHub Rich PR Events** | merge `787c10d` squash; GitHubRichClient; enriquecimento no fluxo `pr_merged`; 370 tests research passando |
-| ✅ **Bug pre-existente: vault.lint import shadowing** | `vault/lint/` package sombreava `vault/lint.py` module; ImportError corrigido com re-export via importlib em `vault/lint/__init__.py`; commit `3ae6fec` |
-| ✅ docs: MEMORY.md + livy-memory-agent.md atualizados | registro de PR #19 e fix |
-| ✅ docs: consolidation-log atualizado | session log de 2026-04-19 02:50 UTC |
-| 🟡 Test failure em `skills/meetings-tldv/` | pre-existente, não relacionado a PR #19; skill fora do escopo do repo |
-| ✅ **WIKI_V2_ENABLED conectado ao ResearchPipeline** | commit `d81eb7e`; flag audita `wiki_v2_active` no `run_started`; TDD 4 testes passando; 443 tests research |
-| ✅ **Wiki v2 produção habilitado (3 fontes)** | commits `30a3b29` + `23e6019`; github/trello/tldv no FusionEngine; old path mantido para flag=false |
-| ✅ **agenda-trello-* removidos do monitoramento local** | jobs eram do Victor/neo e saíram do HEARTBEAT da memória-agent |
-| ✅ **Consolidation backfill seg-sex executado** | `.research/backfill-monfri/state.json` isolado; SSOT produção intocado; 8 eventos Trello dentro da janela |
+| ✅ **PR #24 mergeada — Enriched Claims Rollout** | merge `fd0f9ac` squash; GitHubRichClient; needs_review/review_reason; semantic dedupe keys; quality guardrails; 545 tests research + 140 tests vault |
+| ✅ **Validação pós-merge PR #24** | master sincronizada; 4 crons smoke OK; quality guardrail ativado (1º ciclo ruim esperado — coverage baseline legados) |
+| ✅ docs: MEMORY.md + livy-memory-agent.md + HEARTBEAT.md | registrados PR #24 + quality dashboard |
+| ✅ docs: consolidation-log atualizado | session log de 2026-04-22 00:31 UTC |

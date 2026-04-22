@@ -70,6 +70,36 @@ status: ativo
 - Token GitHub: `GITHUB_PERSONAL_ACCESS_TOKEN` em `~/.openclaw/.env`
 - claude-mem worker: `127.0.0.1:37777`
 
+---
+
+## PR #24 — Enriched Claims Rollout (merge 2026-04-22)
+
+### O que entrou
+
+- **Claim model** (`vault/memory_core/models.py`): `needs_review: bool` + `review_reason: str|None`
+- **Trello client** (`vault/research/trello_client.py`): `get_card_comments()`, `get_card_checklists()`
+- **Trello parser** (`vault/research/trello_parsers.py`): decision extraction via linguagem normativa de comments/checklists
+- **GitHub parser** (`vault/research/github_parsers.py`): linkage `from/to_entity` + decisões por linguagem restritiva
+- **TLDV client** (`vault/research/tldv_client.py`): `summaries.decisions` extraction + regex fallback
+- **Confidence** (`vault/fusion_engine/confidence.py`): `+0.15` por `evidence_ids`, `-0.10` por regex, needs_review calibrado
+- **Supersession** (`vault/fusion_engine/supersession.py`): proteção decision→decision por similaridade `>0.7` ou `supersession_reason`; bloqueia `status→decision`
+- **State store** (`vault/research/state_store.py`): `decision_key` + `linkage_key` como gates secundários de dedupe (complementares a `content_key`)
+- **Consolidation cron** (`vault/crons/research_consolidation_cron.py`): KPIs quality + alerta após 2 ciclos ruins
+
+### Validação
+
+- `tests/research/` → **545 passed** | `tests/vault/` → **140 passed**
+- 4 crons smoke: github/tldv/trello/consolidation → `status=success`
+- claim distribution: `status:97.4% / linkage:2.6% / decision:0%`
+- quality guardrail: 1º ciclo de alerta (`pct_decision=0`, `pct_linkage=2.6 < 40%`); aguarda 2º ciclo para emitir alerta
+
+### Gap esperado
+
+- Baseline SSOT pré-existente sem extraction de decision/linkage — coverage vai subir com próximos ciclos de cron
+- `decision_key`/`linkage_key` em `state_compact` = 0 para dados legados (comportamento esperado)
+
+---
+
 ## Cross-references
 
 - Infra: [openclaw-gateway.md](openclaw-gateway.md) — gateway que hospeda o agente

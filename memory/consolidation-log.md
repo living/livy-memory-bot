@@ -314,3 +314,147 @@
   - `PYTHONPATH=. pytest tests/research/test_github_client.py -q` → **9 passed**
   - `research_github_cron.py` sem novos 404 de pull lookup no audit/log
 - Estado final: PR #23 em produção + hotfix de ruído cross-repo aplicado e validado.
+
+
+## Consolidation 2026-04-21T10:01:46.218247+00:00
+{
+  "run_at": "2026-04-21T10:01:46.218232+00:00",
+  "tldv": {
+    "events_processed": 0,
+    "events_skipped": 0,
+    "status": "success"
+  },
+  "github": {
+    "events_processed": 0,
+    "events_skipped": 0,
+    "status": "success"
+  },
+  "metrics": {
+    "tldv": {
+      "key_count": 10,
+      "size_bytes": 960,
+      "content_key_count": 10,
+      "content_size_bytes": 1550
+    },
+    "github": {
+      "key_count": 11,
+      "size_bytes": 1133,
+      "content_key_count": 11,
+      "content_size_bytes": 1485
+    },
+    "trello": {
+      "key_count": 182,
+      "size_bytes": 16744,
+      "content_key_count": 182,
+      "content_size_bytes": 28574
+    }
+  },
+  "snapshot_created": false,
+  "watchdog_alerts": []
+}
+
+## Consolidation 2026-04-22T00:28:17.659466+00:00
+{
+  "run_at": "2026-04-22T00:28:17.659442+00:00",
+  "tldv": {
+    "events_processed": 0,
+    "events_skipped": 0,
+    "status": "success"
+  },
+  "github": {
+    "events_processed": 0,
+    "events_skipped": 0,
+    "status": "success"
+  },
+  "metrics": {
+    "github": {
+      "key_count": 12,
+      "size_bytes": 1236,
+      "content_key_count": 12,
+      "content_size_bytes": 1620,
+      "decision_key_count": 0,
+      "decision_size_bytes": 2,
+      "linkage_key_count": 0,
+      "linkage_size_bytes": 2
+    },
+    "tldv": {
+      "key_count": 10,
+      "size_bytes": 960,
+      "content_key_count": 10,
+      "content_size_bytes": 1550,
+      "decision_key_count": 0,
+      "decision_size_bytes": 2,
+      "linkage_key_count": 0,
+      "linkage_size_bytes": 2
+    },
+    "trello": {
+      "key_count": 182,
+      "size_bytes": 16744,
+      "content_key_count": 182,
+      "content_size_bytes": 28574,
+      "decision_key_count": 0,
+      "decision_size_bytes": 2,
+      "linkage_key_count": 0,
+      "linkage_size_bytes": 2
+    }
+  },
+  "snapshot_created": false,
+  "watchdog_alerts": [],
+  "quality": {
+    "total_claims": 425,
+    "pct_decision": 0.0,
+    "pct_linkage": 2.588235294117647,
+    "pct_status": 97.41176470588235,
+    "pct_needs_review": 0.0,
+    "pct_with_evidence": 100.0,
+    "passed": false,
+    "failed_kpis": [
+      "pct_decision",
+      "pct_linkage"
+    ],
+    "consecutive_bad_cycles": 1,
+    "alert_emitted": false
+  }
+}
+
+## Session Log — 2026-04-22 00:31 UTC (PR #24 merge + sync + validação + documentação STM/LTM/napkin)
+
+- PR #24 (`feature/enriched-claims-impl` → `master`) **mergeada via squash**.
+- Merge commit em `master`: `fd0f9ac`.
+- `gh pr merge` concluiu merge; falha residual apenas ao deletar branch local por estar anexada a worktree (`workspace-livy-memory-enriched-claims`) — esperado em setup com worktrees.
+- Workspace sincronizado:
+  - `git fetch origin`
+  - `git checkout master`
+  - `git pull --ff-only origin master`
+
+### Validação contra plano/spec (docs/superpowers/plans/2026-04-21-enriched-claims-implementation.md)
+
+- Suites canônicas:
+  - `PYTHONPATH=. pytest tests/research/ -q` → **545 passed**
+  - `PYTHONPATH=. pytest tests/vault/ -q` → **140 passed**
+- Smoke de crons (Task 10):
+  - `python3 vault/crons/research_github_cron.py` → `processed=1`, `status=success`
+  - `python3 vault/crons/research_tldv_cron.py` → `processed=0`, `status=success`
+  - `python3 vault/crons/research_trello_cron.py` → `processed=0`, `status=success`
+  - `python3 vault/crons/research_consolidation_cron.py` → `status=success`
+- Distribuição de claims pós-run:
+  - `status`: 414 (97.41%)
+  - `linkage`: 11 (2.59%)
+  - `decision`: 0 (0.00%)
+- Quality guardrail pós-consolidação:
+  - `passed=false`
+  - `failed_kpis=[pct_decision, pct_linkage]`
+  - `consecutive_bad_cycles=1`
+  - `alert_emitted=false` (threshold configurado para 2 ciclos ruins consecutivos)
+
+### Ajustes necessários após validação
+
+- **Sem ajustes de código adicionais bloqueantes** pós-merge.
+- Gap de cobertura decision/linkage é **esperado no baseline histórico do SSOT**; guardrail ficou ativo para acompanhar evolução nos próximos ciclos.
+
+### Documentação aplicada nesta sessão
+
+- `MEMORY.md` — decisão de merge PR #24 + validação + gaps esperados.
+- `memory/curated/livy-memory-agent.md` — seção PR #24 com escopo técnico e evidências.
+- `HEARTBEAT.md` — atualização de timestamp + dashboard de qualidade de claims + mudança operacional PR #24.
+- `.claude/napkin.md` — regra adicionada para validação de rollout com smoke de 4 crons + leitura de guardrail antes de declarar done.
