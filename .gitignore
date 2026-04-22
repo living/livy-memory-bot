@@ -46,10 +46,10 @@ memory/2026-*-report.md
 memory/vault/insights/*.md
 memory/vault/insights/.last_sent.json
 
-# Research derived state cache (SSOT is state/identity-graph/state.json)
+# Research derived/runtime artifacts
 .research/*/state.json
+.research/*/audit.log
 
 # Identity graph runtime artifacts
 state/identity-graph/*
 !state/identity-graph/.gitkeep
-!state/identity-graph/state.json
