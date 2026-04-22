@@ -124,8 +124,23 @@ def parse_trello_card(card: dict[str, Any], list_name: str) -> ParsedTrelloCard:
     )
 
 
+CONCLUIDO_LISTS = {
+    "concluído 🎉 (entregue)",
+    "concluído 🎉",
+    "done",
+    "liberado teste interno",
+}
+
+
+def _is_concluido_list(list_name: str | None) -> bool:
+    """Return True if list_name indicates the card was decided/delivered."""
+    if not list_name:
+        return False
+    return list_name.strip().lower() in CONCLUIDO_LISTS
+
+
 def card_to_claims(card: ParsedTrelloCard) -> list[dict[str, Any]]:
-    """Generate normalized status/linkage claims from a parsed Trello card."""
+    """Generate normalized status/linkage/decision claims from a parsed Trello card."""
     claims: list[dict[str, Any]] = [
         {
             "source": "trello",
@@ -144,6 +159,28 @@ def card_to_claims(card: ParsedTrelloCard) -> list[dict[str, Any]]:
         }
     ]
 
+    decision_sources = list(card.comments) + list(card.checklists)
+
+    # Quick win: cards in completion lists (Concluído/DONE/Liberado) → decision claim
+    # Apply only when comments/checklists didn't already produce explicit decisions.
+    if _is_concluido_list(card.list_name) and not decision_sources:
+        claims.append(
+            {
+                "source": "trello",
+                "claim_type": "decision",
+                "entity_type": "project",
+                "entity_id": card.card_id,
+                "text": f"Card '{card.card_name}' foi concluído (lista: '{card.list_name}')",
+                "event_timestamp": card.last_activity,
+                "source_ref": {"source_id": card.card_id, "url": card.card_url},
+                "metadata": {
+                    "board_id": card.board_id,
+                    "source": "trello_completion_list",
+                },
+                "confidence": 0.70,
+            }
+        )
+
     for github_link in card.github_links:
         claims.append(
             {
@@ -158,7 +195,6 @@ def card_to_claims(card: ParsedTrelloCard) -> list[dict[str, Any]]:
             }
         )
 
-    decision_sources = list(card.comments) + list(card.checklists)
     if not decision_sources:
         logger.warning("trello_comments_unavailable", extra={"card_id": card.card_id})
 

@@ -1,0 +1,12 @@
+# Claim bb84c6ac-5dbd-4a93-adc4-8993e2ab8a6e
+
+- source: trello
+- entity_type: project
+- entity_id: 67bf4efbcab877487f5eecc4
+- claim_type: decision
+- confidence: 0.450
+- event_timestamp: 2025-02-26T20:20:40.562Z
+- superseded_by: -
+
+## Text
+Card '4D INFRA SDDC:N8n 4D voltar pra versao igual de prod' foi concluído (lista: 'Liberado Teste interno')

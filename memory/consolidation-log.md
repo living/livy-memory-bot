@@ -607,3 +607,32 @@ QUALITY_GUARDRAIL_CONSECUTIVE_TRIGGER = 3   # era 2
 ### Conclusão
 - Quick wins identificados no fact-check estavam corretos e foram capturados.
 - Cobertura quase dobrou (**4.93% → 9.69%**), porém ainda abaixo de metas agressivas (ex. 40%), indicando limitação estrutural da distribuição de tipos no histórico.
+## 2026-04-22 02:02 UTC — Quick Win: Trello completion list → decision
+
+### O que foi feito
+- Identificado via fact-check da própria wiki: 226 cards Trello em listas de
+  conclusão (Concluído/DONE/Liberado) mas 0 decision claims no SSOT
+- Implementado via TDD em `trello_parsers.py` (`_is_concluido_list()`)
+- Regra: card em lista de conclusão sem comments/checklists → decision claim
+- Confiança 0.70 (proxy para decisão implícita)
+
+### Resultado
+| Métrica | Antes | Depois |
+|---|---|---|
+| total | 784 | 1296 |
+| decision | 48 | 304 |
+| linkage | 28 | 28 |
+| coverage | 9.69% | 25.62% |
+
+### Commits
+- `trello_parsers.py`: +`_is_concluido_list()` + rule
+- `test_trello_parsers.py`: 5 novos testes RED→GREEN
+- `memory/vault/claims/*.md`: +452 blob files
+
+### Guardrail
+- pct_decision: 0.76% → 23.46% ✅
+- pct_linkage: 2.16% (abaixo threshold 3.0%) → próximo quick win
+- decision_count_30d: 43 ✅
+
+---
+

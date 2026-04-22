@@ -1,0 +1,12 @@
+# Claim ffbf439f-e152-40ab-ac5f-3fbdc5bbcc8e
+
+- source: tldv
+- entity_type: meeting
+- entity_id: 69ba9ac2a6d8bc0013db04e7
+- claim_type: timeline_event
+- confidence: 0.600
+- event_timestamp: 2026-03-18T12:29:54.265+00:00
+- superseded_by: -
+
+## Text
+Meeting tagged with 'automacao'
