@@ -46,12 +46,23 @@ STATE_PATH = "state/identity-graph/state.json"
 METRICS_PATH = "state/identity-graph/self_healing_metrics.json"
 CONSOLIDATION_LOG = "memory/consolidation-log.md"
 EXPERIMENTS_LOG_PATH = "vault/logs/experiments.jsonl"
+QUALITY_HISTORY_PATH = "state/identity-graph/quality_guardrail_history.jsonl"
 
 # Watchdog thresholds
 REVERT_RATE_THRESHOLD = 5.0        # alert when global revert rate > 5%
 PENDING_REVIEW_THRESHOLD = 50     # alert when pending_review backlog > 50
 HIGH_REVERT_THRESHOLD = 10.0      # per-cycle revert rate > 10% counts as high
 CONSECUTIVE_HIGH_REVERT_TRIGGER = 3  # 3+ consecutive cycles > 10% → global pause
+
+# Quality guardrails (enriched-claims)
+QUALITY_GUARDRAIL_THRESHOLDS = {
+    "min_decision_pct": 5.0,
+    "min_linkage_pct": 3.0,
+    "min_status_pct": 5.0,
+    "max_needs_review_pct": 30.0,
+    "min_with_evidence_pct": 80.0,
+}
+QUALITY_GUARDRAIL_CONSECUTIVE_TRIGGER = 2
 
 
 # ---------------------------------------------------------------------------
@@ -333,6 +344,261 @@ def _run_watchdog_observation_loop() -> list[dict]:
 
 
 # ---------------------------------------------------------------------------
+# Quality guardrails — enriched-claims KPIs
+# ---------------------------------------------------------------------------
+
+def _compute_claim_kpis(claims: list[dict]) -> dict:
+    """
+    Compute quality KPIs from a list of enriched claims.
+
+    KPIs computed:
+    - pct_decision:  % of claims with claim_type == "decision"
+    - pct_linkage:   % of claims with claim_type == "linkage"
+    - pct_status:    % of claims with claim_type == "status"
+    - pct_needs_review: % of claims where needs_review == True
+    - pct_with_evidence: % of claims with non-empty evidence_ids
+    - total: total claim count
+    """
+    total = len(claims)
+    if total == 0:
+        return {
+            "total": 0,
+            "pct_decision": 0.0,
+            "pct_linkage": 0.0,
+            "pct_status": 0.0,
+            "pct_needs_review": 0.0,
+            "pct_with_evidence": 0.0,
+        }
+
+    decision_count = sum(1 for c in claims if c.get("claim_type") == "decision")
+    linkage_count = sum(1 for c in claims if c.get("claim_type") == "linkage")
+    status_count = sum(1 for c in claims if c.get("claim_type") == "status")
+    needs_review_count = sum(1 for c in claims if c.get("needs_review", False) is True)
+    with_evidence_count = sum(
+        1 for c in claims
+        if isinstance(c.get("evidence_ids"), list) and len(c.get("evidence_ids", [])) > 0
+    )
+
+    scale = 100.0 / total
+    return {
+        "total": total,
+        "pct_decision": decision_count * scale,
+        "pct_linkage": linkage_count * scale,
+        "pct_status": status_count * scale,
+        "pct_needs_review": needs_review_count * scale,
+        "pct_with_evidence": with_evidence_count * scale,
+    }
+
+
+def _evaluate_quality_thresholds(
+    kpis: dict,
+    thresholds: dict | None = None,
+    empty_thresholds_treats_as_pass: bool = False,
+) -> dict:
+    """
+    Evaluate claim KPIs against quality thresholds.
+
+    Args:
+        kpis: result of _compute_claim_kpis
+        thresholds: optional override dict; defaults to QUALITY_GUARDRAIL_THRESHOLDS
+        empty_thresholds_treats_as_pass: if True and total==0, return passed=True
+
+    Returns:
+        dict with keys:
+            passed: bool — True only when all thresholds are satisfied
+            failed_kpis: list[str] — names of KPIs that failed
+            message: human-readable summary
+    """
+    if thresholds is None:
+        thresholds = QUALITY_GUARDRAIL_THRESHOLDS
+
+    if empty_thresholds_treats_as_pass and kpis.get("total", 0) == 0:
+        return {
+            "passed": True,
+            "failed_kpis": [],
+            "message": "no claims to evaluate — treated as pass",
+        }
+
+    failed: list[str] = []
+    messages: list[str] = []
+
+    pct_decision = kpis.get("pct_decision", 0.0)
+    min_decision = thresholds.get("min_decision_pct", 5.0)
+    if pct_decision < min_decision:
+        failed.append("pct_decision")
+        messages.append(f"pct_decision {pct_decision:.1f}% < {min_decision:.1f}%")
+
+    pct_linkage = kpis.get("pct_linkage", 0.0)
+    min_linkage = thresholds.get("min_linkage_pct", 3.0)
+    if pct_linkage < min_linkage:
+        failed.append("pct_linkage")
+        messages.append(f"pct_linkage {pct_linkage:.1f}% < {min_linkage:.1f}%")
+
+    pct_status = kpis.get("pct_status", 0.0)
+    min_status = thresholds.get("min_status_pct", 5.0)
+    if pct_status < min_status:
+        failed.append("pct_status")
+        messages.append(f"pct_status {pct_status:.1f}% < {min_status:.1f}%")
+
+    pct_needs_review = kpis.get("pct_needs_review", 0.0)
+    max_needs_review = thresholds.get("max_needs_review_pct", 30.0)
+    if pct_needs_review > max_needs_review:
+        failed.append("pct_needs_review")
+        messages.append(f"pct_needs_review {pct_needs_review:.1f}% > {max_needs_review:.1f}%")
+
+    pct_with_evidence = kpis.get("pct_with_evidence", 0.0)
+    min_with_evidence = thresholds.get("min_with_evidence_pct", 80.0)
+    if pct_with_evidence < min_with_evidence:
+        failed.append("pct_with_evidence")
+        messages.append(f"pct_with_evidence {pct_with_evidence:.1f}% < {min_with_evidence:.1f}%")
+
+    return {
+        "passed": len(failed) == 0,
+        "failed_kpis": failed,
+        "message": "; ".join(messages) if messages else "all KPIs passed",
+    }
+
+
+def _load_quality_history() -> list[dict]:
+    """Load the quality guardrail cycle history from QUALITY_HISTORY_PATH."""
+    path = Path(QUALITY_HISTORY_PATH)
+    if not path.exists():
+        return []
+    history: list[dict] = []
+    for line in path.read_text().splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            history.append(json.loads(line))
+        except json.JSONDecodeError:
+            continue
+    return history
+
+
+def _save_quality_history(history: list[dict]) -> None:
+    """Overwrite QUALITY_HISTORY_PATH with the given cycle history."""
+    path = Path(QUALITY_HISTORY_PATH)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    lines = [json.dumps(r, ensure_ascii=False) for r in history]
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def _count_consecutive_bad_cycles(history: list[dict]) -> int:
+    """
+    Count consecutive bad cycles from the most recent entry backward.
+
+    A "bad" cycle is one where passed == False.
+    Returns 0 if the most recent entry is good or history is empty.
+    """
+    if not history:
+        return 0
+    # history is chronological; iterate from most recent backward
+    count = 0
+    for entry in reversed(history):
+        if entry.get("passed") is False:
+            count += 1
+        else:
+            break
+    return count
+
+
+def _emit_quality_guardrail_alert(alert: dict) -> None:
+    """Append a quality guardrail alert to memory/consolidation-log.md."""
+    log_path = Path(CONSOLIDATION_LOG)
+    ts = _utc_now().isoformat()
+    alert_md = (
+        f"\n\n## Quality Guardrail Alert {ts}\n"
+        + json.dumps(alert, indent=2, ensure_ascii=False)
+    )
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    with log_path.open("a", encoding="utf-8") as f:
+        f.write(alert_md)
+    print(f"[quality_guardrails] ALERT: {alert['alert_type']} — {alert.get('message', '')}")
+
+
+def _record_quality_cycle(cycle: dict) -> None:
+    """Append a single quality-cycle result to QUALITY_HISTORY_PATH."""
+    path = Path(QUALITY_HISTORY_PATH)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8") as fh:
+        fh.write(json.dumps(cycle, ensure_ascii=False))
+        fh.write("\n")
+
+
+def _run_quality_guardrail() -> dict:
+    """
+    Compute enriched-claims quality KPIs and evaluate against thresholds.
+
+    After 2 consecutive bad cycles, emits a quality_guardrail_fail warning.
+    Records every cycle (pass or fail) to QUALITY_HISTORY_PATH.
+
+    Returns:
+        dict with keys:
+            kpis: result of _compute_claim_kpis (plus "passed" key from evaluation)
+            alert_emitted: bool
+            consecutive_bad_cycles: int — count of consecutive bad cycles after this run
+    """
+    # Load claims from state
+    state = load_state(STATE_PATH)
+    claims: list[dict] = state.get("claims", [])
+
+    # Compute KPIs
+    kpis = _compute_claim_kpis(claims)
+
+    # Evaluate against thresholds
+    eval_result = _evaluate_quality_thresholds(kpis, empty_thresholds_treats_as_pass=True)
+    kpis["passed"] = eval_result["passed"]
+    kpis["failed_kpis"] = eval_result["failed_kpis"]
+
+    # Load history and count consecutive bad cycles before this run
+    history = _load_quality_history()
+    consecutive_before = _count_consecutive_bad_cycles(history)
+
+    # Build cycle record
+    run_at = _utc_now().isoformat()
+    cycle = {
+        "run_at": run_at,
+        "passed": eval_result["passed"],
+        "total": kpis["total"],
+        "failed_kpis": eval_result["failed_kpis"],
+        "kpis": {
+            k: v for k, v in kpis.items()
+            if k not in ("passed", "failed_kpis")
+        },
+    }
+
+    # Append cycle and save
+    history.append(cycle)
+    _save_quality_history(history)
+
+    # Count consecutive bad cycles after this run (includes current cycle)
+    consecutive_after = _count_consecutive_bad_cycles(history)
+
+    # Emit alert after QUALITY_GUARDRAIL_CONSECUTIVE_TRIGGER (2) consecutive bad cycles
+    alert_emitted = False
+    if not eval_result["passed"] and consecutive_after >= QUALITY_GUARDRAIL_CONSECUTIVE_TRIGGER:
+        alert = {
+            "alert_type": "quality_guardrail_fail",
+            "failed_kpis": eval_result["failed_kpis"],
+            "kpis": kpis,
+            "consecutive_bad_cycles": consecutive_after,
+            "message": (
+                f"quality guardrail failed: {eval_result['message']} "
+                f"({consecutive_after} consecutive bad cycles)"
+            ),
+        }
+        _emit_quality_guardrail_alert(alert)
+        alert_emitted = True
+
+    return {
+        "kpis": kpis,
+        "alert_emitted": alert_emitted,
+        "consecutive_bad_cycles": consecutive_after,
+    }
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -406,6 +672,19 @@ def main() -> None:
             else:
                 print("[research_consolidation] watchdog: all thresholds clear")
 
+        # 5d) Quality guardrails — enriched-claims KPIs
+        print("[research_consolidation] running quality guardrail evaluation...")
+        quality_result = _run_quality_guardrail()
+        q_kpis = quality_result["kpis"]
+        if quality_result["alert_emitted"]:
+            print(
+                f"[research_consolidation] quality_guardrail_fail: "
+                f"{q_kpis.get('failed_kpis', [])} — "
+                f"{quality_result['consecutive_bad_cycles']} consecutive bad cycles"
+            )
+        else:
+            print(f"[research_consolidation] quality guardrail: {q_kpis.get('total', 0)} claims evaluated")
+
         # 6) Log entry
         run_at = _utc_now().isoformat()
         log_entry = {
@@ -423,6 +702,18 @@ def main() -> None:
             "metrics": metrics,
             "snapshot_created": snapshot_result is not None,
             "watchdog_alerts": [a["alert_type"] for a in watchdog_alerts],
+            "quality": {
+                "total_claims": q_kpis.get("total", 0),
+                "pct_decision": q_kpis.get("pct_decision", 0.0),
+                "pct_linkage": q_kpis.get("pct_linkage", 0.0),
+                "pct_status": q_kpis.get("pct_status", 0.0),
+                "pct_needs_review": q_kpis.get("pct_needs_review", 0.0),
+                "pct_with_evidence": q_kpis.get("pct_with_evidence", 0.0),
+                "passed": q_kpis.get("passed", True),
+                "failed_kpis": q_kpis.get("failed_kpis", []),
+                "consecutive_bad_cycles": quality_result["consecutive_bad_cycles"],
+                "alert_emitted": quality_result["alert_emitted"],
+            },
         }
         _append_consolidation_log(log_entry)
         print(f"[research_consolidation] log entry appended to {CONSOLIDATION_LOG}")
@@ -435,6 +726,7 @@ def main() -> None:
             "metrics": metrics,
             "snapshot_created": log_entry["snapshot_created"],
             "watchdog_alerts": log_entry["watchdog_alerts"],
+            "quality": log_entry["quality"],
         }
         print(json.dumps(result, default=str))
     finally:

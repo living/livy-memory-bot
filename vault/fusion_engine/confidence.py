@@ -5,6 +5,8 @@ Formula:
   + source_reliability  (github/tldv: +0.2, gmail: +0.15, trello/gcal: +0.1)
   + recency             (<7d: +0.2, <30d: +0.1, <90d: 0, >90d: -0.2)
   + convergence         (+0.1 per distinct source, max +0.3)
+  + decision_evidence   (+0.15 for decision claims with evidence_ids)
+  - regex_extraction    (-0.10 for regex-extracted claims)
   - contradiction       (-0.3 if contradicting_claim is provided)
   clamp final to [0.0, 1.0]
 """
@@ -36,6 +38,11 @@ _RECENCY_THRESHOLDS = [
 _CONVERGENCE_BONUS_PER_SOURCE = 0.1
 _CONVERGENCE_MAX = 0.3
 
+# Decision bonus / penalties
+_DECISION_EVIDENCE_BONUS = 0.15
+_REGEX_EXTRACTION_PENALTY = 0.10
+_REGEX_REVIEW_REASONS = {"regex_fallback", "regex_extraction"}
+
 # Contradiction penalty
 _CONTRADICTION_PENALTY = 0.3
 
@@ -64,6 +71,13 @@ def _recency_score(event_timestamp: str) -> float:
         if days < threshold:
             return bonus
     return -0.2  # fallback
+
+
+def _is_regex_extracted_claim(claim: Claim) -> bool:
+    """Return True when claim was extracted by regex fallback."""
+    if not claim.needs_review:
+        return False
+    return (claim.review_reason or "").strip().lower() in _REGEX_REVIEW_REASONS
 
 
 def compute_confidence(
@@ -98,6 +112,14 @@ def compute_confidence(
             _CONVERGENCE_MAX,
         )
         score += convergence
+
+    # Decision evidence bonus
+    if claim.claim_type == "decision" and bool(claim.evidence_ids):
+        score += _DECISION_EVIDENCE_BONUS
+
+    # Mandatory regex extraction penalty
+    if _is_regex_extracted_claim(claim):
+        score -= _REGEX_EXTRACTION_PENALTY
 
     # Contradiction penalty
     if contradicting_claim is not None:

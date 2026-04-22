@@ -1,4 +1,4 @@
-"""TDD RED/GREEN: confidence scoring tests."""
+"""TDD RED/GREEN: confidence scoring tests with decision bonus."""
 import pytest
 from datetime import datetime, timezone, timedelta
 from vault.memory_core.models import Claim, SourceRef, AuditTrail
@@ -9,6 +9,9 @@ def make_claim(
     days_ago: int = 0,
     num_evidence: int = 1,
     claim_id: str = "test-claim",
+    claim_type: str = "status",
+    needs_review: bool = False,
+    review_reason: str | None = None,
 ) -> Claim:
     """Helper to create a claim for testing."""
     ts = (datetime.now(timezone.utc) - timedelta(days=days_ago)).isoformat()
@@ -18,7 +21,7 @@ def make_claim(
         entity_type="project",
         entity_id="proj-1",
         topic_id="topic-1",
-        claim_type="status",
+        claim_type=claim_type,
         text="Test claim",
         source=source,  # type: ignore[arg-type]
         source_ref=SourceRef(source_id="src-1"),
@@ -28,6 +31,8 @@ def make_claim(
         ingested_at=ts,
         confidence=0.0,
         privacy_level="internal",
+        needs_review=needs_review,
+        review_reason=review_reason,
         superseded_by=None,
         supersession_reason=None,
         supersession_version=None,
@@ -153,3 +158,80 @@ class TestConfidenceScoring:
         score = compute_confidence(claim, contradicting_claim=contradicting)
         # base(0.5) + source(0.0) + recency(-0.2) - contradiction(0.3) = 0.0
         assert score == pytest.approx(0.0)
+
+
+class TestDecisionClaimBonus:
+    """Decision claims with evidence_ids get +0.15 bonus."""
+
+    def test_decision_claim_with_evidence_ids_gets_015_bonus(self):
+        """Decision claim with evidence_ids adds +0.15 to confidence."""
+        from vault.fusion_engine.confidence import compute_confidence
+        claim = make_claim(source="github", days_ago=30, claim_type="decision")
+        # base(0.5) + source(0.2) + recency(0.0) + decision_bonus(0.15) = 0.85
+        score = compute_confidence(claim, contradicting_claim=None)
+        assert score == pytest.approx(0.85)
+
+    def test_decision_claim_without_evidence_ids_no_bonus(self):
+        """Decision claim without evidence_ids does NOT get bonus."""
+        from vault.fusion_engine.confidence import compute_confidence
+        claim = make_claim(source="github", days_ago=30, claim_type="decision", num_evidence=0)
+        # base(0.5) + source(0.2) + recency(0.0) = 0.7 (no bonus without evidence)
+        score = compute_confidence(claim, contradicting_claim=None)
+        assert score == pytest.approx(0.7)
+
+    def test_non_decision_claim_no_bonus(self):
+        """Non-decision claims do not get the decision bonus."""
+        from vault.fusion_engine.confidence import compute_confidence
+        claim = make_claim(source="github", days_ago=30, claim_type="status")
+        # base(0.5) + source(0.2) + recency(0.0) = 0.7 (no decision bonus)
+        score = compute_confidence(claim, contradicting_claim=None)
+        assert score == pytest.approx(0.7)
+
+    def test_decision_bonus_composes_with_convergence(self):
+        """Decision bonus + convergence can both apply."""
+        from vault.fusion_engine.confidence import compute_confidence
+        claim = make_claim(source="github", days_ago=30, claim_type="decision")
+        other_sources = ["tldv"]
+        # base(0.5) + source(0.2) + recency(0.0) + decision(0.15) + convergence(0.1) = 0.95
+        score = compute_confidence(claim, contradicting_claim=None, other_sources=other_sources)
+        assert score == pytest.approx(0.95)
+
+    def test_decision_bonus_composes_with_recency(self):
+        """Decision bonus + recency both apply."""
+        from vault.fusion_engine.confidence import compute_confidence
+        claim = make_claim(source="github", days_ago=3, claim_type="decision")
+        # base(0.5) + source(0.2) + recency(0.2) + decision(0.15) = 1.05 → clamp to 1.0
+        score = compute_confidence(claim, contradicting_claim=None)
+        assert score == pytest.approx(1.0)
+
+
+class TestBackwardCompatibility:
+    """Existing behavior must remain unchanged for backward compatibility."""
+
+    def test_existing_confidence_still_works(self):
+        """Original scoring formula still produces same scores."""
+        from vault.fusion_engine.confidence import compute_confidence
+        claim = make_claim(source="github", days_ago=3)
+        other_sources = ["tldv", "gmail"]
+        score = compute_confidence(claim, contradicting_claim=None, other_sources=other_sources)
+        # Original formula: base(0.5) + source(0.2) + recency(0.2) + convergence(0.2) = 1.1 → 1.0
+        assert score == pytest.approx(1.0)
+
+    def test_contradiction_still_applies(self):
+        """Contradiction penalty still works."""
+        from vault.fusion_engine.confidence import compute_confidence
+        claim = make_claim(source="github", days_ago=3, claim_id="c1")
+        contradicting = make_claim(source="tldv", days_ago=1, claim_id="c2")
+        score = compute_confidence(claim, contradicting_claim=contradicting)
+        # base(0.5) + source(0.2) + recency(0.2) - contradiction(0.3) = 0.6
+        assert score == pytest.approx(0.6)
+
+    def test_no_breaking_changes_to_function_signature(self):
+        """compute_confidence signature unchanged (backward compatible)."""
+        from vault.fusion_engine.confidence import compute_confidence
+        import inspect
+        sig = inspect.signature(compute_confidence)
+        params = list(sig.parameters.keys())
+        assert "claim" in params
+        assert "contradicting_claim" in params
+        assert "other_sources" in params

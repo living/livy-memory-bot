@@ -164,15 +164,19 @@ def pr_to_claims(
     })
 
     # -------------------------------------------------------------------------
-    # Approval claims — one per unique approver
+    # Approval claims — one per unique reviewer with meaningful state/body
+    #
+    # Formal reviews (APPROVED, CHANGES_REQUESTED): tagged with review_reason="review_github"
+    # General review comments (COMMENTED with body): tagged with review_reason="comentario_github"
     # -------------------------------------------------------------------------
     seen_approvers: set[str] = set()
     for review in reviews:
         state_str = str(review.get("state", "")).upper()
         login = review.get("user", {}).get("login", "")
+        review_body = review.get("body") or ""
+
         if state_str == "APPROVED" and login and login not in seen_approvers:
             seen_approvers.add(login)
-            review_body = review.get("body") or ""
             claims.append({
                 "source": "github",
                 "claim_type": "approval",
@@ -186,12 +190,31 @@ def pr_to_claims(
                     "review_body": review_body[:500] if review_body else "",
                     "review_state": state_str,
                 },
+                "needs_review": True,
+                "review_reason": "review_github",
+            })
+
+        elif state_str == "COMMENTED" and login and review_body.strip():
+            claims.append({
+                "source": "github",
+                "claim_type": "approval",
+                "entity_type": "github_pr",
+                "entity_id": f"{repo}#{pr_number}" if repo else str(pr_number),
+                "text": f"PR #{pr_number} review comment by {login}",
+                "event_timestamp": event_timestamp,
+                "source_ref": {"source_id": str(pr_number), "url": url},
+                "metadata": {
+                    "reviewer": login,
+                    "review_body": review_body[:500],
+                    "review_state": state_str,
+                },
+                "needs_review": True,
+                "review_reason": "comentario_github",
             })
 
     # -------------------------------------------------------------------------
     # Linkage claims — GitHub refs from body
     # -------------------------------------------------------------------------
-    from vault.research.github_parsers import GitHubParsers
     refs = GitHubParsers._parse_body_refs(body) if body else []
     for ref_str, relation, _ in refs:
         claims.append({

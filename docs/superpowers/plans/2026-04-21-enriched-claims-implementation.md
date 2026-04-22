@@ -321,10 +321,24 @@ git commit -m "feat(fusion): add evidence_ids bonus and calibrated needs_review 
 
 ```python
 def test_status_never_supersedes_decision():
-    ...
+    older = _make_decision_claim("c1", "some decision text")
+    newer = _make_status_claim("c2", "status text")
+    assert should_supersede(newer, older) is False
 
 def test_decision_supersedes_only_with_similarity_or_explicit_reason():
-    ...
+    older = _make_decision_claim("c1", "adopt new video pipeline")
+    newer = _make_decision_claim("c2", "completely different text", supersession_reason=None)
+    # Similarity < 0.7, no explicit reason -> should NOT supersede
+    assert should_supersede(newer, older) is False
+    newer_similar = _make_decision_claim("c2", "adopt new video pipeline approach", supersession_reason=None)
+    # Similarity > 0.7 -> should supersede
+    assert should_supersede(newer_similar, older) is True
+
+def test_decision_supersedes_with_explicit_supersession_reason():
+    older = _make_decision_claim("c1", "adopt new video pipeline")
+    newer = _make_decision_claim("c2", "completely different text", supersession_reason="override by product owner")
+    # Different text but explicit supersession_reason -> should supersede
+    assert should_supersede(newer, older) is True
 ```
 
 - [ ] **Step 2: Run tests (fail expected)**
@@ -332,6 +346,30 @@ def test_decision_supersedes_only_with_similarity_or_explicit_reason():
 Run: `PYTHONPATH=. pytest tests/vault/fusion_engine/test_supersession.py -q`
 
 - [ ] **Step 3: Implement guarded supersession**
+
+Modificar `should_supersede` em `vault/fusion_engine/supersession.py`:
+
+```python
+from difflib import SequenceMatcher
+
+def should_supersede(candidate: Claim, existing: Claim) -> bool:
+    # ... existing guards (entity_id + claim_type match) ...
+
+    # Nova lógica para decision: similaridade textual OU supersession_reason explícito
+    if candidate.claim_type == "decision":
+        has_explicit_reason = candidate.supersession_reason is not None
+        has_high_similarity = (
+            SequenceMatcher(
+                None,
+                candidate.text.lower(),
+                existing.text.lower()
+            ).ratio() > 0.7
+        )
+        if not (has_explicit_reason or has_high_similarity):
+            return False
+
+    return True  # todas as outras checks já passaram
+```
 
 - Similaridade textual `SequenceMatcher > 0.7` para decision->decision.
 - Bloqueio explícito de status->decision.

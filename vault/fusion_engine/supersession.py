@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import copy
 from datetime import datetime, timezone
+from difflib import SequenceMatcher
 
 from vault.memory_core.models import Claim
 
@@ -21,11 +22,20 @@ def should_supersede(candidate: Claim, existing: Claim) -> bool:
     Rules:
     - Same entity_id
     - Same claim_type
+    - status claim never supersedes a decision claim
     - candidate.event_timestamp is strictly newer than existing.event_timestamp
     - existing is not already superseded
+    - decision superseding decision requires either:
+      - text similarity > 0.7, or
+      - explicit supersession_reason on candidate
     """
     if candidate.entity_id != existing.entity_id:
         return False
+
+    # Hard guard: status claims must never supersede decisions.
+    if candidate.claim_type == "status" and existing.claim_type == "decision":
+        return False
+
     if candidate.claim_type != existing.claim_type:
         return False
     if existing.superseded_by is not None:
@@ -34,7 +44,20 @@ def should_supersede(candidate: Claim, existing: Claim) -> bool:
     candidate_ts = _parse_ts(candidate.event_timestamp)
     existing_ts = _parse_ts(existing.event_timestamp)
 
-    return candidate_ts > existing_ts
+    if candidate_ts <= existing_ts:
+        return False
+
+    if candidate.claim_type == "decision":
+        has_explicit_reason = candidate.supersession_reason is not None
+        has_high_similarity = SequenceMatcher(
+            None,
+            candidate.text.lower(),
+            existing.text.lower(),
+        ).ratio() > 0.7
+        if not (has_explicit_reason or has_high_similarity):
+            return False
+
+    return True
 
 
 def apply_supersession(candidate: Claim, existing: Claim) -> Claim:
