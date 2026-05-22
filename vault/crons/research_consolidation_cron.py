@@ -56,14 +56,14 @@ CONSECUTIVE_HIGH_REVERT_TRIGGER = 3  # 3+ consecutive cycles > 10% → global pa
 
 # Quality guardrails (enriched-claims)
 QUALITY_GUARDRAIL_THRESHOLDS = {
-    "min_decision_pct": 0.7,           # Option B hybrid: also requires min_decision_count_30d
+    "min_decision_pct": 5.0,           # Option B hybrid: also requires min_decision_count_30d
     "min_decision_count_30d": 3,        # decisions in last 30 days (recência)
     "min_linkage_pct": 3.0,
     "min_status_pct": 5.0,
     "max_needs_review_pct": 30.0,
     "min_with_evidence_pct": 80.0,
 }
-QUALITY_GUARDRAIL_CONSECUTIVE_TRIGGER = 3
+QUALITY_GUARDRAIL_CONSECUTIVE_TRIGGER = 2   # 2 consecutive bad cycles → alert
 
 
 # ---------------------------------------------------------------------------
@@ -472,7 +472,7 @@ def _evaluate_quality_thresholds(
         # Low pct but sufficient recent decisions — Option B override (passes)
         pass
     elif not pct_fails and count_fails:
-        # Sufficient pct but no recent decisions — still alert on recência
+        # Sufficient pct but no recent decisions — alert on recência via decision_count_30d
         failed.append("decision_count_30d")
         messages.append(
             f"pct_decision ok ({pct_decision:.1f}%) but decision_count_30d {decision_count_30d} < {min_decision_count}"

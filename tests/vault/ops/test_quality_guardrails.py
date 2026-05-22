@@ -36,12 +36,15 @@ def _make_claims(
     other: int = 0,
     needs_review: int = 0,
     with_evidence: int = 0,
+    now_as: str = "2026-04-21T07:00:00Z",
 ) -> list[dict]:
     """
     Build a synthetic claims list with the specified distribution.
 
     needs_review and with_evidence are taken from the decision+linkage+status+other total.
     All needs_review claims get non-empty evidence_ids.
+    All decision claims get a recent event_timestamp (within 30d of now_as) so that
+    _compute_claim_kpis returns a non-zero decision_count_30d for test accuracy.
     """
     all_types = []
     for _ in range(decision):
@@ -61,12 +64,16 @@ def _make_claims(
     for i, ct in enumerate(all_types):
         needs_review_flag = i < needs_review_count
         has_evidence = i < with_evidence_count
-        claims.append({
+        claim = {
             "claim_id": f"c{i}",
             "claim_type": ct,
             "needs_review": needs_review_flag,
             "evidence_ids": [f"ev{i}"] if has_evidence else [],
-        })
+        }
+        # Set event_timestamp for decision claims so decision_count_30d is accurate
+        if ct == "decision":
+            claim["event_timestamp"] = now_as
+        claims.append(claim)
     return claims
 
 
@@ -132,6 +139,7 @@ class TestEvaluateQualityThresholds:
 
     def test_all_kpis_clear_defaults(self):
         from vault.crons import research_consolidation_cron as mod
+        # Include decision_count_30d to match _compute_claim_kpis output (10 decisions recent)
         kpis = {
             "pct_decision": 20.0,
             "pct_linkage": 10.0,
@@ -139,6 +147,7 @@ class TestEvaluateQualityThresholds:
             "pct_needs_review": 5.0,
             "pct_with_evidence": 95.0,
             "total": 100,
+            "decision_count_30d": 10,
         }
         result = mod._evaluate_quality_thresholds(kpis)
         assert result["passed"] is True
@@ -198,6 +207,7 @@ class TestEvaluateQualityThresholds:
             "pct_needs_review": 25.0,
             "pct_with_evidence": 70.0,
             "total": 100,
+            "decision_count_30d": 5,   # 5 recent decisions (>= min_decision_count_30d default of 3)
         }
         # Pass when all custom thresholds allow
         result = mod._evaluate_quality_thresholds(
@@ -451,7 +461,7 @@ class TestRunQualityGuardrail:
         hist_path.parent.mkdir(parents=True, exist_ok=True)
         hist_path.write_text(
             '{"run_at":"2026-04-20T07:00:00Z","passed":false,"total":4,'
-            '"failed_kpis":["pct_decision"],"kpis":{}}\n'
+            '"failed_kpis":["decision_count_30d"],"kpis":{}}\n'
         )
         monkeypatch.setattr(mod, "QUALITY_HISTORY_PATH", str(hist_path))
 
