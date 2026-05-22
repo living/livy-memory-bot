@@ -1,6 +1,6 @@
 # HEARTBEAT — Livy Memory Agent
 
-_Atualizado: 2026-04-22 00:31 UTC (21:31 BRT)_
+_Atualizado: 2026-05-22 02:45 UTC (23:45 BRT)_
 
 ## Jobs Ativos — 21 crons
 
@@ -150,9 +150,11 @@ gh api graphql -f query='{ marketplacePurchases(first:5) { nodes { plan { name }
 
 ## Última Consolidação
 
-- Sessão de implementação/documentação: 2026-04-22 00:31 BRT
-- Alterações aplicadas: PR #24 merge + sincronização + validação + docs STM/LTM/napkin
-- Próxima consolidação: 2026-04-23 07:00 BRT
+- Sessão de consolidação: 2026-05-22 02:45 UTC (23:45 BRT)
+- Alterações: vault-lint regex fix + index.md projects/videos + memory cleanup (Chroma orphans)
+- Orphans: 33 → 6 (remaining 6 = person variants em quarantine — verdadeiro duplicates)
+- Chroma: 4 instâncias → 2 (1 orphan de 45d morto, 2 duplicatas removidas); ~2.1GB libertados
+- Próxima consolidação: 2026-05-23 07:00 BRT
 
 ## Mudanças desde Último HEARTBEAT (2026-04-22 00:31 UTC)
 
@@ -162,3 +164,6 @@ gh api graphql -f query='{ marketplacePurchases(first:5) { nodes { plan { name }
 | ✅ **Validação pós-merge PR #24** | master sincronizada; 4 crons smoke OK; quality guardrail ativado (1º ciclo ruim esperado — coverage baseline legados) |
 | ✅ docs: MEMORY.md + livy-memory-agent.md + HEARTBEAT.md | registrados PR #24 + quality dashboard |
 | ✅ docs: consolidation-log atualizado | session log de 2026-04-22 00:31 UTC |
+| ✅ **Consolidação vault — 2026-05-22** | vault-lint regex fix (commit `2ec4399`); index.md: Projects (16) + Videos (3) adicionados; orphans 33→6 |
+| ✅ **Memory cleanup — Chroma orphans** | 4 instâncias Chroma → 2; PID 3584 (45d, ~1GB) morto; ~2.1GB RAM libertados |
+| ✅ **Gateway restart + sessions cleanup** | Gateway reload; 460 sessões em memória → 0; 254 subagentes zombies limpos |
