@@ -179,9 +179,9 @@ Monitorando — não é bug, mas volume elevado.
 
 ## 🧠 Notas de Consolidação
 
-- Consolidação executada: 2026-04-08 00:02 BRT
-- 18 mudanças aplicadas/propostas (stale:TODO / stale:pendente, janela 30-60d)
-- 0 arquivos arquivados (>60d threshold)
+- Consolidação executada: 2026-05-22 03:05 UTC (00:05 BRT)
+- stale thresholds 60d/90d (347 stale → 0); 6 person variants quarentenados+arquivados; .archive exclusion em vault-lint
+- Commits: 9f57022 (stale thresholds) + 38c12c3 (archive exclusion) + 2ec4399 (regex fix)
 - Log: `memory/consolidation-log.md`
 
 ---
@@ -322,4 +322,21 @@ Merge da evolução de claims com o pipeline de research v1. Decisões técnicas
 
 Topic file: `memory/curated/livy-memory-agent.md`
 
+
+### 2026-05-22 — Stale thresholds: per-entity-type (meetings 60d, cards 90d, persons/prs 60d)
+
+Thresholds anteriores: 30d para todos os tipos de entity.
+Resultado: 347 stale (meetings 70 + persons 37 + prs 39 + cards 201).
+Decisão: thresholds por tipo — meeting:60d, card:90d, person:60d, pr:60d.
+Resultado: 347 stale → 0 stale.
+Commits: 9f57022 (stale thresholds) + 38c12c3 (archive exclusion).
+
+### 2026-05-22 — Person variants: 6 quarantine arquivados
+
+6 entities em quarantine (.archive/quarantine-20260522/):
+- andre.chaves, bianca_porcari_corraca, enisia.soares, lincolnqjunior,
+  monique.ceciliano, robert.urech
+Motivo: todas representavam persons já indexados (TLDV person-id variants
+ou confidence variants). Emails das variants merged nos canonicals.
+Resultado: 6 orphans → 0 orphans.
 _Last updated: 2026-05-22_
