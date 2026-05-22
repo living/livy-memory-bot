@@ -98,7 +98,7 @@ def _read_index_paths(vault_root: Path) -> set[str]:
         # Build filename stem → relative-path lookup (lazy)
         _stem_cache: dict[str, str] | None = None
 
-        for wm in re.finditer(r'\[\[([^\]]+)\]\]', text):
+        for wm in re.finditer(r'\[\[(.+?)\]\]', text):
             link_text = wm.group(1).strip()
             # Skip if it looks like a path already
             if "/" in link_text:
