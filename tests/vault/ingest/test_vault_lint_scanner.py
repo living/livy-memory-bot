@@ -141,3 +141,80 @@ class TestWikiLinkRegex:
         # New non-greedy regex matches correctly
         assert new_match is not None
         assert new_match.group(1) == "2026-03-25 [Tech] Reunião de Cadência 4D imobi"
+
+
+class TestStaleThresholds:
+    """Test stale detection with per-entity-type thresholds."""
+
+    def test_meetings_stale_at_60_days_not_30(self):
+        """Meeting with last_seen_at 45 days ago should NOT be stale (threshold = 60d)."""
+        from vault.ingest.vault_lint_scanner import run_lint_scans
+        import tempfile
+        from datetime import datetime, timezone, timedelta
+
+        # A meeting seen 45 days ago
+        past = (datetime.now(timezone.utc) - timedelta(days=45)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        index_content = """
+        ## 🗂 Meetings
+
+        - [[Test Meeting]]
+        """
+        entity_files = {
+            "entities/meetings/Test Meeting.md": f"---\ntype: meeting\nlast_seen_at: {past}\n---\n# Test Meeting",
+        }
+        with tempfile.TemporaryDirectory() as tmpdir:
+            vault_root = Path(tmpdir) / "vault"
+            vault_root.mkdir()
+            (vault_root / "index.md").write_text(index_content)
+            for rel_path, content in entity_files.items():
+                f = vault_root / rel_path
+                f.parent.mkdir(parents=True, exist_ok=True)
+                f.write_text(content)
+            report = run_lint_scans(vault_root)
+            stale_meetings = [s for s in report["stale"] if "Test Meeting" in s]
+            # Should NOT be stale at 45 days (threshold 60d for meetings)
+            assert len(stale_meetings) == 0, f"Meeting at 45d should NOT be stale, got: {stale}"
+
+    def test_meetings_stale_at_90_days(self):
+        """Meeting with last_seen_at 90 days ago SHOULD be stale (threshold = 60d)."""
+        from vault.ingest.vault_lint_scanner import run_lint_scans
+        import tempfile
+        from datetime import datetime, timezone, timedelta
+
+        past = (datetime.now(timezone.utc) - timedelta(days=90)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        entity_files = {
+            "entities/meetings/Old Meeting.md": f"---\ntype: meeting\nlast_seen_at: {past}\n---\n# Old Meeting",
+        }
+        with tempfile.TemporaryDirectory() as tmpdir:
+            vault_root = Path(tmpdir) / "vault"
+            vault_root.mkdir()
+            (vault_root / "index.md").write_text("- [[Old Meeting]]")
+            for rel_path, content in entity_files.items():
+                f = vault_root / rel_path
+                f.parent.mkdir(parents=True, exist_ok=True)
+                f.write_text(content)
+            report = run_lint_scans(vault_root)
+            stale_meetings = [s for s in report["stale"] if "Old Meeting" in s]
+            assert len(stale_meetings) == 1, f"Meeting at 90d should be stale, got: {stale_meetings}"
+
+    def test_cards_stale_at_90_days_not_60(self):
+        """Card with last_seen_at 75 days ago should NOT be stale (threshold = 90d)."""
+        from vault.ingest.vault_lint_scanner import run_lint_scans
+        import tempfile
+        from datetime import datetime, timezone, timedelta
+
+        past = (datetime.now(timezone.utc) - timedelta(days=75)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        entity_files = {
+            "entities/cards/card-old-test.md": f"---\ntype: card\nlast_seen_at: {past}\n---\n# Old Card",
+        }
+        with tempfile.TemporaryDirectory() as tmpdir:
+            vault_root = Path(tmpdir) / "vault"
+            vault_root.mkdir()
+            (vault_root / "index.md").write_text("- [[Old Card]]")
+            for rel_path, content in entity_files.items():
+                f = vault_root / rel_path
+                f.parent.mkdir(parents=True, exist_ok=True)
+                f.write_text(content)
+            report = run_lint_scans(vault_root)
+            stale_cards = [s for s in report["stale"] if "card-old-test" in s]
+            assert len(stale_cards) == 0, f"Card at 75d should NOT be stale (threshold 90d), got: {stale_cards}"

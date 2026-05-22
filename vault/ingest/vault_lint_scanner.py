@@ -146,7 +146,8 @@ def run_lint_scans(vault_root: Path) -> LintReport:
 
     Checks:
     - orphans: entities present on disk but missing from index.md
-    - stale: entities with last_seen_at older than 30 days
+    - stale: entities with last_seen_at older than per-type threshold
+        (meeting:60d, card:90d, person:60d, pr:60d, default:30d)
     - gaps: concept IDs referenced in entity frontmatter but without their own concepts/ page
     - contradictions: multiple entity files sharing an id_canonical with conflicting confidence
     """
@@ -163,17 +164,29 @@ def run_lint_scans(vault_root: Path) -> LintReport:
             orphans.append(rel)
 
     # ── Stale ──────────────────────────────────────────────────────────────────
-    # Entities with last_seen_at > 30 days ago
+    # Per-entity-type thresholds (days):
+    #   meeting: 60d (less volatile, archived less frequently)
+    #   card:   90d (Trello cards persist longer)
+    #   person: 60d (identity is stable)
+    #   pr:     60d (PR lifecycle is medium)
+    #   other:  30d (default)
+    STALE_THRESHOLDS: dict[str, int] = {
+        "meeting": 60,
+        "card": 90,
+        "person": 60,
+        "pr": 60,
+    }
     stale: list[str] = []
     now = datetime.now(timezone.utc)
     for _f, fm in entities:
         last_seen = fm.get("last_seen_at")
         if last_seen:
             try:
-                # Handle "Z" suffix (Python <3.11 fromisoformat doesn't accept Z)
+                entity_type = fm.get("type", "")
+                threshold = STALE_THRESHOLDS.get(entity_type, 30)
                 ts_str = str(last_seen).replace("Z", "+00:00")
                 ts = datetime.fromisoformat(ts_str)
-                if (now - ts).days > 30:
+                if (now - ts).days > threshold:
                     stale.append(fm.get("_path", ""))
             except (ValueError, TypeError):
                 pass
