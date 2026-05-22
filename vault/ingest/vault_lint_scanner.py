@@ -55,6 +55,8 @@ def _scan_entities(vault_root: Path) -> list[tuple[Path, dict[str, Any]]]:
     if not entities_dir.exists():
         return entities
     for f in entities_dir.rglob("*.md"):
+        if "/.archive/" in str(f):
+            continue
         fm = _parse_frontmatter(f.read_text(encoding="utf-8"))
         fm["_path"] = str(f.relative_to(vault_root))
         entities.append((f, fm))
