@@ -11,6 +11,14 @@ Idempotência: path do ficheiro = date + slugify(subject) + sha256(source_ref)[:
 Se o ficheiro já existe, skip — nunca sobrescreve lições manuais.
 """
 
+import sys
+from pathlib import Path
+
+# Ensure project root is on sys.path so `vault.research.*` imports work
+_WS_ROOT = Path(__file__).resolve().parents[2]
+if str(_WS_ROOT) not in sys.path:
+    sys.path.insert(0, str(_WS_ROOT))
+
 import argparse
 import hashlib
 import json
@@ -263,6 +271,156 @@ def build_trello_lesson_path(updated_at: str, board_name: str, card_id: str, car
     return LESSONS_DIR / f"{date_str}-{slug}-{subhash}.md"
 
 
+# ─── TLDV SYNTHESIS ───────────────────────────────────────────────────────────
+
+
+def extract_project_tag(name: str) -> str | None:
+    """Extract project tag from meeting name. E.g. 'DELPHOS Sprint' -> 'DELPHOS'."""
+    import re
+
+    # Look for uppercase words (2-10 chars) that could be project names
+    tags = re.findall(r"\b([A-Z]{2,10})\b", name)
+    KNOWN = {"DELPHOS", "BAT", "HYDRA", "FORGE", "TLDV", "LIVY", "SVD", "KABA"}
+    for tag in tags:
+        if tag in KNOWN:
+            return tag
+    return None
+
+
+def synthesize_tldv_via_llm(project: str, transcripts: list[dict], model: str) -> str | None:
+    """Synthesize multiple meeting transcripts into one lesson via LLM."""
+    transcript_summary = "\n\n".join(
+        f"=== {t['name']} ({t['date']}) ===\n{t['transcript'][:2000]}"
+        for t in transcripts
+    )
+    prompt = f"""You are a senior engineer synthesizing multiple meeting transcripts into one concise lesson.
+Project: {project}
+
+TRANSCRIPTS:
+{transcript_summary}
+
+Task: Identify recurring decisions, agreements, action items, and blockers across these meetings.
+Output ONLY valid YAML frontmatter + lesson body in Portuguese (BR). No code fences.
+
+Rules:
+- type: lesson
+- source: tldv
+- source_ref: "tldv/{project}/synthesis"
+- date: YYYY-MM-DD (today)
+- subject: "[Síntese] {project} — N reuniões"
+- tags: [{project.lower()}, synthesis, meetings]
+
+Format:
+## O que aconteceu
+[What was discussed across these meetings]
+
+## Decisões identificadas
+[List of specific decisions made]
+
+## Lessons
+- [lesson 1]
+- [lesson 2]
+- [lesson 3]
+
+## Source
+Auto-generated from TLDV transcripts (Azure Blob)
+"""
+
+    try:
+        import urllib.request
+
+        payload = {
+            "model": model,
+            "messages": [
+                {"role": "user", "content": prompt}
+            ],
+            "temperature": 0.3,
+            "max_tokens": 800,
+        }
+        req = urllib.request.Request(
+            "https://api.openai.com/v1/chat/completions",
+            data=json.dumps(payload).encode(),
+            headers={"Authorization": f"Bearer {OPENAI_API_KEY}", "Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            return json.loads(resp.read())["choices"][0]["message"]["content"]
+    except Exception as e:
+        print(f"    [WARN] LLM call failed: {e}", file=sys.stderr)
+        return None
+
+
+def synthesize_tldv_lessons(since_days: int, model: str, dry_run: bool = False) -> list[str]:
+    """
+    Synthesize lessons from TLDV meetings via Azure Blob transcripts.
+    Group meetings by project (from name tags like DELPHOS, BAT, HYDRA).
+    Only synthesize when 2+ meetings for same project exist.
+    Transcript source: Azure Blob primary.
+    """
+    from vault.research.tldv_client import TLDVClient
+    from vault.research.azure_blob_client import AzureBlobClient
+
+    client = TLDVClient(lookback_days=since_days)
+    azure = AzureBlobClient()
+
+    # Fetch meeting list from TLDV (use fetch_events_since with None to use lookback_days)
+    try:
+        meetings = client.fetch_events_since(None)
+    except Exception as e:
+        print(f"    [WARN] TLDV client error: {e}", file=sys.stderr)
+        return []
+
+    # Group by project from meeting name (extract uppercase project tags)
+    by_project: dict[str, list[tuple[dict, str]]] = {}
+    for meeting in meetings:
+        name = meeting.get("name", "")
+        meeting_id = meeting.get("meeting_id", "") or meeting.get("id", "")
+        if not meeting_id:
+            continue
+        project = extract_project_tag(name)
+        if project:
+            by_project.setdefault(project, []).append((meeting, meeting_id))
+
+    lessons = []
+    for project, meeting_list in by_project.items():
+        if len(meeting_list) < 2:
+            continue  # need 2+ meetings to synthesize
+
+        transcript_texts = []
+        for meeting, meeting_id in meeting_list:
+            try:
+                transcript = azure.fetch_transcript(meeting_id)
+                if transcript:
+                    # Use created_at for date, fallback to updated_at
+                    date_val = meeting.get("created_at") or meeting.get("updated_at", "")
+                    # Normalize ISO timestamp to date string
+                    if date_val:
+                        try:
+                            date_str = datetime.fromisoformat(date_val.replace("Z", "+00:00"))
+                            date_str = date_str.strftime("%Y-%m-%d")
+                        except Exception:
+                            date_str = str(date_val)[:10]
+                    else:
+                        date_str = ""
+                    transcript_texts.append({
+                        "meeting_id": meeting_id,
+                        "name": meeting.get("name", ""),
+                        "date": date_str,
+                        "transcript": transcript[:3000],  # truncate for LLM
+                    })
+            except Exception:
+                continue
+
+        if not transcript_texts:
+            continue
+
+        print(f"  [PROC] {project}: synthesizing {len(transcript_texts)} meetings")
+        lesson = synthesize_tldv_via_llm(project, transcript_texts, model)
+        if lesson:
+            lessons.append(lesson)
+    return lessons
+
+
 def get_updated_trello_cards(since_days: int) -> list[dict]:
     """Return Trello cards updated in last N days via existing TrelloClient."""
     try:
@@ -387,12 +545,21 @@ def run(
     else:
         print(f"[honcho_capture] Processing {len(repos)} repos: {repos}")
 
-    summary = {
-        "lessons_written": 0,
-        "sources": {},
-        "skipped": 0,
-        "errors": [],
-    }
+    # Short-circuit: non-GitHub sources don't need repo discovery
+    if source in ("trello", "tldv-synthesis"):
+        summary = {
+            "lessons_written": 0,
+            "sources": {},
+            "skipped": 0,
+            "errors": [],
+        }
+    else:
+        summary = {
+            "lessons_written": 0,
+            "sources": {},
+            "skipped": 0,
+            "errors": [],
+        }
 
     for repo in repos:
         prs = get_merged_prs(org, repo, since_days)
@@ -557,6 +724,28 @@ def run(
             except Exception as e:
                 summary["sources"]["trello"]["errors"] += 1
                 summary["errors"].append(f"trello/{card_id}: write failed — {e}")
+
+    # ── TLDV Synthesis ──────────────────────────────────────────────────────
+    if source == "tldv-synthesis":
+        summary["sources"]["tldv"] = {"found": 0, "processed": 0, "errors": 0}
+        lessons = synthesize_tldv_lessons(since_days, model, dry_run)
+        summary["sources"]["tldv"]["found"] = len(lessons)
+        for lesson in lessons:
+            fm = parse_frontmatter(lesson)
+            subject = fm.get("subject", "tldv-synthesis")
+            date_str = datetime.now().strftime("%Y-%m-%d")
+            slug = slugify(subject)
+            path = LESSONS_DIR / f"{date_str}-{slug}-tldv-synthesis.md"
+            if path.exists():
+                print(f"  [SKIP] {path.name} already exists")
+                summary["skipped"] += 1
+                continue
+            if not dry_run:
+                path.write_text(lesson.strip() + "\n")
+                print(f"  [WROTE] {path.name}")
+            summary["lessons_written"] += 1
+            summary["sources"]["tldv"]["processed"] += 1
+        return summary
 
     return summary
 
