@@ -249,6 +249,115 @@ def build_lesson_path(merged_at: str, org: str, repo: str, pr_number: int, subje
     return LESSONS_DIR / f"{date_str}-{slug}-{subhash}.md"
 
 
+def build_trello_lesson_path(updated_at: str, board_name: str, card_id: str, card_name: str) -> Path:
+    """Build lesson path for a Trello card."""
+    date_brazil = None
+    try:
+        date_brazil = datetime.fromisoformat(updated_at.replace("Z", "+00:00")) - timedelta(hours=3)
+    except Exception:
+        date_brazil = datetime.now()
+    date_str = date_brazil.strftime("%Y-%m-%d")
+    slug = slugify(card_name)
+    source_ref = f"trello/{card_id}"
+    subhash = hashlib.sha256(source_ref.encode()).hexdigest()[:6]
+    return LESSONS_DIR / f"{date_str}-{slug}-{subhash}.md"
+
+
+def get_updated_trello_cards(since_days: int) -> list[dict]:
+    """Return Trello cards updated in last N days via existing TrelloClient."""
+    try:
+        from vault.research.trello_client import TrelloClient
+        client = TrelloClient()
+        boards = client.list_boards()
+        cutoff = datetime.now(timezone.utc) - timedelta(days=since_days)
+        cards = []
+        for board in boards:
+            try:
+                board_cards = client.get_board_cards(board["id"])
+                for card in board_cards:
+                    try:
+                        updated = datetime.fromisoformat(card["dateLastUpdate"].replace("Z", "+00:00"))
+                        if updated >= cutoff:
+                            card["_board_name"] = board.get("name", "")
+                            cards.append(card)
+                    except Exception:
+                        continue
+            except Exception:
+                continue
+        cards.sort(key=lambda c: c.get("dateLastUpdate", ""), reverse=True)
+        return cards
+    except Exception as e:
+        print(f"    [WARN] Trello client error: {e}", file=sys.stderr)
+        return []
+
+
+def extract_trello_lesson_via_llm(card_name: str, card_desc: str, board_name: str, url: str, updated: str, model: str) -> str | None:
+    """Extract lesson from a Trello card via LLM."""
+    user_prompt = f"""Card: {card_name}
+Board: {board_name}
+Description: {card_desc or '(no description)'}
+Updated: {updated}
+URL: {url}
+
+Extract a lesson if this card represents a meaningful decision, process change, or architectural choice.
+If it's a routine task or backlog item, return skip_reason=trivial."""
+
+    system = """You are a senior engineer writing a concise lesson from a Trello card.
+Output ONLY valid YAML frontmatter + lesson body in Portuguese (BR). No code fences.
+
+Rules:
+- type: lesson
+- source: trello
+- source_ref: "trello/{card_id}"
+- date: YYYY-MM-DD (BRT = UTC-3)
+- subject: "Trello: {card_name} [{board_name}]"
+- tags: [trello, {board_name_slug}]
+
+Format:
+## O que aconteceu
+[What this card represents]
+
+## Decisão / Solução
+[The decision or process captured]
+
+## Lessons
+- [lesson 1]
+- [lesson 2]
+
+## Source
+[URL]
+
+If trivial (backlog item, routine task, no decision), output ONLY:
+---
+type: lesson
+skip_reason: trivial
+---
+"""
+
+    try:
+        import urllib.request
+        payload = {
+            "model": model,
+            "messages": [
+                {"role": "system", "content": system.format(board_name_slug=slugify(board_name))},
+                {"role": "user", "content": user_prompt},
+            ],
+            "temperature": 0.3,
+            "max_tokens": 600,
+        }
+        req = urllib.request.Request(
+            "https://api.openai.com/v1/chat/completions",
+            data=json.dumps(payload).encode(),
+            headers={"Authorization": f"Bearer {OPENAI_API_KEY}", "Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            return json.loads(resp.read())["choices"][0]["message"]["content"]
+    except Exception as e:
+        print(f"    [WARN] LLM call failed: {e}", file=sys.stderr)
+        return None
+
+
 def run(
     org: str,
     repos: list[str] | None,
@@ -400,6 +509,54 @@ def run(
                 except Exception as e:
                     summary["sources"][repo]["errors"] += 1
                     summary["errors"].append(f"{org}/{repo} issue#{number}: write failed — {e}")
+
+    # ── Trello Cards ──────────────────────────────────────────────────────────
+    if source == "trello":
+        cards = get_updated_trello_cards(since_days)
+        summary["sources"]["trello"] = {"cards_found": len(cards), "processed": 0, "skipped_existing": 0, "errors": 0}
+        print(f"\n[honcho_capture] Trello: {len(cards)} cards updated in last {since_days} days")
+        for card in cards:
+            card_id = card.get("id", "")
+            name = card.get("name", "")
+            desc = card.get("desc", "") or ""
+            board_name = card.get("_board_name", "")
+            updated = card.get("dateLastUpdate", "")
+            url = card.get("shortUrl", "")
+            path = build_trello_lesson_path(updated, board_name, card_id, name)
+
+            if path.exists():
+                print(f"  [SKIP] {path.name} already exists")
+                summary["sources"]["trello"]["skipped_existing"] += 1
+                summary["skipped"] += 1
+                continue
+
+            if dry_run:
+                print(f"  [DRY] Would write: {path.name}")
+                summary["sources"]["trello"]["processed"] += 1
+                continue
+
+            summary["sources"]["trello"]["processed"] += 1
+            print(f"  [PROC] Card: {name[:50]}")
+
+            content = extract_trello_lesson_via_llm(name, desc, board_name, url, updated, model)
+            if content is None:
+                summary["sources"]["trello"]["errors"] += 1
+                summary["errors"].append(f"trello/{card_id}: LLM call failed")
+                continue
+
+            fm = parse_frontmatter(content)
+            if fm.get("skip_reason") == "trivial":
+                print(f"  [SKIP] Trivial card")
+                summary["skipped"] += 1
+                continue
+
+            try:
+                path.write_text(content.strip() + "\n")
+                print(f"  [WROTE] {path.name}")
+                summary["lessons_written"] += 1
+            except Exception as e:
+                summary["sources"]["trello"]["errors"] += 1
+                summary["errors"].append(f"trello/{card_id}: write failed — {e}")
 
     return summary
 
