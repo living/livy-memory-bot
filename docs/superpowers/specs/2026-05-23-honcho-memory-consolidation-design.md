@@ -33,7 +33,7 @@ A pipeline actual ingere dados de TLDV, GitHub e Trello → SSOT (state.json com
 │  Peer model: owner, agent-main, agent-memory-agent         │
 │  Reasoning: extrai conclusões, não só armazena              │
 │  Self-hosted: http://100.121.74.111:8000 (Tailscale-only) │
-│  Peer refresh: tipicamente < 5 min após nova lesson        │
+│  Peer refresh: tipicamente < 5 min após nova lesson[^1]        │
 ├─────────────────────────────────────────────────────────────┤
 │                     VAULT (disk)                           │
 │  memory/vault/lessons/    ← honcho_capture.py (NOVO)       │
@@ -167,7 +167,7 @@ TLDV/Supabase                            memory/vault/lessons/ search_conclusion
 ```
 memory/vault/lessons/YYYY-MM-DD-{slugify(subject)}-{sha256(source_ref)[:6]}.md
 ```
-Exemplo: `memory/vault/lessons/2026-05-22-pr24-enriched-claims-rollout-a3f2c1.md`
+Path completo: `memory/vault/lessons/2026-05-22-pr24-enriched-claims-rollout-a3f2c1.md`
 
 **Regra:** Se arquivo já existe, skip (idempotência garantida pelo path único).
 
@@ -303,6 +303,8 @@ Model:     fastest
 }
 ```
 Se o ETL falhar 2 execuções consecutivas, alerta enviado a Lincoln.
+
+**Nota CLI:** Formato `--failureAlert` deve ser verificado com `openclaw cron add --help` antes de criar. Se CLI não aceitar flags aninhadas, usar JSON payload em vez de flags.
 
 **Argumentos do script:**
 - `--days N` — janela de extracção (default: 1 dia)
@@ -455,3 +457,8 @@ Após QW-2: testar `honcho_search_conclusions` sobre as lessons escritas manualm
 ---
 
 _Last updated: 2026-05-23_
+
+[^1]: TTL peer refresh: "< 5 min" é estimativa não verificada instrumentalmente.
+Honcho rebuilda peer representations async; o delay real depende da carga.
+Fallback disk cobre a incerteza: se Honcho ainda não reflectiu, leitura de
+memory/vault/lessons/ retorna o dado correto.
