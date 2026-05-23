@@ -1,7 +1,7 @@
 # Spec — Camada de Sabedoria: Vault Lessons + Honcho
 
 **Data:** 2026-05-23
-**Revisão:** 3ª — pós review estruturado
+**Revisão:** 4ª — pós segundo review estruturado
 **Autor:** Lincoln + Livy Memory
 **Status:** Approved
 
@@ -26,38 +26,41 @@ A pipeline actual ingere dados de TLDV, GitHub e Trello → SSOT (state.json com
 ┌─────────────────────────────────────────────────────────────┐
 │                     AGENTE (main / memory)                   │
 │                                                             │
-│  honcho_search_conclusions  ←→  honcho_ask                  │
-│       (peer reasoning)          (context injection)          │
+│  honcho_search_conclusions  ←→  honcho_ask                   │
+│       (peer reasoning)         (context injection)           │
 ├─────────────────────────────────────────────────────────────┤
 │                        HONCHO                               │
 │  Peer model: owner, agent-main, agent-memory-agent         │
 │  Reasoning: extrai conclusões, não só armazena              │
 │  Self-hosted: http://100.121.74.111:8000 (Tailscale-only) │
+│  Peer refresh: tipicamente < 5 min após nova lesson        │
 ├─────────────────────────────────────────────────────────────┤
 │                     VAULT (disk)                           │
-│  lessons/         ← honcho_capture.py (NOVO)                │
-│  claims/          ← research_* (existente)                │
-│  decisions/       ← consolidations (existente)             │
+│  memory/vault/lessons/    ← honcho_capture.py (NOVO)       │
+│  memory/vault/claims/     ← research_* (existente)        │
+│  memory/vault/decisions/  ← consolidations (existente)     │
 ├─────────────────────────────────────────────────────────────┤
 │                   CLAUDE MEM                               │
-│  19,922 obs · 8,610 summaries · 1,838 sessões             │
-│  Papel: busca em histórico conversacional (18 anos)        │
-│  Mantido como search backup durante maturação do Honcho    │
+│  19,922 obs · 8,610 summaries · 1,838 sessões            │
+│  Papel: busca em histórico conversacional (18 anos)         │
+│  Mantido como search backup durante maturação do Honcho     │
 └─────────────────────────────────────────────────────────────┘
 
 FONTES (ETL existente):
-  GitHub ──► research_github ──► vault/claims/
-  Trello ──► research_trello  ──► vault/claims/
-  TLDV   ──► research_tldv   ──► vault/claims/
-              honcho_capture.py (NOVO) ──► lessons/
+  GitHub ──► research_github ──► memory/vault/claims/
+  Trello ──► research_trello  ──► memory/vault/claims/
+  TLDV   ──► research_tldv   ──► memory/vault/claims/
+              honcho_capture.py (NOVO) ──► memory/vault/lessons/
 ```
+
+**Path canonical:** Todos os paths do vault são relativos a `memory/vault/`. A arquitectura e diagramas usam `memory/vault/lessons/` — este é o path correcto.
 
 ### Pilares da arquitectura (invioláveis)
 
 | Camada | Função | Quem escreve | Storage |
 |---|---|---|---|
-| **Facts** | Source of truth | `vault/crons/research_*.py` | `vault/claims/`, `vault/decisions/` |
-| **Sabedoria** | Lições derivadas | `honcho_capture.py` | `vault/lessons/` |
+| **Facts** | Source of truth | `vault/crons/research_*.py` | `memory/vault/claims/`, `memory/vault/decisions/` |
+| **Sabedoria** | Lições derivadas | `honcho_capture.py` | `memory/vault/lessons/` |
 | **Cache semântica** | Retrieval rápido | `honcho_capture` (lê lessons) | Honcho (peer memory) |
 | **Histórico** | Busca em conversa | OpenClaw auto | Claude Mem (SQLite) |
 
@@ -78,16 +81,16 @@ FONTES (ETL existente):
 
 ---
 
-## ⚠️ Risco: SPOF Desktop-Link (QW-X)
+## ⚠️ Risco: SPOF Desktop-Link
 
 **Problema:** Honcho está a correr no desktop Windows, accessed via Tailscale from VPS. Se o desktop dormir ou a ligação Tailscale cair, Honcho fica offline.
 
 **Mitigações:**
-- `vault/lessons/` é storage primário — sempre disponível offline
-- Heartbeat valida Honcho antes de usar; se offline, usa `honcho-query` em modo disk-only
-- Alerta enviado a Lincoln se Honcho offline por >15 min
+- `memory/vault/lessons/` é storage primário — sempre disponível offline
+- `honcho_health_check()` valida Honcho antes de usar; se offline, usa fallback disk
+- Alerta enviado a Lincoln se Honcho offline por > 15 min
 
-**Não é blockers:** o sistema funciona sem Honcho (lê do vault). Só perde a cache semântica e o reasoning model.
+**Não é blocker:** o sistema funciona sem Honcho (lê do vault). Só perde a cache semântica e o reasoning model.
 
 ---
 
@@ -96,10 +99,10 @@ FONTES (ETL existente):
 ```
 FONTES CRUAS              PIPELINE              STORAGE              RETRIEVAL
 ─────────────             ────────              ───────              ─────────
-GitHub API  ────────►  research_*       ───►  vault/claims/  ───► agents
-Trello API      (já existente)              vault/decisions/       via honcho_
-TLDV/Supabase                            vault/lessons/      search/ask
-                                        (lessons/ = novo)
+GitHub API  ────────►  research_*       ───►  vault/claims/ ───► agents
+Trello API      (já existente)               vault/decisions/        via honcho_
+TLDV/Supabase                            memory/vault/lessons/ search_conclusions
+                                         (lessons/ = novo)    ou honcho-query skill
                     honcho_capture.py
                       │
                       ▼
@@ -110,8 +113,8 @@ TLDV/Supabase                            vault/lessons/      search/ask
 ```
 
 **Separação RAW / Sabedoria:**
-- RAW facts → `vault/claims/`, `vault/decisions/` — source of truth
-- Sabedoria/lições → `vault/lessons/` — reasoning derivado
+- RAW facts → `memory/vault/claims/`, `memory/vault/decisions/` — source of truth
+- Sabedoria/lições → `memory/vault/lessons/` — reasoning derivado
 - Honcho = cache de leitura rápida — lê do vault, não escreve no vault
 
 ---
@@ -128,10 +131,10 @@ TLDV/Supabase                            vault/lessons/      search/ask
 - Derivada — não é source of truth
 - Escrita **só** por `honcho_capture.py`
 - Lê fontes cruas (não o SSOT) para permitir reprocessamento por período
-- Armazenada em `vault/lessons/` como markdown
+- Armazenada em `memory/vault/lessons/` como markdown
 - Honcho é cache de leitura rápida — não storage primário
 
-**Regra de ouro:** Facts no Vault. Lições no vault/lessons. Honcho é cache. Se Honcho morrer, lessons continuam no vault.
+**Regra de ouro:** Facts no Vault. Lições em `memory/vault/lessons/`. Honcho é cache. Se Honcho morrer, lessons continuam no vault.
 
 ---
 
@@ -142,11 +145,11 @@ TLDV/Supabase                            vault/lessons/      search/ask
 | Honcho plugin | ✅ Enabled, self-hosted `http://100.121.74.111:8000` |
 | Peers Honcho | ✅ owner, agent-main, agent-memory-agent, 7426291192 |
 | honcho_capture.py | ❌ Não existe |
-| `vault/lessons/` | ❌ Não existe (Gap 1 — blocker) |
+| `memory/vault/lessons/` | ❌ Não existe (Gap 1 — blocker) |
 | Cron honcho-lessons-capture | ❌ Não existe (Gap 4) |
 | Claude Mem | ✅ 19,922 obs, 8,610 summaries — mantido como backup |
-| honcho-query skill | ❌ Não existe (skill vault-query não cobre lessons) |
-| SPOF desktop-link | ⚠️ Não documentado — risco activo |
+| Skill honcho-query | ❌ Não existe |
+| SPOF desktop-link | ⚠️ Documentado com mitigação |
 
 ---
 
@@ -154,11 +157,19 @@ TLDV/Supabase                            vault/lessons/      search/ask
 
 ### 1. `vault/insights/honcho_capture.py`
 
-**Responsabilidade:** ETL que lê fontes cruas (não o SSOT), gera lições estruturadas e escreve em `vault/lessons/`.
+**Responsabilidade:** ETL que lê fontes cruas (não o SSOT), gera lições estruturadas e escreve em `memory/vault/lessons/`.
 
 **Input:** GitHub API (PRs, issues, comments), Trello API (cards, checklists, comments), TLDV/Supabase (transcripts, summaries)
 
-**Output:** Markdown files em `vault/lessons/` com frontmatter.
+**Output:** Markdown files em `memory/vault/lessons/`.
+
+**Path de cada lesson (idempotência por path):**
+```
+memory/vault/lessons/YYYY-MM-DD-{slugify(subject)}-{sha256(source_ref)[:6]}.md
+```
+Exemplo: `memory/vault/lessons/2026-05-22-pr24-enriched-claims-rollout-a3f2c1.md`
+
+**Regra:** Se arquivo já existe, skip (idempotência garantida pelo path único).
 
 **Formato de cada lesson:**
 ```yaml
@@ -177,8 +188,6 @@ oai_model: fastest     # LLM used to generate
 ---
 ```
 
-**Nota:** Campo `processed` removido — idempotência garantida por path do arquivo (date + source_ref = ID único). Se o arquivo já existe, não re-escreve.
-
 **Gatilhos de extracção:**
 | Gatilho | Fonte | Tipo de lição |
 |---|---|---|
@@ -193,52 +202,107 @@ oai_model: fastest     # LLM used to generate
 **Granularidade (regra):**
 - 1 PR com múltiplas decisões independentes → **múltiplas lessons** (ex: architecture + naming + rollback = 3 arquivos com tags partilhadas)
 - Decisões do mesmo PR sobre o mesmo tema → **1 lesson** (evita ruído)
-- 1 decision track de reunión → **1 lesson**
+- 1 decision track de reunião → **1 lesson**
 
-### 2. `vault/lessons/` (storage primário de lições)
+**Output do run (JSON summary):**
+```json
+{"lessons_written": 3, "sources": {"github": 2, "trello": 1}, "skipped": 0, "errors": []}
+```
+Impresso no stdout no final do run. Usado pelo cron para reportar.
+
+---
+
+### 2. `memory/vault/lessons/` (storage primário de lições)
 
 **Responsabilidade:** Storage primário de lições (Honcho é cache).
 
 **Estrutura:**
 ```
 memory/vault/lessons/
-  2026-05-22-pr24-quality-guardrail.md
-  2026-05-22-vault-regex-brackets-fix.md
-  2026-05-22-stale-thresholds-per-entity.md
+  2026-05-22-pr24-enriched-claims-rollout-a3f2c1.md
+  2026-05-22-stale-thresholds-per-entity-9d3e1b.md
+  2026-05-22-vault-regex-brackets-fix-c4f8a2.md
   ...
 ```
 
-**Idempotência:** path do arquivo = hash de `date + source_ref`. Se arquivo existe, skip.
+**Idempotência:** path do arquivo = `date + slugify(subject) + sha256(source_ref)[:6]`. Se arquivo existe, skip.
+
+---
 
 ### 3. Skill `honcho-query` (novo)
 
-**Responsabilidade:** Retrieval de lições. Lê tanto do Honcho (fast path) quanto de `vault/lessons/` (fallback).
+**Responsabilidade:** Retrieval de lições com fallback disk.
 
-**Operações:**
-- `honcho_query(query, topK=5)` — busca no Honcho
-- Se Honcho offline → lê de `vault/lessons/` via full-text search
-- Se Ambas falham → retorna empty com mensagem
+**Interface:**
 
-**Nota:** Skill `vault-query` não é alterada — cobre entities/concepts/decisions. `honcho-query` é skill separada para lessons.
+```python
+# honcho_query(query: str, topK: int = 5) -> List[Lesson]
+#   Busca no Honcho (fast path). Se Honcho offline ou vazio,
+#   fáilleback para full-text search em memory/vault/lessons/.
+#   Retorna lista de lessons com score de relevância.
+#
+# honcho_health_check() -> bool
+#   Verifica se Honcho está disponível. Usado pelo heartbeat
+#   antes de invocar honcho_query. Retorna True se Honcho
+#   responded within 3s, False caso contrário.
+```
+
+**Comportamento de `honcho_query`:**
+1. Tenta `honcho_search_conclusions(query, topK)` — fast path
+2. Se Honcho offline ou retornou < topK results:
+   - Faz full-text search em `memory/vault/lessons/*.md`
+   - Usa regex/grep ou Python para buscar por tags, subject, lesson text
+3. Retorna results combinados com source attribution (honcho vs disk)
+
+**Invocação pelo agente:**
+```
+# Query rápida (sem fallback): usa honcho_search_conclusions (built-in tool)
+conclusions = honcho_search_conclusions(query=topic, topK=5)
+
+# Query com fallback disk: usa skill honcho-query
+conclusions = honcho_query(query=topic, topK=5)
+```
+
+**Cenários de uso:**
+| Cenário | Tool |
+|---|---|
+| Startup agent — contexto rápido | `honcho_search_conclusions` (built-in) |
+| Heartbeat — briefing com fallback | `honcho-query` skill |
+| Query sobre erro específico | `honcho-query` skill (garante results do vault) |
+
+---
 
 ### 4. Cron `honcho-lessons-capture`
 
 **Responsabilidade:** Extrair lições diariamente às 07h BRT.
 
+**Configuração:**
 ```
-# Cron: 0 10 * * * (BRT = UTC-3, 07h BRT)
-# Session target: isolated (agent memory-agent)
-# O agente recebe instrução, não comando shell directo
+Schedule:  cron 0 10 * * * (BRT = UTC-3, 07h BRT)
+Session:   isolated
+Agent:     memory-agent
+Model:     fastest
 ```
 
-**Payload (correcto):**
+**Payload (agentTurn — o agente recebe instrução):**
 ```json
 {
   "kind": "agentTurn",
-  "message": "Execute honcho_capture: run --days 1. Validate dates first (QW-0). Write lessons to vault/lessons/. Report results.",
+  "message": "Execute honcho_capture: run --days 1. Validate dates first (QW-0). Write lessons to memory/vault/lessons/. Report JSON summary at end.",
   "model": "fastest"
 }
 ```
+
+**Failure alert:**
+```json
+{
+  "after": 2,
+  "channel": "telegram",
+  "to": "7426291192",
+  "mode": "announce"
+}
+```
+Se o ETL falhar 2 execuções consecutivas, alerta enviado a Lincoln.
 
 **Argumentos do script:**
 - `--days N` — janela de extracção (default: 1 dia)
@@ -252,7 +316,7 @@ memory/vault/lessons/
 ### Startup (Main agent + Memory agent)
 
 ```python
-# No início de cada sessão:
+# Ferramentas built-in (Honcho directo — fast path):
 conclusions = honcho_search_conclusions(
     query=session_topic,  # o tema da sessão
     topK=5
@@ -267,23 +331,22 @@ briefing = honcho_ask(
 ### Heartbeat (diário 07h BRT)
 
 ```python
-briefing = honcho_ask(
+# Skill honcho-query (com fallback disk):
+if not honcho_health_check():
+    alert("Honcho offline — using disk fallback")
+
+briefing = honcho_query(
     "briefing dos projectos activos: "
     "o que mudou, o que precisa atenção, lições da semana?",
-    depth="thorough"
+    topK=10
 )
 # Envia DM para Lincoln
-# Se Honcho offline: alerta + leitura directa de vault/lessons/
 ```
 
 ### Pergunta directa
 
 Lincoln pode perguntar "o que a gente já decidiu sobre X?" →
 `honcho_search_conclusions(query=X)` → lições relacionadas.
-
-### Fallback (Honcho offline)
-
-Agentes usam `honcho-query` skill — lê directamente de `vault/lessons/` se Honcho offline.
 
 ---
 
@@ -295,18 +358,18 @@ Antes de commitar qualquer lesson de exemplo, validar as datas reais dos eventos
 - JWT TLDV renewal: quando foi? Confirmar no commit history
 - Cron disappearing: quando foi detectado? Confirmar no HEARTBEAT
 - Azure blob pipeline: quando? Confirmar no commit history
-- max_tokens bug: quando foi descubierto?
+- max_tokens bug: quando foi descoberto?
 
 **Não commitar exemplos com datas erradas.**
 
-### QW-1 — Criar folder `vault/lessons/` + template (5 min)
+### QW-1 — Criar folder `memory/vault/lessons/` + template (5 min)
 ```bash
 mkdir -p memory/vault/lessons
-# Criar lessons/template.md com frontmatter correcto (sem processed)
+# Criar lessons/TEMPLATE.md com frontmatter correcto
 ```
 
 ### QW-2 — Escrever 3-5 lessons manuais (30 min)
-Lições de decisões reais ( datas validadas em QW-0):
+Lições de decisões reais (datas validadas em QW-0):
 1. Stale thresholds por entity
 2. JWT TLDV renewal via BrowserBox
 3. Cron job disappearing → detecção e recovery
@@ -314,8 +377,13 @@ Lições de decisões reais ( datas validadas em QW-0):
 5. max_tokens=600 bug em insights_json
 
 ### QW-3 — Criar `honcho_capture.py` mínimo (2-4h)
-Lê GitHub PRs (via `github_client.py` existente), gera lessons, escreve em `vault/lessons/`.
+Lê GitHub PRs (via `github_client.py` existente), gera lessons, escreve em `memory/vault/lessons/`.
 **Modelo:** `fastest` (GPT-5-mini ou equivalente) — lições curtas, não precisa reasoning pesado.
+
+**Output:** JSON summary no stdout:
+```json
+{"lessons_written": 3, "sources": {"github": 2, "trello": 1}, "skipped": 0, "errors": []}
+```
 
 ### QW-4 — Criar cron `honcho-lessons-capture` (15 min)
 ```bash
@@ -326,13 +394,20 @@ openclaw cron add \
   --agentId memory-agent \
   --model fastest \
   --payload.kind agentTurn \
-  --payload.message "Execute honcho_capture: run --days 1. Validate dates first (QW-0). Write lessons to vault/lessons/. Report results." \
-  --description "Extrai lições de GitHub/Trello/TLDV e escreve em vault/lessons/"
+  --payload.message "Execute honcho_capture: run --days 1. Validate dates first (QW-0). Write lessons to memory/vault/lessons/. Report JSON summary at end." \
+  --failureAlert.after 2 \
+  --failureAlert.channel telegram \
+  --failureAlert.to 7426291192 \
+  --description "Extrai lições de GitHub/Trello/TLDV e escreve em memory/vault/lessons/"
 ```
 
 ### QW-5 — Criar skill `honcho-query` (1-2h)
-Skill que lê de Honcho E de vault/lessons/ com fallback.
-Inclui validação de disponibilidade Honcho no heartbeat.
+Skill que expõe:
+```python
+honcho_query(query: str, topK: int = 5) -> List[Lesson]
+honcho_health_check() -> bool
+```
+Com fallback disk quando Honcho offline.
 
 ### QW-6 — Validar retrieval no Honcho (15 min)
 Após QW-2: testar `honcho_search_conclusions` sobre as lessons escritas manualmente.
@@ -344,19 +419,21 @@ Após QW-2: testar `honcho_search_conclusions` sobre as lessons escritas manualm
 | Decisão | Escolha | Rationale |
 |---|---|---|
 | LLM para extracção | `fastest` (GPT-5-mini) | Lições curtas, não precisa reasoning pesado |
-| Granularidade | **Múltiplas se independentes, 1 se mesmo tema** | "Por decisão" é a regra; se PR tem 3 decisões sobre o mesmo tema = 1 lesson |
-| Deduplicação | Path = hash(date + source_ref) | Se arquivo existe, skip — idempotência sem campo extra |
+| Granularidade | **Múltiplas se independentes, 1 se mesmo tema** | "Por decisão" é a regra |
+| Deduplicação | Path = `date + slugify(subject) + sha256(source_ref)[:6]` | Se arquivo existe, skip — idempotente |
 | Retenção | lessons nunca expiram | Relevância avaliada no retrieval |
 | `processed` flag | **Removido** | Campo sem consumidor; idempotência por path |
-| Fallback Honcho→disk | Skill `honcho-query` separada | vault-query não é alterada; nova skill cobre lessons |
+| Fallback Honcho→disk | Skill `honcho-query` separada | honcho_query com fallback disk |
 | SPOF desktop-link | Documentado + mitigação | Heartbeat valida; vault/lessons/ sempre disponível |
+| Output do ETL | JSON summary no stdout | Legível por cron/agente; report simples |
+| Peer refresh TTL | Tipicamente < 5 min (desconhecido) | Fallback disk se Honcho não refletiu ainda |
 
 ---
 
 ## Progressão
 
-1. **Phase 1 (QW-0 + QW-1 + QW-2):** Validar datas + vault/lessons/ criado + 5 lessons manuais
-2. **Phase 2 (QW-3 + QW-4):** honcho_capture.py ETL mínimo + cron
+1. **Phase 1 (QW-0 + QW-1 + QW-2):** Validar datas + `memory/vault/lessons/` criado + 5 lessons manuais
+2. **Phase 2 (QW-3 + QW-4):** honcho_capture.py ETL mínimo + cron com failureAlert
 3. **Phase 3 (QW-5 + QW-6):** Skill honcho-query + validação retrieval
 4. **Phase 4:** Trello + TLDV no ETL
 5. **Phase 5:** Integração nos heartbeats + agentes
@@ -367,11 +444,11 @@ Após QW-2: testar `honcho_search_conclusions` sobre as lessons escritas manualm
 ## Checklist de Execução
 
 - [ ] **QW-0:** Validar datas das lessons de exemplo antes de QW-2
-- [ ] QW-1: Criar `vault/lessons/` + template (sem `processed`)
+- [ ] QW-1: Criar `memory/vault/lessons/` + template
 - [ ] QW-2: Escrever 3-5 lessons manuais (datas validadas)
-- [ ] QW-3: Criar `honcho_capture.py` mínimo
-- [ ] QW-4: Criar cron `honcho-lessons-capture` (payload agentTurn correcto)
-- [ ] QW-5: Criar skill `honcho-query` com fallback
+- [ ] QW-3: Criar `honcho_capture.py` mínimo (JSON output)
+- [ ] QW-4: Criar cron `honcho-lessons-capture` (failureAlert após 2 falhas)
+- [ ] QW-5: Criar skill `honcho-query` com fallback disk
 - [ ] QW-6: Validar retrieval no Honcho
 - [ ] Gap 6: Validar schema de decisões existente
 
