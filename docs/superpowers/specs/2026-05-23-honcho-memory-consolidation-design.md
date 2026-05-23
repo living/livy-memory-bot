@@ -169,6 +169,18 @@ memory/vault/lessons/YYYY-MM-DD-{slugify(subject)}-{sha256(source_ref)[:6]}.md
 ```
 Path completo: `memory/vault/lessons/2026-05-22-pr24-enriched-claims-rollout-a3f2c1.md`
 
+**Slugify (obrigatório — linguagem-agnóstico):**
+```python
+def slugify(text):
+    text = text.lower()
+    text = re.sub(r'[^a-z0-9-]', '', text)   # strip non-alphanumeric
+    text = text.replace(' ', '-')
+    return re.sub(r'-+', '-', text).strip('-')
+```
+Exemplo: `PR #24 — Enriched Claims Rollout` → `pr-24-enriched-claims-rollout`
+
+O ETL (Python) e a skill honcho-query (JS) devem usar exactamente este algoritmo — sem libs — para garantir idempotência de path.
+
 **Regra:** Se arquivo já existe, skip (idempotência garantida pelo path único).
 
 **Formato de cada lesson:**
