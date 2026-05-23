@@ -29,6 +29,71 @@ import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+import httpx
+
+# ─── HONCHO CONFIG ─────────────────────────────────────────────────────────────
+
+HONCHO_BASE = os.environ.get("HONCHO_BASE", "http://100.121.74.111:8000")
+HONCHO_API_KEY = os.environ.get("HONCHO_API_KEY", "")
+HONCHO_WORKSPACE = os.environ.get("HONCHO_WORKSPACE_ID", "openclaw")
+HONCHO_AGENT_PEER = os.environ.get("HONCHO_AGENT_PEER", "agent-memory-agent")
+
+
+def _honcho_headers() -> dict:
+    return {"Authorization": f"Bearer {HONCHO_API_KEY}"} if HONCHO_API_KEY else {}
+
+
+def index_lesson_to_honcho(path: Path) -> bool:
+    """Index a lesson file to Honcho conclusions API.
+    
+    Reads frontmatter + body, posts to POST /v3/workspaces/{id}/conclusions.
+    Returns True on success, False on failure.
+    Silently skips on error (lesson is already on disk).
+    """
+    try:
+        content = path.read_text()
+        lines = content.split("\n")
+        frontmatter = {}
+        in_fm = False
+        fm_lines, body_lines = [], []
+        for l in lines:
+            if l.strip() == "---":
+                in_fm = not in_fm
+                continue
+            (fm_lines if in_fm else body_lines).append(l)
+        for l in fm_lines:
+            if ":" in l:
+                k, v = l.split(":", 1)
+                frontmatter[k.strip()] = v.strip().strip('"')
+        body = "\n".join(body_lines).strip()
+        subject = frontmatter.get("subject", path.stem)
+        date = frontmatter.get("date", "")
+        body_short = body[:1000].replace("\n", " ")
+        payload = {
+            "conclusions": [{
+                "content": f"{subject} | {date} | {body_short}",
+                "observer_id": HONCHO_AGENT_PEER,
+                "observed_id": HONCHO_AGENT_PEER,
+            }]
+        }
+        r = httpx.post(
+            f"{HONCHO_BASE}/v3/workspaces/{HONCHO_WORKSPACE}/conclusions",
+            json=payload,
+            headers=_honcho_headers(),
+            timeout=15,
+        )
+        if r.status_code == 201:
+            cid = r.json()[0].get("id", "?")[:12]
+            print(f"    [HONCHO] indexed {cid}")
+            return True
+        else:
+            print(f"    [HONCHO] index failed ({r.status_code}): {r.text[:80]}", file=sys.stderr)
+            return False
+    except Exception as e:
+        print(f"    [HONCHO] index error: {e}", file=sys.stderr)
+        return False
+
+
 # ─── SLUGIFY (language-agnostic, per spec) ───────────────────────────────────
 
 def slugify(text: str) -> str:
@@ -790,6 +855,7 @@ def run(
                     path.write_text(content.strip() + "\n")
                     print(f"    [WROTE] {path.name}")
                     summary["lessons_written"] += 1
+                    index_lesson_to_honcho(path)
                 except Exception as e:
                     summary["sources"]["trello"]["errors"] += 1
                     summary["errors"].append(f"trello/{card_id}: write failed — {e}")
@@ -811,6 +877,7 @@ def run(
                     print(f"    [WROTE] {path.name}")
                     summary["lessons_written"] += 1
                     summary["sources"]["tldv"]["processed"] += 1
+                    index_lesson_to_honcho(path)
                 except Exception as e:
                     summary["sources"]["tldv"]["errors"] += 1
                     summary["errors"].append(f"tldv/{meeting_id}: write failed — {e}")
@@ -897,6 +964,7 @@ def run(
                 path.write_text(content.strip() + "\n")
                 print(f"    [WROTE] {path.name}")
                 summary["lessons_written"] += 1
+                index_lesson_to_honcho(path)
             except Exception as e:
                 summary["sources"][repo]["errors"] += 1
                 summary["errors"].append(f"{org}/{repo}#{number}: write failed — {e}")
@@ -951,6 +1019,7 @@ def run(
                     path.write_text(content.strip() + "\n")
                     print(f"    [WROTE] {path.name}")
                     summary["lessons_written"] += 1
+                    index_lesson_to_honcho(path)
                 except Exception as e:
                     summary["sources"][repo]["errors"] += 1
                     summary["errors"].append(f"{org}/{repo} issue#{number}: write failed — {e}")
