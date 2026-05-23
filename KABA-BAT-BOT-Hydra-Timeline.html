@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KABA / BAT / BOT / Hydra — Timeline</title>
+<style>
+  :root { --bg: #0d1117; --sur: #161b22; --border: #30363d; --text: #e6edf3; --muted: #8b949e; --accent: #58a6ff; --green: #3fb950; --yellow: #d29922; --red: #f85149; --purple: #bc8cff; --pink: #ff7eb6; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; background: var(--bg); color: var(--text); font-size: 13px; line-height: 1.5; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 24px 16px; }
+  h1 { font-size: 20px; font-weight: 600; margin-bottom: 4px; }
+  .subtitle { color: var(--muted); font-size: 12px; margin-bottom: 24px; }
+  h2 { font-size: 14px; font-weight: 600; margin: 28px 0 10px; padding-bottom: 6px; border-bottom: 1px solid var(--border); color: var(--accent); }
+  h3 { font-size: 13px; font-weight: 600; margin: 14px 0 6px; color: var(--yellow); }
+  .meta { font-size: 11px; color: var(--muted); }
+  .tag { display: inline-block; padding: 1px 7px; border-radius: 12px; font-size: 10px; font-weight: 500; margin: 1px; }
+  .tag-decision { background: #3fb95022; color: var(--green); border: 1px solid #3fb95044; }
+  .tag-bug { background: #f8514922; color: var(--red); border: 1px solid #f8514944; }
+  .tag-infra { background: #58a6ff22; color: var(--accent); border: 1px solid #58a6ff44; }
+  .tag-ai { background: #bc8cff22; color: var(--purple); border: 1px solid #bc8cff44; }
+  .tag-migration { background: #d2992222; color: var(--yellow); border: 1px solid #d2992244; }
+  .tag-hydra { background: #ff7eb622; color: var(--pink); border: 1px solid #ff7eb644; }
+  .tag-meeting { background: #8b949e22; color: var(--muted); border: 1px solid #8b949e44; }
+  .tag-trello { background: #e8a93522; color: #e8a935; border: 1px solid #e8a93544; }
+  .tag-github { background: #3fb95022; color: var(--green); border: 1px solid #3fb95044; }
+
+  /* Timeline */
+  .timeline { border-left: 2px solid var(--border); margin-left: 8px; padding-left: 20px; }
+  .event { position: relative; margin-bottom: 20px; }
+  .event::before { content: ''; position: absolute; left: -25px; top: 6px; width: 9px; height: 9px; border-radius: 50%; background: var(--accent); border: 2px solid var(--bg); }
+  .event.decision::before { background: var(--green); }
+  .event.bug::before { background: var(--red); }
+  .event.hydra::before { background: var(--pink); }
+  .event.github::before { background: var(--green); }
+  .event.trello::before { background: #e8a935; }
+  .date { font-size: 11px; color: var(--muted); font-weight: 500; }
+  .event-title { font-weight: 600; font-size: 13px; margin: 2px 0 4px; }
+  .event-body { color: var(--text); opacity: 0.9; }
+  .event-body ul { margin: 4px 0 4px 16px; }
+  .event-body li { margin: 2px 0; }
+  .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; margin-top: 12px; }
+  .card { background: var(--sur); border: 1px solid var(--border); border-radius: 8px; padding: 12px; }
+  .card-title { font-weight: 600; font-size: 12px; margin-bottom: 4px; }
+  .card-subtitle { font-size: 11px; color: var(--muted); margin-bottom: 8px; }
+  .card-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+
+  /* Boards */
+  .board-section { background: var(--sur); border: 1px solid var(--border); border-radius: 8px; padding: 14px; margin-bottom: 12px; }
+  .board-name { font-weight: 700; font-size: 14px; margin-bottom: 2px; }
+  .board-url { font-size: 11px; color: var(--accent); margin-bottom: 10px; }
+  .board-url a { color: var(--accent); text-decoration: none; }
+  .board-url a:hover { text-decoration: underline; }
+  .list-row { display: flex; align-items: baseline; gap: 8px; margin: 4px 0; font-size: 12px; }
+  .list-name { font-weight: 600; color: var(--muted); min-width: 130px; }
+  .list-count { font-size: 11px; color: var(--muted); background: var(--border); padding: 0 6px; border-radius: 10px; }
+  .card-list { margin: 8px 0 8px 16px; }
+  .card-item { font-size: 12px; padding: 3px 0; color: var(--text); opacity: 0.85; }
+  .card-item .due { color: var(--muted); font-size: 11px; margin-right: 6px; }
+  .card-item.done { opacity: 0.5; text-decoration: line-through; }
+
+  /* Decisions */
+  .decision-box { background: #3fb95011; border: 1px solid #3fb95033; border-radius: 6px; padding: 10px 12px; margin: 8px 0; }
+  .decision-box strong { color: var(--green); font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .decision-box p { margin-top: 4px; font-size: 12px; }
+
+  .section-header { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+  .section-header .icon { font-size: 18px; }
+  .section-header .title { font-size: 15px; font-weight: 700; }
+
+  .stats-row { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 24px; }
+  .stat { background: var(--sur); border: 1px solid var(--border); border-radius: 8px; padding: 12px 16px; min-width: 120px; }
+  .stat .num { font-size: 24px; font-weight: 700; }
+  .stat .label { font-size: 11px; color: var(--muted); }
+  .stat.green .num { color: var(--green); }
+  .stat.blue .num { color: var(--accent); }
+  .stat.pink .num { color: var(--pink); }
+  .stat.yellow .num { color: var(--yellow); }
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>📊 KABA / BAT / BOT — Timeline Integrada</h1>
+<p class="subtitle">Delphos SVD + Trello + GitHub + Hydra-Flow | Atualizado: 2026-05-07</p>
+
+<!-- Stats -->
+<div class="stats-row">
+  <div class="stat blue"><div class="num">26</div><div class="label">Reuniões KABA/BAT/BOT</div></div>
+  <div class="stat green"><div class="num">17</div><div class="label">Decisões registradas</div></div>
+  <div class="stat yellow"><div class="num">3</div><div class="label">Boards Trello relevantes</div></div>
+  <div class="stat pink"><div class="num">2</div><div class="label">PRs Hydra-Flow open</div></div>
+  <div class="stat"><div class="num">5</div><div class="label">Repositórios GitHub</div></div>
+</div>
+
+<!-- Boards Trello -->
+<h2>🎯 Boards Trello Relacionados</h2>
+
+<div class="board-section">
+  <div class="board-name">BAT / ConectaBot</div>
+  <div class="board-url"><a href="https://trello.com/b/Es60OZHU" target="_blank">https://trello.com/b/Es60OZHU</a></div>
+  <div class="list-row"><span class="list-name">Concluído 🎉</span><span class="list-count">123 cards</span></div>
+  <div class="list-row"><span class="list-name">Em andamento</span><span class="list-count">14 cards</span></div>
+  <div class="list-row"><span class="list-name">Liberado Teste interno</span><span class="list-count">19 cards</span></div>
+  <div class="list-row"><span class="list-name">A Fazer (prioritário)</span><span class="list-count">9 cards</span></div>
+  <div class="list-row"><span class="list-name">Bloqueado</span><span class="list-count">3 cards</span></div>
+  <div class="list-row"><span class="list-name">Backlog ordenado</span><span class="list-count">3 cards</span></div>
+  <div class="card-list" style="margin-top:10px">
+    <div class="card-item"><span class="due">🟡 Doing:</span> Suporte mensal 2026 · Migração VMs · ConectaBot - Touchpoint - NOW · Voice-commerce</div>
+    <div class="card-item"><span class="due">🔴 Blocked:</span> DBR NPC v2 · Pedido Ideal</div>
+    <div class="card-item done">✅ ConectaBot Voice UAT deploy · NPS UAT deploy · Suporte Mensal (todos os meses)</div>
+    <div class="card-item"><span class="due">📋 Backlog:</span> Voice - bug troca código varejo · VOICE 5: DASHBOARD · Proxy Teste AB</div>
+  </div>
+</div>
+
+<div class="board-section">
+  <div class="board-name">BAT - Conecta Check</div>
+  <div class="board-url"><a href="https://trello.com/b/ii7JHYnK" target="_blank">https://trello.com/b/ii7JHYnK</a></div>
+  <div class="list-row"><span class="list-name">Backlog ordenado</span><span class="list-count">3 cards</span></div>
+  <div class="list-row"><span class="list-name">Planejamentos</span><span class="list-count">3 cards</span></div>
+  <div class="card-list" style="margin-top:10px">
+    <div class="card-item"><span class="due">📋 Backlog:</span> Daily Meeting — Conecta Check · Propostas comerciais e técnicas</div>
+    <div class="card-item"><span class="due">📋 Planejamentos:</span> Proposta e entendimento inicial do edital · Reuniões com clientes · Reuniões internas</div>
+  </div>
+</div>
+
+<div class="board-section">
+  <div class="board-name">Hydra</div>
+  <div class="board-url"><a href="https://trello.com/b/78mRsE1D" target="_blank">https://trello.com/b/78mRsE1D</a></div>
+  <div class="list-row"><span class="list-name">DOING</span><span class="list-count">1 card</span></div>
+  <div class="list-row"><span class="list-name">Ready for Tests</span><span class="list-count">1 card</span></div>
+  <div class="card-list" style="margin-top:10px">
+    <div class="card-item"><span class="due">🟡 2026-04-29:</span> Hydra - config phone Meta (UAT)</div>
+    <div class="card-item"><span class="due">🔵 Ready:</span> Criação do repo e documentação inicial HydraFlow</div>
+  </div>
+</div>
+
+<div class="board-section">
+  <div class="board-name">B3 / Balcão-MVP Modernização</div>
+  <div class="board-url"><a href="https://trello.com/b/0zTG6qYr" target="_blank">https://trello.com/b/0zTG6qYr</a></div>
+  <div class="list-row"><span class="list-name">Recurring Tasks</span><span class="list-count">2 cards</span></div>
+  <div class="list-row"><span class="list-name">Ready to Test</span><span class="list-count">9 cards</span></div>
+  <div class="list-row"><span class="list-name">Doing</span><span class="list-count">7 cards</span></div>
+  <div class="list-row"><span class="list-name">Done</span><span class="list-count">7 cards</span></div>
+  <div class="card-list" style="margin-top:10px">
+    <div class="card-item"><span class="due">🔁 Recurring:</span> Reuniões com o Cliente · Reuniões interna Living</div>
+    <div class="card-item"><span class="due">🟡 Doing:</span> Migração DATABASE ECB17 → KE20 · Configuração ambiente Balcão · Processar arquivo LCI</div>
+    <div class="card-item"><span class="due">🔵 Ready:</span> Extração Negociação · Extração Transferência Compulsório · Migração BPAs ECB17 → KE20 · Mediacao KE20</div>
+    <div class="card-item done">✅ Infra das VMs · Execução Scripts Versionamento · Extração Custodia</div>
+  </div>
+</div>
+
+<div class="board-section">
+  <div class="board-name">B3 / Balcão</div>
+  <div class="board-url"><a href="https://trello.com/b/nQs1tJOt" target="_blank">https://trello.com/b/nQs1tJOt</a></div>
+  <div class="list-row"><span class="list-name">Done</span><span class="list-count">50 cards</span></div>
+  <div class="list-row"><span class="list-name">Backlog</span><span class="list-count">16 cards</span></div>
+  <div class="list-row"><span class="list-name">Ready for Tests</span><span class="list-count">8 cards</span></div>
+  <div class="list-row"><span class="list-name">Blocked</span><span class="list-count">1 card</span> <span style="color:var(--red);font-size:11px">⚠️ B3 Billing 99% CPU</span></div>
+  <div class="list-row"><span class="list-name">Recurring Tasks</span><span class="list-count">5 cards</span></div>
+  <div class="card-list" style="margin-top:10px">
+    <div class="card-item"><span class="due">🟡 Doing:</span> TAR-9491 CCB CVM175 · [TAR-10735] Importacao lancamento manual grande volume</div>
+    <div class="card-item"><span class="due">🔵 To Do:</span> TAR-10637 Erro relatorio Bilateral (2026-05-08) · TAR-10638 · TAR-9938 Ativar tarifação duplicatas</div>
+    <div class="card-item"><span class="due">🔴 Blocked:</span> B3 Billing consumindo 99% CPU</div>
+  </div>
+</div>
+
+<div class="board-section">
+  <div class="board-name">Living / Infra ECB</div>
+  <div class="board-url"><a href="https://trello.com/b/URlvKQfK" target="_blank">https://trello.com/b/URlvKQfK</a></div>
+  <div class="list-row"><span class="list-name">Done</span><span class="list-count">39 cards</span></div>
+  <div class="list-row"><span class="list-name">To Do</span><span class="list-count">16 cards</span></div>
+  <div class="list-row"><span class="list-name">Doing</span><span class="list-count">6 cards</span></div>
+  <div class="card-list" style="margin-top:10px">
+    <div class="card-item"><span class="due">🟡 Doing:</span> Melhorias processos internos · Adapter execução automações · Assistente de Billing · Daily Operações/Infra/Suporte B3</div>
+    <div class="card-item done">✅ Deploy CERT BB3 · API Sincad PagHub · Gerador PDF templates dinâmicos</div>
+  </div>
+</div>
+
+<!-- GitHub -->
+<h2>🐙 Repositórios GitHub</h2>
+<div class="card-grid">
+  <div class="card">
+    <div class="card-title">🦊 hydra-flow</div>
+    <div class="card-subtitle">living/hydra-flow · Plugin-first event-driven hub</div>
+    <div class="card-tags">
+      <span class="tag tag-hydra">TypeScript</span>
+      <span class="tag tag-github">5.260 KB</span>
+    </div>
+    <div style="margin-top:8px;font-size:12px">
+      <div><strong>PR #6</strong> (open) — feat: Add roadmap × Delphos MVP<br><span class="meta">lincolnqjunior · 2026-01-20</span></div>
+      <div style="margin-top:4px"><strong>PR #8</strong> (open) — Initial Core Code and Plugins<br><span class="meta">estevesm · 2026-04-30</span></div>
+    </div>
+    <div style="margin-top:8px;font-size:11px;color:var(--muted)">
+      Commits recentes: estevesm com monorepo foundation, plugin registry, Azure Service Bus, WhatsApp v1 plugin (2026-04-20)
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-title">📹 delphos-svd / svd-sistema-vistorias-delphos</div>
+    <div class="card-subtitle">living/delphos-svd · Sistema de Vistorias Delphos</div>
+    <div class="card-tags">
+      <span class="tag tag-infra">pipeline ativo</span>
+      <span class="tag tag-ai">whisper migrado</span>
+    </div>
+    <div style="margin-top:8px;font-size:12px">
+      Pipeline de transcrição e enriquecimento de reuniões. gw.tldv.io com 502 known issue — workaround via video_archiver.py direto.
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-title">🔗 living-trello-connector</div>
+    <div class="card-subtitle">Conector Trello API v1</div>
+    <div class="card-tags">
+      <span class="tag tag-trello">Trello REST API</span>
+    </div>
+    <div style="margin-top:8px;font-size:12px">
+      boards: B3 Rollout ECB, B3/Balcao-MVP, B3/Balcão, B3/BancoB3, BAT/ConectaBot, BAT/Conecta Check, Hydra, Living/Infra ECB, Living/M.I.C.I, B3/Listados, B3/UIF+NW+NT, B3/Neoway+Neurotech
+    </div>
+  </div>
+</div>
+
+<!-- Timeline -->
+<h2>📅 Timeline de Reuniões e Eventos</h2>
+
+<div class="timeline">
+
+<div class="event github">
+  <div class="date">2026-01-13</div>
+  <div class="event-title">Repo hydra-flow criado</div>
+  <div class="event-body">Documentação inicial + estrutura. Estevesm e lincolnqjunior como contribuidores iniciais.</div>
+  <span class="tag tag-github">github</span>
+</div>
+
+<div class="event">
+  <div class="date">2026-01-20</div>
+  <div class="event-title">PR #6 — Roadmap Hydra-Flow × Delphos MVP</div>
+  <div class="event-body">Upgrade de YAML state-machine → GitHub Copilot SDK para orquestração determinística de agents. Estevesm e lincolnqjunior alinhados.</div>
+  <span class="tag tag-hydra">hydra</span> <span class="tag tag-github">github</span>
+</div>
+
+<div class="event">
+  <div class="date">2026-03-13</div>
+  <div class="event-title">📋 Status Kaba/BAT/BOT + Reunião de Cadência 4D imobi</div>
+  <div class="event-body">
+    <ul>
+      <li>Kaba/BAT/BOT: Status geral dos projetos</li>
+      <li>Decisão: bot entra automaticamente em todas as reuniões, com opção de desativar por participante</li>
+    </ul>
+    <div class="decision-box"><strong>✓ Decisão</strong><p>Aprovação para bot entrar automaticamente em todas as reuniões</p></div>
+  </div>
+  <span class="tag tag-meeting">reunião</span>
+</div>
+
+<div class="event bug">
+  <div class="date">2026-03-16</div>
+  <div class="event-title">🐛 Bug Crítico: sessão não é limpa ao trocar usuário no SAP</div>
+  <div class="event-body">
+    Proxy em produção configurado (botproxy A e B). Bug de autenticação identificado.
+    <div class="decision-box"><strong>✓ Decisão</strong><p>Manter alteração do proxy sem forçar reinício. Correção do bug de auth SAP deve ser feita antes do próximo deploy.</p></div>
+  </div>
+  <span class="tag tag-bug">bug</span> <span class="tag tag-infra">infra</span>
+</div>
+
+<div class="event">
+  <div class="date">2026-03-18</div>
+  <div class="event-title">📋 Status Kaba/BAT/BOT + Processo NW + Roadmap Futuro</div>
+  <div class="event-body">
+    <ul>
+      <li>Acompanhamento de pendências técnicas via cards Trello</li>
+      <li>Levantamento de requisitos Neoway+Neurotech</li>
+      <li>4D imobi: Chatbot Cindy em fluxo de consentimento</li>
+    </ul>
+  </div>
+  <span class="tag tag-meeting">reunião</span> <span class="tag tag-trello">trello</span>
+</div>
+
+<div class="event">
+  <div class="date">2026-03-24–27</div>
+  <div class="event-title">📋 Status Kaba/BAT/BOT (semana)</div>
+  <div class="event-body">
+    <ul>
+      <li>Status Kaba, BAT, BOT separados</li>
+      <li>Bugs: retorno de erro na tela, relatório ICB, condições comerciais</li>
+      <li>Alinhamento Living/Task sobre entregas e pendências</li>
+    </ul>
+  </div>
+  <span class="tag tag-meeting">reunião</span>
+</div>
+
+<div class="event decision">
+  <div class="date">2026-03-31</div>
+  <div class="event-title">📋 Status Kaba/BAT/BOT + Decisão Minimax API</div>
+  <div class="event-body">
+    <ul>
+      <li>Configuração Minimax API para Lightning</li>
+      <li>Limitação do Lightning em capturar dados de reset de contexto</li>
+    </ul>
+    <div class="decision-box"><strong>✓ Decisão</strong><p>Utilizar API do Minimax plugada no Cloud Code para coleta de dados de status do Lightning</p></div>
+  </div>
+  <span class="tag tag-decision">decisão</span> <span class="tag tag-ai">ai</span>
+</div>
+
+<div class="event decision">
+  <div class="date">2026-04-06</div>
+  <div class="event-title">📋 Status Kaba/BAT/BOT + Decisão Migração MySQL→Postgre</div>
+  <div class="event-body">
+    <ul>
+      <li>Migração Kaba/BAT/BOT — avanços do sistema legado</li>
+      <li>Problemas: ausência de FKs, registros órfãos, normalização inexistente, gambiarras de 20+ anos</li>
+      <li>Desafios de IA na interpretação código vs banco — inconsistências entre lógica e dados</li>
+      <li>Migração MySQL→Postgre via PGLoader: duplicação e perda de dados</li>
+    </ul>
+    <div class="decision-box"><strong>✓ Decisões</strong>
+    <p>1. Limpar banco Supabase e re-migrar MySQL de forma controlada (corrigir FKs, remover duplicados/órfãos)</p>
+    <p>2. Esteves gerar relatório técnico documentando barreiras e falhas do sistema legado</p></div>
+  </div>
+  <span class="tag tag-migration">migration</span> <span class="tag tag-decision">decisão</span>
+</div>
+
+<div class="event decision">
+  <div class="date">2026-04-08</div>
+  <div class="event-title">📋 Status Kaba/BAT/BOT + Cadência 4D imobi</div>
+  <div class="event-body">
+    <ul>
+      <li>Documentação e lessons learned do projeto Kaba</li>
+      <li>Migração de regras de negócio Kaba — identificados em itens de menu</li>
+      <li>Chatbot Cindy: fluxo de consentimento e captura de dados</li>
+    </ul>
+    <div class="decision-box"><strong>✓ Decisões</strong>
+    <p>1. Não há regra complexa em cadastros de vinhos — dados são crudos</p>
+    <p>2. Identity key não foi resetada ao migrar tabela carinho/mordomo — corrigido</p>
+    <p>3. André deve usar formulário M8N (já migrado) ao invés de VIP via WhatsApp</p></div>
+  </div>
+  <span class="tag tag-decision">decisão</span> <span class="tag tag-meeting">reunião</span>
+</div>
+
+<div class="event decision">
+  <div class="date">2026-04-09</div>
+  <div class="event-title">📋 Status Kaba/BAT/BOT + Bug Argentina + Rollback</div>
+  <div class="event-body">
+    <ul>
+      <li>Correção de texto incorreto (menção à Argentina) no BAT/BOT</li>
+      <li>Investigação e rollback de backup que causou problemas em produção</li>
+      <li>Verificação de fila de auditoria bloqueada (Proxess/Greenlog)</li>
+    </ul>
+    <div class="decision-box"><strong>✓ Decisão</strong><p>Subir correção do texto (remover menção à Argentina) ainda hoje para validar funcionamento</p></div>
+  </div>
+  <span class="tag tag-bug">bugfix</span> <span class="tag tag-decision">decisão</span>
+</div>
+
+<div class="event">
+  <div class="date">2026-04-13</div>
+  <div class="event-title">📋 Status Kaba/BAT/BOT + Relatório B3</div>
+  <div class="event-body">
+    <ul>
+      <li>Cobrança de horas para ambiente de desenvolvimento</li>
+      <li>Documentação técnica para cliente Bianca</li>
+      <li>Esteves: ~36h gastas, estimado ~60h total</li>
+    </ul>
+    <div class="decision-box"><strong>✓ Decisão</strong><p>Documentar todas as horas gastas no projeto para repasse à Bianca</p></div>
+  </div>
+  <span class="tag tag-meeting">reunião</span>
+</div>
+
+<div class="event">
+  <div class="date">2026-04-16</div>
+  <div class="event-title">📋 Status Kaba/BAT/BOT + SLA B3 50%</div>
+  <div class="event-body">
+    <ul>
+      <li>SLA de incidente em 50% cobrado pela BAT — causa: E-Premiums (não equipe Living)</li>
+      <li>Primeiro e-mail de notificação enviado pela plataforma</li>
+      <li>Estudos sobre sistemas internos (CFS Buzz, Rebs)</li>
+      <li>Documentação de fluxo de escalação criada</li>
+    </ul>
+    <div class="decision-box"><strong>✓ Decisão</strong><p>Aprovação para ação junto à E-Premiums</p></div>
+  </div>
+  <span class="tag tag-decision">decisão</span>
+</div>
+
+<div class="event decision hydra">
+  <div class="date">2026-04-13 / 2026-04-20</div>
+  <div class="event-title">🔴 Decisão Arquitetural: Azure Logic Apps ❌ → Hydra-Flow próprio ✅</div>
+  <div class="event-body">
+    Estevesm inicia desenvolvimento real do Hydra-Flow v2:
+    <ul>
+      <li>2026-04-13: Relatório "Azure Logic Apps vs Hydra-Flow" — decisão de construir próprio</li>
+      <li>2026-04-20: Commits concretos — monorepo workspace, Fastify, Azure Service Bus, plugin registry, WhatsApp v1 plugin</li>
+      <li>Docs migrados de RabbitMQ → Azure Service Bus</li>
+    </ul>
+    <div class="decision-box"><strong>✓ Decisão</strong><p>Construir Hydra-Flow próprio em vez de Azure Logic Apps. Fastify > NestJS. No over-engineering.</p></div>
+  </div>
+  <span class="tag tag-hydra">hydra</span> <span class="tag tag-decision">decisão</span> <span class="tag tag-github">github</span>
+</div>
+
+<div class="event">
+  <div class="date">2026-04-22</div>
+  <div class="event-title">📋 Status Kaba/BAT/BOT + Revisão Delphi</div>
+  <div class="event-body">
+    <ul>
+      <li>Revisão de documento sobre sistemas Delphi Kaba/BAT/BOT</li>
+      <li>Preparação para demonstração a terceiros</li>
+      <li>Merge PR #7 — docs migration v2</li>
+    </ul>
+  </div>
+  <span class="tag tag-meeting">reunião</span> <span class="tag tag-github">github</span>
+</div>
+
+<div class="event hydra">
+  <div class="date">2026-04-29</div>
+  <div class="event-title">🔌 Hydra — Config phone Meta (UAT)</div>
+  <div class="event-body">Card "Hydra - config phone Meta (UAT)" movido para DOING no board Trello Hydra. Trello: 69f2019a</div>
+  <span class="tag tag-hydra">hydra</span> <span class="tag tag-trello">trello</span>
+</div>
+
+<div class="event">
+  <div class="date">2026-04-30</div>
+  <div class="event-title">📋 Status Kaba/BAT/BOT + PR #8 Hydra-Flow</div>
+  <div class="event-body">
+    <ul>
+      <li>Discussão sobre custo de credits IA (~US$10/milhão tokens)</li>
+      <li>Comparação de performance: V4 vs GPT 5.5 Opus</li>
+      <li>OpenRouter no Cloud — configuração e mapeamento de modelos</li>
+      <li>PR #8 hydra-flow: "Initial - Core Code and Plugins" (estevesm)</li>
+    </ul>
+  </div>
+  <span class="tag tag-meeting">reunião</span> <span class="tag tag-ai">ai</span> <span class="tag tag-hydra">hydra</span>
+</div>
+
+<div class="event">
+  <div class="date">2026-05-05</div>
+  <div class="event-title">📋 Status Kaba/BAT/BOT</div>
+  <div class="event-body">Reunião de status geral dos projetos Kaba, BAT e BOT.</div>
+  <span class="tag tag-meeting">reunião</span>
+</div>
+
+<div class="event">
+  <div class="date">2026-05-06</div>
+  <div class="event-title">📋 Status Kaba/BAT/BOT + Service Bus Refactoring</div>
+  <div class="event-body">
+    <ul>
+      <li>Status geral dos projetos Kaba, BAT e BOT</li>
+      <li>Revisão de pendências e entregas em andamento</li>
+      <li>Alinhamento de infraestrutura e replicação de arquivos</li>
+      <li>Estado do refactoring do Service Bus</li>
+    </ul>
+  </div>
+  <span class="tag tag-meeting">reunião</span>
+</div>
+
+</div>
+
+<!-- Legend -->
+<h2 style="margin-top:32px">🏷️ Legenda</h2>
+<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px">
+  <span class="tag tag-meeting">reunião</span><span style="color:var(--muted);font-size:12px;align-self:center">Reunião TLDV</span>
+  <span class="tag tag-decision">decisão</span><span style="color:var(--muted);font-size:12px;align-self:center">Decisão registrada</span>
+  <span class="tag tag-bug">bug</span><span style="color:var(--muted);font-size:12px;align-self:center">Bug/crítico</span>
+  <span class="tag tag-infra">infra</span><span style="color:var(--muted);font-size:12px;align-self:center">Infraestrutura</span>
+  <span class="tag tag-ai">ai</span><span style="color:var(--muted);font-size:12px;align-self:center">IA/Modelos</span>
+  <span class="tag tag-migration">migration</span><span style="color:var(--muted);font-size:12px;align-self:center">Migração BD</span>
+  <span class="tag tag-hydra">hydra</span><span style="color:var(--muted);font-size:12px;align-self:center">Hydra-Flow</span>
+  <span class="tag tag-trello">trello</span><span style="color:var(--muted);font-size:12px;align-self:center">Trello</span>
+  <span class="tag tag-github">github</span><span style="color:var(--muted);font-size:12px;align-self:center">GitHub</span>
+</div>
+
+</div>
+</body>
+</html>

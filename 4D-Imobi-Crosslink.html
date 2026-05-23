@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>4D Imobi — Cruzamento Corrigido</title>
+<style>
+  :root { --bg: #0d1117; --sur: #161b22; --border: #30363d; --text: #e6edf3; --muted: #8b949e; --accent: #58a6ff; --green: #3fb950; --red: #f85149; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; background: var(--bg); color: var(--text); font-size: 13px; line-height: 1.6; }
+  .container { max-width: 1000px; margin: 0 auto; padding: 24px 16px; }
+  h1 { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+  .subtitle { color: var(--muted); font-size: 12px; margin-bottom: 20px; }
+  h2 { font-size: 14px; font-weight: 600; margin: 24px 0 10px; padding-bottom: 6px; border-bottom: 1px solid var(--border); color: var(--accent); }
+  .tag { display: inline-block; padding: 1px 7px; border-radius: 12px; font-size: 10px; font-weight: 500; }
+  .tag-meeting { background: #8b949e22; color: var(--muted); border: 1px solid #8b949e44; }
+  .tag-decision { background: #3fb95022; color: var(--green); border: 1px solid #3fb95044; }
+  .tag-project { background: #58a6ff22; color: var(--accent); border: 1px solid #58a6ff44; }
+  .meeting-card { background: var(--sur); border: 1px solid var(--border); border-radius: 8px; padding: 14px; margin-bottom: 10px; }
+  .meeting-date { font-size: 11px; color: var(--muted); font-weight: 500; }
+  .meeting-title { font-weight: 700; font-size: 13px; margin: 2px 0; }
+  .meeting-participants { font-size: 11px; color: var(--muted); margin: 4px 0; }
+  .decision-box { background: #3fb95011; border: 1px solid #3fb95033; border-radius: 6px; padding: 10px 12px; margin: 8px 0; }
+  .decision-box strong { color: var(--green); font-size: 11px; text-transform: uppercase; }
+  .decision-box p { margin-top: 4px; font-size: 12px; }
+  .stats-row { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 20px; }
+  .stat { background: var(--sur); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; min-width: 110px; }
+  .stat .num { font-size: 22px; font-weight: 700; }
+  .stat .label { font-size: 11px; color: var(--muted); }
+  .stat.blue .num { color: var(--accent); }
+  .stat.green .num { color: var(--green); }
+  .person-card { display: inline-flex; align-items: center; gap: 6px; background: var(--sur); border: 1px solid var(--border); border-radius: 20px; padding: 4px 12px; margin: 3px; font-size: 12px; }
+  .person-role { font-size: 10px; color: var(--muted); }
+  .timeline { border-left: 2px solid var(--border); margin-left: 8px; padding-left: 20px; }
+  .event { position: relative; margin-bottom: 18px; }
+  .event::before { content: ''; position: absolute; left: -25px; top: 6px; width: 9px; height: 9px; border-radius: 50%; background: var(--accent); border: 2px solid var(--bg); }
+  .event.decision::before { background: var(--green); }
+  .event.bug::before { background: var(--red); }
+  .date { font-size: 11px; color: var(--muted); font-weight: 500; }
+  .event-title { font-weight: 600; font-size: 13px; margin: 2px 0 4px; }
+  .note-box { background: #f8514911; border: 1px solid #f8514933; border-radius: 6px; padding: 12px; margin: 12px 0; font-size: 12px; }
+  .note-box strong { color: var(--red); }
+  .card { background: var(--sur); border: 1px solid var(--border); border-radius: 8px; padding: 14px; margin-bottom: 10px; }
+  .section-header { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>🏠 4D Imobi — Cruzamento Corrigido</h1>
+<p class="subtitle">Reuniões + Pessoas · Sem board Trello dedicado · Atualizado: 2026-05-07</p>
+
+<!-- Stats -->
+<div class="stats-row">
+  <div class="stat blue"><div class="num">7</div><div class="label">Reuniões (Mar–Mai 2026)</div></div>
+  <div class="stat blue"><div class="num">5</div><div class="label">Pessoas identificadas</div></div>
+  <div class="stat green"><div class="num">3</div><div class="label">Decisões registradas</div></div>
+  <div class="stat"><div class="num">0</div><div class="label">Boards Trello</div></div>
+</div>
+
+<!-- ⚠️ Correção -->
+<div class="note-box">
+  <strong>⚠️ Correção aplicada em 2026-05-07</strong><br>
+  Versão anterior associavaerroneamente cards dos boards <strong>CERC/Billing</strong>, <strong>B3/Listados</strong> e <strong>B3/UIF+NW+NT</strong> ao 4D Imobi. Esses boards são projetos de billing da Living e <strong>nada têm a ver com o 4D Imobi</strong>. Os cards foram mencionados nas reuniões por <strong>comparação de problemas</strong> entre projetos — não por pertencerem ao 4D Imobi. O 4D Imobi <strong>não possui board Trello dedicado</strong>.
+</div>
+
+<!-- Equipe -->
+<h2>👥 Equipe</h2>
+<div>
+  <div class="person-card">
+    <span><strong>André Chaves</strong></span>
+    <span class="person-role">PO Externo · andre.chaves@4dimobi.com</span>
+  </div>
+  <div class="person-card">
+    <span><strong>Esteves Marques</strong></span>
+    <span class="person-role">Tech Lead Living</span>
+  </div>
+  <div class="person-card">
+    <span><strong>Robert Urech</strong></span>
+    <span class="person-role">Living</span>
+  </div>
+  <div class="person-card">
+    <span><strong>Patrícia Ribeiro</strong></span>
+    <span class="person-role">Living</span>
+  </div>
+  <div class="person-card">
+    <span><strong>Enisia Soares</strong></span>
+    <span class="person-role">Living</span>
+  </div>
+</div>
+
+<!-- Reuniões -->
+<h2>📅 Reuniões de Cadência</h2>
+
+<div class="meeting-card">
+  <div class="meeting-date">2026-03-18 · 22 min</div>
+  <div class="meeting-title">[Tech] Reunião de Cadência 4D imobi</div>
+  <div class="meeting-participants">Esteves Marques, André Chaves</div>
+  <span class="tag tag-project">4D Imobi</span>
+</div>
+
+<div class="meeting-card">
+  <div class="meeting-date">2026-03-25</div>
+  <div class="meeting-title">[Tech] Reunião de Cadência 4D imobi</div>
+  <div class="meeting-participants">André Chaves</div>
+  <span class="tag tag-project">4D Imobi</span>
+</div>
+
+<div class="meeting-card">
+  <div class="meeting-date">2026-04-01</div>
+  <div class="meeting-title">[Tech] Reunião de Cadência 4D imobi</div>
+  <div class="meeting-participants">Esteves Marques</div>
+  <span class="tag tag-project">4D Imobi</span>
+</div>
+
+<div class="meeting-card">
+  <div class="meeting-date">2026-04-08 · 70 min · 5 participantes</div>
+  <div class="meeting-title">[Tech] Reunião de Cadência 4D imobi</div>
+  <div class="meeting-participants">Esteves Marques, André Chaves, Patrícia Ribeiro</div>
+  <div style="margin-top:8px">
+    <div class="decision-box"><strong>✓ Decisão 1</strong><p>Adicionar botão "Estou ciente" no fluxo de consentimento do chatbot Cindy — para clareza da ação necessária do usuário</p></div>
+    <div class="decision-box"><strong>✓ Decisão 2</strong><p>Registrar o histórico da conversa antes da mensagem de consentimento (útil para compliance e auditoria)</p></div>
+    <div class="decision-box"><strong>✓ Decisão 3</strong><p>Usuária Lovisinha presa na mensagem inicial — correção do bug no fluxo do chatbot</p></div>
+  </div>
+  <span class="tag tag-decision">decisão</span> <span class="tag tag-project">4D Imobi</span>
+</div>
+
+<div class="meeting-card">
+  <div class="meeting-date">2026-04-15 ⚠️</div>
+  <div class="meeting-title">[Tech] Reunião de Cadência 4D imobi</div>
+  <div class="meeting-participants">Esteves Marques, André Chaves + 2 não identificados</div>
+  <div style="margin-top:4px;font-size:12px;color:var(--muted)">⚠️ Reunião comprometida por falhas de conexão; pauta não duly alinhada</div>
+  <span class="tag tag-project">4D Imobi</span>
+</div>
+
+<div class="meeting-card">
+  <div class="meeting-date">2026-04-22</div>
+  <div class="meeting-title">[Tech] Reunião de Cadência 4D imobi</div>
+  <div class="meeting-participants">Esteves Marques, André Chaves, Robert Urech, Enisia Soares</div>
+  <div style="margin-top:4px;font-size:12px;color:var(--muted)">Testes em homologação vs produção · Módulo Vic · Ajustes "curvinhas"</div>
+  <span class="tag tag-project">4D Imobi</span>
+</div>
+
+<div class="meeting-card">
+  <div class="meeting-date">2026-05-06</div>
+  <div class="meeting-title">[Tech] Reunião de Cadência 4D imobi</div>
+  <div class="meeting-participants">Esteves Marques, André Chaves, Robert Urech, Enisia Soares</div>
+  <span class="tag tag-project">4D Imobi</span>
+</div>
+
+<!-- Timeline -->
+<h2>📆 Timeline</h2>
+<div class="timeline">
+
+<div class="event">
+  <div class="date">2026-03-18</div>
+  <div class="event-title">Início da cadência 4D Imobi</div>
+  <div class="event-body">Primeira reunião técnica. Equipe Living (Esteves) + PO Externo (André Chaves).</div>
+  <span class="tag tag-meeting">reunião</span>
+</div>
+
+<div class="event bug">
+  <div class="date">2026-04-01</div>
+  <div class="event-title">🐛 Bug: Lovisinha presa na mensagem inicial do chatbot</div>
+  <div class="event-body">Bug no fluxo do chatbot Cindy. Problema de login em produção. Integração Vicky/Cindy.</div>
+  <span class="tag tag-meeting">reunião</span>
+</div>
+
+<div class="event decision">
+  <div class="date">2026-04-08</div>
+  <div class="event-title">✅ 3 decisões + bug corrigido</div>
+  <div class="event-body">Botão "Estou ciente" no fluxo de consentimento · Histórico de conversa para compliance · Bug Lovisinha corrigido.</div>
+  <span class="tag tag-decision">decisão</span>
+</div>
+
+<div class="event">
+  <div class="date">2026-04-15</div>
+  <div class="event-title">⚠️ Reunião comprometida por conexão</div>
+  <div class="event-body">Pauta não была properly alinhada debido a falhas de rede.</div>
+  <span class="tag tag-meeting">reunião</span>
+</div>
+
+<div class="event">
+  <div class="date">2026-04-22</div>
+  <div class="event-title">🧪 Testes homologação vs produção</div>
+  <div class="event-body">Módulo Vic em validação. Divergência na lista de unidades entre ambientes. Ajustes curvinhas.</div>
+  <span class="tag tag-meeting">reunião</span>
+</div>
+
+<div class="event">
+  <div class="date">2026-05-06</div>
+  <div class="event-title">📋 Revisão geral de status</div>
+  <div class="event-body">Revisão de pendências e cards vinculados ao projeto.</div>
+  <span class="tag tag-meeting">reunião</span>
+</div>
+
+</div>
+
+<!-- Entidade corrigida -->
+<h2>📝 Entidade Corrigida</h2>
+<div class="card">
+  <div style="font-weight:700;font-size:13px">memory/vault/entities/projects/4D Imobi.md</div>
+  <div style="font-size:12px;color:var(--muted);margin-top:6px">
+    ✅ PO: André Chaves (externo)<br>
+    ✅ 7 reuniões vinculadas<br>
+    ✅ 3 decisões registradas<br>
+    ✅ Equipe Living identificada<br>
+    ✅ Nota: sem board Trello dedicado<br>
+    ❌ Cards de B3/Listados, CERC/Billing removidos (foram mencionados por comparação, não pertencem ao projeto)
+  </div>
+</div>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,12 @@
+# Claim f371613b-a1f7-4bbb-bc9f-df726cef3deb
+
+- source: tldv
+- entity_type: meeting
+- entity_id: 6a031645153f9c00138f969f
+- claim_type: timeline_event
+- confidence: 0.800
+- event_timestamp: 2026-05-12T12:00:05.853+00:00
+- superseded_by: -
+
+## Text
+Meeting tagged with 'bot'

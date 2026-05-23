@@ -1,0 +1,12 @@
+# Claim 8e3bddab-e7c9-490e-a1f9-fffc51d7fbeb
+
+- source: tldv
+- entity_type: meeting
+- entity_id: 
+- claim_type: status
+- confidence: 0.900
+- event_timestamp: 2026-03-20T11:59:59.403+00:00
+- superseded_by: f6b389a8-017a-4a0d-ab58-8d5271834898
+
+## Text
+Status Kaba/BAT/BOT

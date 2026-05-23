@@ -1,0 +1,12 @@
+# Claim fba96fd7-cd0e-4cca-9ddb-45f5e1d211be
+
+- source: tldv
+- entity_type: meeting
+- entity_id: 69f8fcd65eaadd001330fafc
+- claim_type: timeline_event
+- confidence: 0.800
+- event_timestamp: 2026-05-04T20:08:54.235+00:00
+- superseded_by: -
+
+## Text
+Meeting tagged with 'Neoway'

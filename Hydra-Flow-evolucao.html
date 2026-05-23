@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hydra-Flow — Evolução Completa</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #252936;
+    --border: #2e3348;
+    --text: #e2e4ef;
+    --muted: #8b8fa8;
+    --accent: #f97316;
+    --accent2: #a78bfa;
+    --green: #48bb78;
+    --yellow: #ecc94b;
+    --orange: #ed8936;
+    --red: #fc8181;
+    --cyan: #22d3ee;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    padding: 24px;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+  header {
+    text-align: center;
+    padding: 48px 0 40px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 40px;
+  }
+  .badge {
+    display: inline-block;
+    background: var(--accent);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    padding: 4px 12px;
+    border-radius: 20px;
+    margin-bottom: 16px;
+  }
+  .badge.design { background: var(--accent2); }
+  .badge.open { background: var(--orange); }
+  h1 {
+    font-size: clamp(28px, 5vw, 42px);
+    font-weight: 800;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 12px;
+  }
+  .subtitle { color: var(--muted); font-size: 16px; margin-bottom: 8px; }
+  .meta {
+    display: flex;
+    gap: 16px;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-top: 16px;
+  }
+  .meta-item {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 16px;
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .meta-item strong { color: var(--cyan); }
+
+  /* Cards grid */
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 16px;
+    margin: 32px 0;
+  }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    text-align: center;
+  }
+  .card .num {
+    font-size: 36px;
+    font-weight: 800;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+  .card .label { font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+  .card .sub { font-size: 11px; color: var(--muted); margin-top: 4px; }
+
+  /* Sections */
+  h2 {
+    font-size: 20px;
+    font-weight: 700;
+    margin: 40px 0 16px;
+    color: var(--text);
+    border-left: 3px solid var(--accent);
+    padding-left: 12px;
+  }
+  .section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 20px;
+  }
+  .section h3 { font-size: 15px; font-weight: 700; color: var(--accent2); margin-bottom: 12px; }
+
+  /* Timeline */
+  .timeline {
+    position: relative;
+    padding-left: 32px;
+    margin: 24px 0;
+  }
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 7px;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    background: linear-gradient(to bottom, var(--accent), var(--accent2));
+    border-radius: 2px;
+  }
+  .timeline-item {
+    position: relative;
+    margin-bottom: 24px;
+  }
+  .timeline-item::before {
+    content: '';
+    position: absolute;
+    left: -28px;
+    top: 10px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    border: 2px solid var(--accent);
+    background: var(--bg);
+  }
+  .timeline-item.design::before { background: var(--accent2); border-color: var(--accent2); }
+  .timeline-item.open::before { background: var(--orange); border-color: var(--orange); }
+  .timeline-date { font-size: 12px; color: var(--muted); font-weight: 600; margin-bottom: 4px; }
+  .timeline-card {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+  }
+  .timeline-card h4 { font-size: 14px; font-weight: 700; color: var(--accent); margin-bottom: 6px; }
+  .timeline-card .desc { font-size: 13px; color: var(--text); margin-bottom: 8px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip {
+    font-size: 11px; font-weight: 600; padding: 3px 10px;
+    border-radius: 20px; background: var(--surface); color: var(--muted);
+    border: 1px solid var(--border);
+  }
+  .chip.orange { background: rgba(249,115,22,0.15); color: var(--orange); border-color: rgba(249,115,22,0.3); }
+  .chip.violet { background: rgba(167,139,250,0.15); color: var(--accent2); border-color: rgba(167,139,250,0.3); }
+  .chip.green { background: rgba(72,187,120,0.15); color: var(--green); border-color: rgba(72,187,120,0.3); }
+  .chip.cyan { background: rgba(34,211,238,0.15); color: var(--cyan); border-color: rgba(34,211,238,0.3); }
+
+  /* Table */
+  table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 12px; }
+  th {
+    text-align: left; padding: 10px 12px;
+    background: var(--surface2); color: var(--muted);
+    font-size: 11px; text-transform: uppercase;
+    letter-spacing: 0.5px; border-bottom: 1px solid var(--border);
+  }
+  td { padding: 10px 12px; border-bottom: 1px solid var(--border); }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--surface2); }
+  .status-open { color: var(--orange); font-weight: 600; }
+  .status-design { color: var(--accent2); font-weight: 600; }
+  .status-done { color: var(--green); font-weight: 600; }
+
+  /* Arch */
+  .arch-diagram {
+    background: var(--surface2); border-radius: 12px;
+    padding: 20px; margin: 16px 0;
+    font-family: 'Courier New', monospace; font-size: 12px;
+    line-height: 1.8; overflow-x: auto; white-space: pre;
+    color: var(--cyan);
+  }
+
+  /* Meeting */
+  .meeting-item {
+    background: var(--surface2); border-radius: 8px;
+    padding: 14px 16px; margin-bottom: 10px;
+    border-left: 3px solid var(--accent);
+  }
+  .meeting-item .date { font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+  .meeting-item .name { font-size: 14px; font-weight: 600; margin-bottom: 6px; }
+  .meeting-item .topics span { color: var(--text); }
+  .meeting-item.plugin { border-left-color: var(--accent2); }
+  .meeting-item.plugin::before { content: '🧩 '; }
+
+  /* Spec */
+  .spec-item {
+    background: var(--surface2); border-radius: 8px;
+    padding: 12px 16px; margin-bottom: 8px;
+    border-left: 3px solid var(--accent2);
+  }
+  .spec-item .spec-id { font-size: 11px; color: var(--accent2); font-weight: 700; margin-bottom: 2px; }
+  .spec-item .spec-title { font-size: 13px; font-weight: 600; }
+
+  /* Alert */
+  .alert {
+    background: rgba(249,115,22,0.08);
+    border: 1px solid rgba(249,115,22,0.25);
+    border-radius: 10px;
+    padding: 16px 20px;
+    margin: 24px 0;
+    font-size: 14px;
+  }
+  .alert strong { color: var(--orange); }
+
+  footer {
+    text-align: center; margin-top: 60px;
+    padding: 24px; border-top: 1px solid var(--border);
+    font-size: 12px; color: var(--muted);
+  }
+  footer a { color: var(--accent); }
+  @media (max-width: 600px) {
+    body { padding: 16px; }
+    .timeline { padding-left: 24px; }
+    .timeline-item::before { left: -20px; }
+    .timeline::before { left: 5px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="badge design">📐 Fase: Design &amp; Spec</div>
+  <h1>Hydra-Flow</h1>
+  <p class="subtitle">Hub extensível plugin-first para comunicação, mensageria e processos</p>
+  <p class="subtitle" style="font-size:14px;">
+    Cliente: Living Consultoria &nbsp;|&nbsp; Repo: <strong>living/hydra-flow</strong> &nbsp;|&nbsp; Stack: TypeScript (Fastify)
+  </p>
+  <div class="meta">
+    <div class="meta-item"><strong>2026-01-13</strong> criado</div>
+    <div class="meta-item"><strong>2</strong> PRs open</div>
+    <div class="meta-item"><strong>0</strong> PRs merged</div>
+    <div class="meta-item"><strong>2</strong> issues open</div>
+    <div class="meta-item"><strong>3</strong> specs</div>
+    <div class="meta-item">Última atualização: <strong>2026-04-30</strong></div>
+  </div>
+</header>
+
+<div class="cards">
+  <div class="card">
+    <div class="num">20+</div>
+    <div class="label">Commits</div>
+    <div class="sub">Jan–Abr 2026</div>
+  </div>
+  <div class="card">
+    <div class="num">3</div>
+    <div class="label">Specs</div>
+    <div class="sub">CONSTITUTION + 2 specs</div>
+  </div>
+  <div class="card">
+    <div class="num">2</div>
+    <div class="label">PRs open</div>
+    <div class="sub">0 merged (100% design)</div>
+  </div>
+  <div class="card">
+    <div class="num">3</div>
+    <div class="label">Reuniões</div>
+    <div class="sub">KABA + Hydra Foundation</div>
+  </div>
+</div>
+
+<div class="alert">
+  ⚠️ <strong>Status: Fase de design e documentação.</strong> Hydra-Flow ainda não tem código de runtime merged. O repositório é predominantemente documental (specs, arquitetura, processo). A implementação do monorepo e plugins está em construção — PR #8 (Initial - Core Code and Plugins) de estevesm é a primeira contribuição de código real.
+</div>
+
+<h2>O que é</h2>
+
+<div class="section">
+  <p style="font-size:14px; color: var(--text); margin-bottom: 16px;">
+    <strong>Hydra-Flow</strong> será um <strong>hub extensível plugin-first</strong> para operar comunicação, mensageria e processos em ambiente <strong>event-driven</strong> e <strong>multi-tenant</strong>.
+  </p>
+  <p style="font-size:14px; color: var(--muted); margin-bottom: 16px;">
+    Diferente do SVD (implementação concreta), Hydra-Flow é um <strong>projeto de fundação</strong> — focado em definir a arquitetura, padrões e processo antes de implementar runtime.
+  </p>
+  <h3>Princípios inegociáveis</h3>
+  <table>
+    <tr><th>Princípio</th><th>Descrição</th></tr>
+    <tr><td class="status-design">Spec-First</td><td>Sem Spec aprovada, sem código</td></tr>
+    <tr><td class="status-design">Request Brokered</td><td>Todo request vira job no broker</td></tr>
+    <tr><td class="status-design">Plugin-First</td><td>Core mínimo; regra específica em plugins</td></tr>
+    <tr><td class="status-design">Type Safety</td><td>TypeScript strict, sem <code>any</code></td></tr>
+    <tr><td class="status-design">Test-Driven</td><td>Mudanças acompanhadas de testes</td></tr>
+  </table>
+</div>
+
+<h2>Stack Tecnológico</h2>
+
+<div class="section">
+  <table>
+    <tr><th>Componente</th><th>Tecnologia</th><th>Nota</th></tr>
+    <tr>
+      <td>Runtime</td><td>TypeScript (strict mode)</td>
+      <td><span class="chip violet">sem <code>any</code></span></td>
+    </tr>
+    <tr>
+      <td>HTTP Framework</td>
+      <td>Fastify</td>
+      <td><span class="chip orange">mudou de NestJS</span></td>
+    </tr>
+    <tr>
+      <td>Message Broker</td>
+      <td>Azure Service Bus</td>
+      <td><span class="chip orange">mudou de RabbitMQ</span></td>
+    </tr>
+    <tr>
+      <td>Banco de dados</td>
+      <td>Cosmos DB v2</td>
+      <td><span class="chip orange">nova stack</span></td>
+    </tr>
+    <tr>
+      <td>Orquestração</td>
+      <td>GitHub Copilot SDK</td>
+      <td><span class="chip violet">evoluiu de YAML/engine</span></td>
+    </tr>
+    <tr>
+      <td>Infraestrutura</td>
+      <td>Azure Service Bus SDK (ensureQueue)</td>
+      <td>plugin registry dinâmico</td>
+    </tr>
+  </table>
+</div>
+
+<h2>Arquitetura</h2>
+
+<div class="section">
+  <h3>Diagrama</h3>
+  <div class="arch-diagram">Hydra-Flow (TypeScript / Fastify)
+├── ai_docs/                    ← documentação viva
+│   ├── ARCHITECTURE.md         ← plugin-first + event-driven
+│   ├── TECH_STACK.md           ← stack e versões
+│   ├── DEVELOPMENT_GUIDE.md    ← setup e padrões
+│   ├── CONSTITUTION.md         ← regras do projeto (spec-first, etc)
+│   ├── specs/                  ← specs numeradas
+│   └── memory/                ← rastreabilidade de decisões
+│
+├── SPEC 001: Monorepo Foundation + Plugin Registry
+├── SPEC 002: Fastify + Azure Service Bus migration
+│
+├── packages/                   ← (em construção)
+│   ├── core/                  ← AuditPassport, EventEnvelope
+│   ├── plugins/                ← plugin manifests + loader
+│   └── shared/                 ← contratos centrais
+│
+└── plugins/                    ← plugins (WhatsApp v1, etc)
+    └── whatsapp-v1/            ← primeiro plugin</div>
+</div>
+
+<h2>Cronologia de Commits</h2>
+
+<div class="timeline">
+
+  <div class="timeline-item design">
+    <div class="timeline-date">2026-01-13 — Início</div>
+    <div class="timeline-card">
+      <h4> Fundação do repositório</h4>
+      <div class="desc">README, onboarding, guardrails, estrutura inicial de documentação</div>
+      <div class="chips">
+        <span class="chip violet">lincolnqjunior</span>
+        <span class="chip">docs-only</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="timeline-item design">
+    <div class="timeline-date">2026-01-14</div>
+    <div class="timeline-card">
+      <h4>Refactor code structure</h4>
+      <div class="desc">Refatoração inicial para legibilidade e manutenibilidade</div>
+      <div class="chips">
+        <span class="chip violet">lincolnqjunior</span>
+        <span class="chip">structure</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="timeline-item design">
+    <div class="timeline-date">2026-04-06</div>
+    <div class="timeline-card">
+      <h4>Deliverables, CLAUDE.md e napkin</h4>
+      <div class="desc">Atualização de deliverables, configuração do agente e documentação operacional</div>
+      <div class="chips">
+        <span class="chip violet">lincolnqjunior</span>
+        <span class="chip">process</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="timeline-item design">
+    <div class="timeline-date">2026-04-13</div>
+    <div class="timeline-card">
+      <h4>Relatório Azure Logic Apps vs Hydra-Flow</h4>
+      <div class="desc">Análise comparativa de Azure Logic Apps vs abordagem Hydra-Flow — decisão de construir próprio</div>
+      <div class="chips">
+        <span class="chip violet">lincolnqjunior</span>
+        <span class="chip cyan">decisão técnica</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="timeline-item design">
+    <div class="timeline-date">2026-04-20 — Migração de stack</div>
+    <div class="timeline-card">
+      <h4>Migração RabbitMQ → Azure Service Bus + Fastify → NestJS removido</h4>
+      <div class="desc"> Reescrita da documentação de arquitetura: RabbitMQ substituído por Azure Service Bus + Cosmos DB v2. NestJS removido em favor de Fastify. Adicionada regra "No Over-engineering".</div>
+      <div class="chips">
+        <span class="chip violet">estevesm</span>
+        <span class="chip cyan">migração stack</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="timeline-item design">
+    <div class="timeline-date">2026-04-20</div>
+    <div class="timeline-card">
+      <h4>SPEC 001: Monorepo Foundation + Plugin Registry</h4>
+      <div class="desc">Core contract interfaces (AuditPassport, EventEnvelope, PluginManifest), plugin registry com carregamento dinâmico de manifest e provisionamento de fila</div>
+      <div class="chips">
+        <span class="chip violet">estevesm</span>
+        <span class="chip green">✅ spec approved</span>
+        <span class="chip">monorepo</span>
+        <span class="chip">plugin-registry</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="timeline-item design">
+    <div class="timeline-date">2026-04-20</div>
+    <div class="timeline-card">
+      <h4>SPEC 002: Task 01.1 — Contract alignment + fix typecheck</h4>
+      <div class="desc">Alinhamento de contratos com SPEC 001, correção de nomeação de filas e resolução de imports</div>
+      <div class="chips">
+        <span class="chip violet">estevesm</span>
+        <span class="chip green">✅ spec</span>
+        <span class="chip">typecheck</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="timeline-item design">
+    <div class="timeline-date">2026-04-22</div>
+    <div class="timeline-card">
+      <h4>Autenticação de plugins + integração ENGDelphos</h4>
+      <div class="desc">Brainstorm sobre autenticação de plugins e integração com ENGDelphos (SVD)</div>
+      <div class="chips">
+        <span class="chip violet">lincolnqjunior</span>
+        <span class="chip cyan">discussão</span>
+        <span class="chip">auth</span>
+        <span class="chip">SVD integration</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="timeline-item open">
+    <div class="timeline-date">2026-04-30 🔄</div>
+    <div class="timeline-card">
+      <h4>PR #8: Initial - Core Code and Plugins</h4>
+      <div class="desc">Primeira contribuição real de código runtime — core code + plugins. Aberto por estevesm. <strong>Primeira PR com código real do Hydra-Flow.</strong></div>
+      <div class="chips">
+        <span class="chip orange">🔄 open</span>
+        <span class="chip violet">estevesm</span>
+        <span class="chip">runtime</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<h2>Specs</h2>
+
+<div class="section">
+  <div class="spec-item">
+    <div class="spec-id">CONSTITUTION</div>
+    <div class="spec-title">Constituição Hydra-Flow — Regras do Projeto</div>
+    <p style="font-size:12px; color: var(--muted); margin-top: 4px;">Spec-First, Request Brokered, Plugin-First, Type Safety, Test-Driven</p>
+  </div>
+  <div class="spec-item">
+    <div class="spec-id">SPEC 001</div>
+    <div class="spec-title">Monorepo Foundation + Plugin Registry</div>
+    <p style="font-size:12px; color: var(--muted); margin-top: 4px;">Core contract interfaces (AuditPassport, EventEnvelope, PluginManifest), workspace TSConfig, plugin registry dinâmico</p>
+  </div>
+  <div class="spec-item">
+    <div class="spec-id">SPEC 002</div>
+    <div class="spec-title">Fastify + Azure Service Bus Stack Migration</div>
+    <p style="font-size:12px; color: var(--muted); margin-top: 4px;">Migração de NestJS → Fastify, RabbitMQ → Azure Service Bus, adiciona regra No Over-engineering</p>
+  </div>
+</div>
+
+<h2>PRs Abertas</h2>
+
+<table>
+  <tr><th>#</th><th>Título</th><th>Autor</th><th>Data</th><th>Status</th></tr>
+  <tr>
+    <td>#8</td>
+    <td><strong>Initial - Core Code and Plugins</strong></td>
+    <td>estevesm</td>
+    <td>2026-04-30</td>
+    <td class="status-open">🔄 open</td>
+  </tr>
+  <tr>
+    <td>#6</td>
+    <td><strong>feat: Add roadmap for Hydra-Flow × Delphos MVP</strong></td>
+    <td>lincolnqjunior</td>
+    <td>2026-01-20</td>
+    <td class="status-open">🔄 open</td>
+  </tr>
+</table>
+
+<div class="section">
+  <h3>Sobre PR #6 (Roadmap)</h3>
+  <p style="font-size:13px; color: var(--muted);">
+    Roadmap que propõe a <strong>evolução do padrão de orquestração</strong>: de máquina de estados tradicional (YAML/engine) para um fluxo orientado a <strong>agents/LLM via GitHub Copilot SDK</strong>. Atualiza documentos de visão, processo e adiciona skills explícitas para criação e manutenção de specs.
+  </p>
+</div>
+
+<h2>Reuniões</h2>
+
+<div class="meeting-item">
+  <div class="date">2026-04-29 — Status Kaba/BAT/BOT</div>
+  <div class="name">Desenvolvimento de plugin e front-end isolado</div>
+  <div class="topics">Tópicos: <span>Plugin e front-end isolado em desenvolvimento, discussão fila com Bruno Esteves</span></div>
+</div>
+
+<div class="meeting-item">
+  <div class="date">2026-04-24 — Status Kaba/BAT/BOT</div>
+  <div class="name">Criação de ambiente/plugin</div>
+  <div class="topics">Tópicos: <span>Criação de ambiente/plugin — referência a cersei-bush, lucio, idra</span></div>
+</div>
+
+<div class="meeting-item">
+  <div class="date">2026-04-17 — Fundação Hydra</div>
+  <div class="name">Marco zero Hydra-Flow</div>
+  <div class="topics">
+    Tópicos: <span>Acesso a repositórios GitHub do Hydra e SVD, permissões (Verciel/BS), criação de back-end</span><br>
+    Decisões: <span style="color: var(--yellow);">nenhuma registrada</span>
+  </div>
+</div>
+
+<h2>Integração SVD ↔ Hydra-Flow</h2>
+
+<div class="section">
+  <table>
+    <tr><th>Elemento</th><th>SVD (delphos-svd)</th><th>Hydra-Flow</th></tr>
+    <tr>
+      <td>Hydra Adapter</td>
+      <td><span class="status-done">PR #9 merged (SP5, 2026-04-23)</span></td>
+      <td><span class="status-open">em design — specs 001/002</span></td>
+    </tr>
+    <tr>
+      <td>Stack</td>
+      <td>C# / .NET 10</td>
+      <td>TypeScript / Fastify</td>
+    </tr>
+    <tr>
+      <td>Broker</td>
+      <td>Azure Service Bus</td>
+      <td>Azure Service Bus</td>
+    </tr>
+    <tr>
+      <td>Plugin WhatsApp</td>
+      <td>—</td>
+      <td><span class="status-open">em construção (PR #8)</span></td>
+    </tr>
+    <tr>
+      <td>Integração</td>
+      <td colspan="2">SVD SP5 (Hydra Adapter) se comunica via webhook com Hydra-Flow como hub central</td>
+    </tr>
+  </table>
+</div>
+
+<h2>Decisões Técnicas Registradas</h2>
+
+<div class="section">
+  <table>
+    <tr><th>Quando</th><th>Decisão</th><th>Contexto</th></tr>
+    <tr>
+      <td>2026-04-13</td>
+      <td>Construir Hydra-Flow ao invés de usar Azure Logic Apps</td>
+      <td>Relatório comparativo "Azure Logic Apps vs Hydra-Flow"</td>
+    </tr>
+    <tr>
+      <td>2026-04-20</td>
+      <td>Fastify取代 NestJS — mais leve, menos opinionated</td>
+      <td>SPEC 002: simplificação da stack</td>
+    </tr>
+    <tr>
+      <td>2026-04-20</td>
+      <td>RabbitMQ → Azure Service Bus</td>
+      <td>Migração para统一的 messaging na Living</td>
+    </tr>
+    <tr>
+      <td>2026-04-20</td>
+      <td>YAML/engine → Copilot SDK para orquestração</td>
+      <td>PR #6: evolução do padrão de orquestração</td>
+    </tr>
+    <tr>
+      <td>2026-04-20</td>
+      <td>Plugin manifest com registry dinâmico</td>
+      <td>SPEC 001: arquitetura plugin-first</td>
+    </tr>
+  </table>
+</div>
+
+<h2>Pendências</h2>
+
+<table>
+  <tr><th>Item</th><th>Status</th><th>Responsável</th></tr>
+  <tr>
+    <td>PR #8 — Core Code and Plugins (primeiro código runtime)</td>
+    <td class="status-open">🔄 open — estevesm</td>
+    <td>estevesm</td>
+  </tr>
+  <tr>
+    <td>PR #6 — Roadmap Hydra-Flow × Delphos MVP</td>
+    <td class="status-open">🔄 open</td>
+    <td>lincolnqjunior</td>
+  </tr>
+  <tr>
+    <td>Plugin WhatsApp v1</td>
+    <td class="status-design">📐 design</td>
+    <td>—</td>
+  </tr>
+  <tr>
+    <td>Autenticação de plugins + integração ENGDelphos</td>
+    <td class="status-design">📐 brainstorm</td>
+    <td>lincolnqjunior</td>
+  </tr>
+  <tr>
+    <td>Alinhamento Hydra Adapter SVD ↔ Hydra-Flow runtime</td>
+    <td class="status-open">⚠️ a definir</td>
+    <td>—</td>
+  </tr>
+</table>
+
+<footer>
+  <p>Gerado por <strong>Livy Memory Agent</strong> &nbsp;|&nbsp; Fontes: GitHub PRs + TLDV Meetings + SSOT Claims</p>
+  <p>Repo: <a href="#">living/hydra-flow</a> &nbsp;|&nbsp; Topic: <a href="#">memory/curated/hydra-flow.md</a></p>
+  <p style="margin-top:8px;">2026-04-30 22:15 UTC &nbsp;|&nbsp; Living Consultoria</p>
+</footer>
+
+</body>
+</html>

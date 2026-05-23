@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Trello × Meetings — Crosslink Review</title>
+<style>
+  :root { --bg: #0d1117; --sur: #161b22; --border: #30363d; --text: #e6edf3; --muted: #8b949e; --accent: #58a6ff; --green: #3fb950; --yellow: #d29922; --red: #f85149; --purple: #bc8cff; --pink: #ff7eb6; --orange: #e8a935; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; background: var(--bg); color: var(--text); font-size: 13px; line-height: 1.5; }
+  .container { max-width: 1200px; margin: 0 auto; padding: 24px 16px; }
+  h1 { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+  .subtitle { color: var(--muted); font-size: 12px; margin-bottom: 24px; }
+  h2 { font-size: 14px; font-weight: 600; margin: 24px 0 10px; padding-bottom: 6px; border-bottom: 1px solid var(--border); color: var(--accent); }
+  h3 { font-size: 13px; font-weight: 600; margin: 14px 0 6px; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th { text-align: left; padding: 8px 10px; background: var(--sur); border: 1px solid var(--border); color: var(--accent); font-weight: 600; position: sticky; top: 0; }
+  td { padding: 8px 10px; border: 1px solid var(--border); vertical-align: top; }
+  tr:hover td { background: #1c2128; }
+  .date { white-space: nowrap; color: var(--muted); font-size: 11px; }
+  .title { max-width: 300px; }
+  .title a { color: var(--text); text-decoration: none; }
+  .title a:hover { color: var(--accent); text-decoration: underline; }
+  .board-cell { font-size: 11px; line-height: 1.6; }
+  .board-tag { display: inline-block; padding: 1px 6px; border-radius: 4px; margin: 1px; font-size: 10px; font-weight: 600; white-space: nowrap; }
+  .auto-tag { background: #30363d44; color: var(--muted); border: 1px solid #30363d; }
+  .b3-list { background: #ff7eb622; color: #ff7eb6; }
+  .b3-uif { background: #5858d122; color: #5858d1; }
+  .cerc { background: #bc8cff22; color: var(--purple); }
+  .balcao { background: #e8a93522; color: var(--orange); }
+  .bat-bot { background: #3fb95022; color: var(--green); }
+  .delphos { background: #58a6ff22; color: var(--accent); }
+  .tldv { background: #8b949e22; color: var(--muted); }
+  .living { background: #d2992222; color: var(--yellow); }
+  .recurring { background: #f8514922; color: var(--red); border: 1px solid #f8514944; display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 10px; margin: 1px; }
+  .freq-note { font-size: 10px; color: var(--muted); }
+  .warn { background: #d2992211; border: 1px solid #d2992244; padding: 2px 6px; border-radius: 4px; font-size: 10px; color: var(--yellow); }
+  .filter-section { background: var(--sur); border: 1px solid var(--border); border-radius: 8px; padding: 14px; margin-bottom: 20px; }
+  .filter-section h3 { margin-top: 0; }
+  .filter-btn { display: inline-block; padding: 4px 12px; border-radius: 16px; font-size: 11px; margin: 3px; cursor: pointer; border: 1px solid var(--border); background: var(--bg); color: var(--text); }
+  .filter-btn.active { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+  .board-legend { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; font-size: 11px; }
+  .legend-item { display: flex; align-items: center; gap: 4px; }
+  .stats-row { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 20px; }
+  .stat { background: var(--sur); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; min-width: 100px; }
+  .stat .num { font-size: 22px; font-weight: 700; }
+  .stat .label { font-size: 11px; color: var(--muted); }
+  .stat.blue .num { color: var(--accent); }
+  .stat.red .num { color: var(--red); }
+  .stat.green .num { color: var(--green); }
+  .highlight-row td { background: #3fb95011 !important; }
+  .suspicious td { background: #f8514911 !important; }
+  .meeting-row:hover td { background: #1c2128; }
+  input[type="text"] { background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 6px 10px; border-radius: 6px; font-size: 12px; width: 250px; }
+  .section-note { background: #d2992211; border: 1px solid #d2992244; border-radius: 6px; padding: 10px 14px; margin: 12px 0; font-size: 12px; color: var(--yellow); }
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>🎯 Trello × Meetings — Crosslink Review</h1>
+<p class="subtitle">Análise de cruzamentos entre reuniões TLDV e boards Trello · Atualizado: 2026-05-08</p>
+
+<div class="stats-row">
+  <div class="stat blue"><div class="num">50</div><div class="label">Reuniões com links Trello</div></div>
+  <div class="stat"><div class="num">41</div><div class="label">Cards únicos referenciados</div></div>
+  <div class="stat red"><div class="num">~15</div><div class="label">Cards recorrentes (>40% meetings)</div></div>
+  <div class="stat green"><div class="num">9</div><div class="label">Boards únicos</div></div>
+</div>
+
+<!-- Legenda -->
+<div class="board-legend">
+  <span style="color:var(--muted);font-size:11px;width:100%;margin-bottom:4px">Legenda dos boards:</span>
+  <span class="board-tag b3-list">B3/Listados</span>
+  <span class="board-tag b3-uif">B3/UIF+NW+NT</span>
+  <span class="board-tag cerc">CERC/Billing</span>
+  <span class="board-tag balcao">B3/Balcão</span>
+  <span class="board-tag bat-bot">BAT/ConectaBot</span>
+  <span class="board-tag delphos">Delphos/SVD</span>
+  <span class="board-tag tldv">tl;dv integrations</span>
+  <span class="board-tag living">Living/M.I.C.I</span>
+  <span class="recurring">⚠️ recorrente</span>
+</div>
+
+<div class="section-note">
+  ⚠️ <strong>Cards recorrentes</strong>: os marcados com ⚠️ aparecem em &gt;40% das reuniões — são issues persistentes (TARs em aberto) que são mencionados repetidamente, não necessariamente cruzamentos errados.
+</div>
+
+<!-- Filtro -->
+<div class="filter-section">
+  <h3>🔍 Filtrar por board predominante</h3>
+  <div>
+    <span class="filter-btn active" onclick="filterBoard('')">Todos</span>
+    <span class="filter-btn" onclick="filterBoard('4D')" style="border-color:#bc8cff">4D Imobi</span>
+    <span class="filter-btn" onclick="filterBoard('B3/Listados')" style="border-color:#ff7eb6">B3/Listados</span>
+    <span class="filter-btn" onclick="filterBoard('CERC/Billing')" style="border-color:#bc8cff">CERC/Billing</span>
+    <span class="filter-btn" onclick="filterBoard('Delphos')" style="border-color:#58a6ff">Delphos</span>
+    <span class="filter-btn" onclick="filterBoard('Kaba')" style="border-color:#3fb950">Kaba/BAT/BOT</span>
+    <span class="filter-btn" onclick="filterBoard('Daily')" style="border-color:#8b949e">Daily B3</span>
+  </div>
+</div>
+
+<!-- Tabela completa -->
+<table id="crossTable">
+<thead>
+<tr>
+  <th>Data</th>
+  <th>Reunião</th>
+  <th>Boards Trello Referenciados (cards por board)</th>
+  <th>Veredito</th>
+</tr>
+</thead>
+<tbody>
+</tbody>
+</table>
+
+<script>
+// Full data embedded from analysis
+const DATA = [
+  {date:"2026-02-13",title:"ENC: Weekly Billing X Living (Kansys)",file:"2026-02-13 ENC: Weekly Billing X Living (Kansys).md",recurring:1,boards:{"B3/Listados":2,"B3/UIF+NW+NT":2,"CERC/Billing":7,"tl;dv integrations":3}},
+  {date:"2026-02-19",title:"Daily Operações/Infra/Suporte B3",file:"2026-02-19 Daily Operações/Infra/Suporte B3.md",recurring:1,boards:{"B3/Listados":2,"B3/UIF+NW+NT":2,"CERC/Billing":7,"tl;dv integrations":3}},
+  {date:"2026-02-20",title:"Daily Operações/Infra/Suporte B3",file:"2026-02-20 Daily Operações/Infra/Suporte B3.md",recurring:1,boards:{"B3/Listados":2,"B3/UIF+NW+NT":2}},
+  {date:"2026-02-20",title:"ENC: Weekly Billing X Living (Kansys)",file:"2026-02-20 ENC: Weekly Billing X Living (Kansys).md",recurring:1,boards:{"B3/Balcão":1,"B3/Listados":2,"B3/UIF+NW+NT":2,"BAT/ConectaBot":1,"CERC/Billing":5,"tl;dv integrations":3}},
+  {date:"2026-02-20",title:"Status IA",file:"2026-02-20 Status IA.md",recurring:0,boards:{"B3/Listados":2,"CERC/Billing":10,"tl;dv integrations":3}},
+  {date:"2026-02-23",title:"Daily Operações/Infra/Suporte B3",file:"2026-02-23 Daily Operações/Infra/Suporte B3.md",recurring:1,boards:{"B3/Listados":2,"B3/UIF+NW+NT":2,"CERC/Billing":7,"tl;dv integrations":3}},
+  {date:"2026-02-23",title:"Deploy SVRDelphos + PWA",file:"2026-02-23 Deploy SVRDelphos + PWA.md",recurring:1,boards:{"B3/Listados":2,"B3/UIF+NW+NT":2,"CERC/Billing":7,"tl;dv integrations":3}},
+  {date:"2026-02-24",title:"Status Kaba/BAT/BOT",file:"2026-02-24 Status Kaba-BAT-BOT.md",recurring:1,boards:{"B3/Balcão":1,"B3/Listados":2,"B3/UIF+NW+NT":2,"BAT/ConectaBot":1,"CERC/Billing":5,"tl;dv integrations":3}},
+  {date:"2026-02-25",title:"Daily Operações/Infra/Suporte B3",file:"2026-02-25 Daily Operações-Infra-Suporte B3.md",recurring:1,boards:{"B3/Balcão":1,"B3/Listados":2,"B3/UIF+NW+NT":2,"BAT/ConectaBot":1,"CERC/Billing":5,"tl;dv integrations":3}},
+  {date:"2026-02-27",title:"Daily Operações/Infra/Suporte B3",file:"2026-02-27 Daily Operações-Infra-Suporte B3.md",recurring:1,boards:{"B3/Balcão":1,"B3/Listados":2,"B3/UIF+NW+NT":2,"BAT/ConectaBot":1,"CERC/Billing":5,"tl;dv integrations":3}},
+  {date:"2026-03-18",title:"Daily Operações/Infra/Suporte B3",file:"2026-03-18 Daily Operações-Infra-Suporte B3.md",recurring:1,boards:{"B3/Listados":2,"B3/UIF+NW+NT":2}},
+  {date:"2026-03-18",title:"Processo NW + Roadmap Futuro",file:"2026-03-18 Processo NW + Roadmap Futuro.md",recurring:1,boards:{"B3/Listados":2,"B3/UIF+NW+NT":2}},
+  {date:"2026-03-18",title:"[Tech] Reunião de Cadência 4D imobi",file:"2026-03-18 [Tech] Reunião de Cadência 4D imobi.md",recurring:0,boards:{"B3/Listados":2,"tl;dv integrations":3}},
+  {date:"2026-03-19",title:"Status Kaba/BAT/BOT",file:"2026-03-19 Status Kaba-BAT-BOT.md",recurring:1,boards:{"B3/Listados":2,"B3/UIF+NW+NT":2}},
+  {date:"2026-03-20",title:"Status Kaba/BAT/BOT",file:"2026-03-20 Status Kaba-BAT-BOT.md",recurring:1,boards:{"B3/Listados":2,"B3/UIF+NW+NT":2}},
+  {date:"2026-03-23",title:"Daily Operações/Infra/Suporte B3",file:"2026-03-23 Daily Operações-Infra-Suporte B3.md",recurring:1,boards:{"B3/Balcão":5,"B3/Listados":2,"B3/UIF+NW+NT":2,"BAT/ConectaBot":1,"CERC/Billing":4}},
+  {date:"2026-03-23",title:"Review Energia",file:"2026-03-23 Review Energia.md",recurring:1,boards:{"B3/Listados":2,"B3/UIF+NW+NT":2,"CERC/Billing":10}},
+  {date:"2026-03-23",title:"Status Kaba/BAT/BOT",file:"2026-03-23 Status Kaba-BAT-BOT.md",recurring:1,boards:{"B3/Balcão":5,"B3/Listados":2,"B3/UIF+NW+NT":2,"BAT/ConectaBot":1,"CERC/Billing":4}},
+  {date:"2026-03-24",title:"Status Kaba/BAT/BOT",file:"2026-03-24 Status Kaba-BAT-BOT.md",recurring:1,boards:{"B3/Listados":2,"B3/UIF+NW+NT":2,"CERC/Billing":10}},
+  {date:"2026-03-25",title:"Status Kaba/BAT/BOT",file:"2026-03-25 Status Kaba-BAT-BOT.md",recurring:1,boards:{"B3/Listados":2,"B3/UIF+NW+NT":2,"CERC/Billing":10}},
+  {date:"2026-03-25",title:"[Tech] Reunião de Cadência 4D imobi",file:"2026-03-25 [Tech] Reunião de Cadência 4D imobi.md",recurring:1,boards:{"B3/Listados":2,"B3/UIF+NW+NT":2,"CERC/Billing":10}},
+  {date:"2026-03-26",title:"Reunião de Alinhamento entre Living e Task",file:"2026-03-26 Reunião de Alinhamento entre Living e Task.md",recurring:1,boards:{"B3/Listados":2,"B3/UIF+NW+NT":2,"CERC/Billing":10}},
+  {date:"2026-03-26",title:"Status Kaba/BAT/BOT",file:"2026-03-26 Status Kaba-BAT-BOT.md",recurring:1,boards:{"B3/Listados":2,"B3/UIF+NW+NT":2,"CERC/Billing":7,"tl;dv integrations":3}},
+  {date:"2026-03-27",title:"Status Kaba/BAT/BOT",file:"2026-03-27 Status Kaba-BAT-BOT.md",recurring:1,boards:{"B3/Listados":2,"B3/UIF+NW+NT":2,"CERC/Billing":7,"tl;dv integrations":3}},
+  {date:"2026-03-30",title:"Daily Operações/Infra/Suporte B3",file:"2026-03-30 Daily Operações-Infra-Suporte B3.md",recurring:1,boards:{"B3/Listados":2,"B3/UIF+NW+NT":2,"CERC/Billing":7,"tl;dv integrations":3}},
+  {date:"2026-03-30",title:"Deploy Produção Robô OCR",file:"2026-03-30 Deploy Produção Robô OCR.md",recurring:1,boards:{"B3/Listados":2,"B3/UIF+NW+NT":2}},
+  {date:"2026-03-30",title:"Status Kaba/BAT/BOT",file:"2026-03-30 Status Kaba-BAT-BOT.md",recurring:1,boards:{"B3/Balcão":5,"B3/Listados":2,"B3/UIF+NW+NT":2,"BAT/ConectaBot":1,"CERC/Billing":1,"tl;dv integrations":3}},
+  {date:"2026-03-31",title:"Status Kaba/BAT/BOT",file:"2026-03-31 Status Kaba-BAT-BOT.md",recurring:1,boards:{"B3/Listados":2,"B3/UIF+NW+NT":2}},
+  {date:"2026-03-31",title:"Status",file:"2026-03-31 Status.md",recurring:1,boards:{"B3/Listados":2,"B3/UIF+NW+NT":2}},
+  {date:"2026-04-01",title:"Solução para Patrimônio Liquido",file:"2026-04-01 Solução para Patrimônio Liquido.md",recurring:1,boards:{"B3/Listados":1,"B3/UIF+NW+NT":2,"tl;dv integrations":1}},
+  {date:"2026-04-01",title:"Status Kaba/BAT/BOT",file:"2026-04-01 Status Kaba-BAT-BOT.md",recurring:1,boards:{"B3/Listados":2,"B3/UIF+NW+NT":2}},
+  {date:"2026-04-01",title:"[Tech] Reunião de Cadência 4D imobi",file:"2026-04-01 [Tech] Reunião de Cadência 4D imobi.md",recurring:1,boards:{"B3/Listados":1,"B3/UIF+NW+NT":2,"CERC/Billing":1}},
+  {date:"2026-04-06",title:"Status Kaba/BAT/BOT",file:"2026-04-06 Status Kaba-BAT-BOT.md",recurring:0,boards:{"tl;dv integrations":1}},
+  {date:"2026-04-07",title:"Status Kaba/BAT/BOT",file:"2026-04-07 Status Kaba-BAT-BOT.md",recurring:0,boards:{"tl;dv integrations":1}},
+  {date:"2026-04-08",title:"Status Kaba/BAT/BOT",file:"2026-04-08 Status Kaba-BAT-BOT.md",recurring:0,boards:{"CERC/Billing":7,"tl;dv integrations":1}},
+  {date:"2026-04-08",title:"[Tech] Reunião de Cadência 4D imobi",file:"2026-04-08 [Tech] Reunião de Cadência 4D imobi.md",recurring:0,boards:{"CERC/Billing":7}},
+  {date:"2026-04-09",title:"Status Kaba/BAT/BOT",file:"2026-04-09 Status Kaba-BAT-BOT.md",recurring:0,boards:{"BAT/ConectaBot":1,"Delphos Integração 2026":2,"Living/M.I.C.I":1,"tl;dv integrations":1}},
+  {date:"2026-04-10",title:"Status Kaba/BAT/BOT",file:"2026-04-10 Status Kaba-BAT-BOT.md",recurring:0,boards:{"CERC/Billing":5}},
+  {date:"2026-04-13",title:"Status Kaba/BAT/BOT",file:"2026-04-13 Status Kaba-BAT-BOT.md",recurring:0,boards:{"CERC/Billing":5}},
+  {date:"2026-04-15",title:"[Tech] Reunião de Cadência 4D imobi",file:"2026-04-15 [Tech] Reunião de Cadência 4D imobi.md",recurring:1,boards:{"B3/UIF+NW+NT":2,"CERC/Billing":2}},
+  {date:"2026-04-16",title:"Status Kaba/BAT/BOT",file:"2026-04-16 Status Kaba-BAT-BOT.md",recurring:1,boards:{"B3/UIF+NW+NT":2,"CERC/Billing":2}},
+  {date:"2026-04-17",title:"Fundação Hydra",file:"2026-04-17 Fundação Hydra.md",recurring:1,boards:{"B3/UIF+NW+NT":2,"CERC/Billing":1,"Delphos/SVD":1}},
+  {date:"2026-04-20",title:"20/04/2026 - Status Delphos",file:"2026-04-20 20-04-2026 - Status Delphos.md",recurring:0,boards:{"CERC/Billing":3,"Delphos/SVD":2}},
+  {date:"2026-04-20",title:"Status Kaba/BAT/BOT",file:"2026-04-20 Status Kaba-BAT-BOT.md",recurring:0,boards:{"CERC/Billing":3,"Delphos/SVD":2}},
+  {date:"2026-04-22",title:"22/04/2026-Meeting",file:"2026-04-22 22-04-2026-Meeting.md",recurring:0,boards:{"B3/Balcão":2,"Delphos/SVD":2}},
+  {date:"2026-04-22",title:"Status Kaba/BAT/BOT",file:"2026-04-22 Status Kaba-BAT-BOT.md",recurring:0,boards:{"B3/Balcão":2,"Delphos/SVD":2}},
+  {date:"2026-04-22",title:"[Tech] Reunião de Cadência 4D imobi",file:"2026-04-22 [Tech] Reunião de Cadência 4D imobi.md",recurring:0,boards:{"B3/Balcão":2,"Delphos/SVD":2}},
+  {date:"2026-04-24",title:"Status Kaba/BAT/BOT",file:"2026-04-24 Status Kaba-BAT-BOT.md",recurring:0,boards:{"B3/Listados":1,"Delphos/SVD":4}},
+  {date:"2026-04-30",title:"Status Kaba/BAT/BOT",file:"2026-04-30 Status Kaba-BAT-BOT.md",recurring:0,boards:{"B3/Listados":3,"Delphos/SVD":2}},
+  {date:"2026-05-04",title:"04/05/2026-Meeting",file:"2026-05-04 04-05-2026-Meeting.md",recurring:1,boards:{"B3/Listados":2,"B3/UIF+NW+NT":1,"Delphos/SVD":1}},
+  {date:"2026-05-05",title:"Status Kaba/BAT/BOT",file:"2026-05-05 Status Kaba-BAT-BOT.md",recurring:1,boards:{"B3/Listados":2,"B3/UIF+NW+NT":1,"Delphos/SVD":1}},
+  {date:"2026-05-06",title:"[Tech] Reunião de Cadência 4D imobi",file:"2026-05-06 [Tech] Reunião de Cadência 4D imobi.md",recurring:1,boards:{"B3/Listados":2,"Delphos/SVD":2}},
+];
+
+const BOARD_CLASS = {
+  "B3/Listados": "b3-list",
+  "B3/UIF+NW+NT": "b3-uif",
+  "CERC/Billing": "cerc",
+  "B3/Balcão": "balcao",
+  "BAT/ConectaBot": "bat-bot",
+  "Delphos/SVD": "delphos",
+  "Delphos Integração 2026": "delphos",
+  "tl;dv integrations": "tldv",
+  "Living/M.I.C.I": "living",
+};
+
+// Recurring cards threshold: cards appearing in >40% meetings
+const RECURRING = {"FSYWbVu6","FxJZN8pQ","4P0Pt4at","gdYaSPHn","izOCyYLG","dVysJwW5","G6dhRBh1","oTHsYZ1I","dFoFt56c","HXxAI72i"};
+
+function getVerdict(d) {
+  const boardNames = Object.keys(d.boards).filter(b => b !== "tl;dv integrations");
+  if (boardNames.length === 0) return { text: "Só card automático", class: "" };
+  if (d.title.includes("4D") && (boardNames.includes("B3/Listados") || boardNames.includes("CERC/Billing"))) {
+    return { text: "⚠️ Verificar — B3/Listados ou CERC mencionados em reunião 4D imobi", class: "suspicious" };
+  }
+  if (boardNames.includes("B3/Listados") && boardNames.includes("Delphos/SVD")) {
+    return { text: "⚠️ Cruzamento B3/Listados × Delphos", class: "suspicious" };
+  }
+  return { text: "OK", class: "" };
+}
+
+function renderTable(filter) {
+  const tbody = document.querySelector("#crossTable tbody");
+  tbody.innerHTML = "";
+  DATA.forEach(d => {
+    const boardNames = Object.keys(d.boards).filter(b => b !== "tl;dv integrations");
+    const fileBase = d.file.replace(/\.md$/, "");
+
+    // Apply filter
+    if (filter === "4D" && !d.title.includes("4D")) return;
+    if (filter === "B3/Listados" && !boardNames.includes("B3/Listados")) return;
+    if (filter === "CERC/Billing" && !boardNames.includes("CERC/Billing")) return;
+    if (filter === "Delphos" && !boardNames.some(b => b.includes("Delphos"))) return;
+    if (filter === "Kaba" && !d.title.includes("Kaba")) return;
+    if (filter === "Daily" && !d.title.includes("Daily")) return;
+
+    const recNote = d.recurring > 0 ? `<span class="recurring">⚠️ ${d.recurring}x card recorrente</span>` : "";
+    const boards_html = boardNames.map(b => {
+      const cls = BOARD_CLASS[b] || "";
+      const count = d.boards[b];
+      return `<span class="board-tag ${cls}">${b}: ${count}</span>`;
+    }).join(" ");
+
+    const tldv_note = d.boards["tl;dv integrations"]
+      ? `<span class="board-tag tldv">tl;dv: ${d.boards["tl;dv integrations"]}</span>` : "";
+
+    const verdict = getVerdict(d);
+    const rowClass = verdict.class || (d.title.includes("4D") && boardNames.some(b => b === "B3/Listados" || b === "CERC/Billing") ? "suspicious" : "");
+
+    const tr = document.createElement("tr");
+    tr.className = rowClass ? rowClass : "meeting-row";
+    tr.innerHTML = `
+      <td class="date">${d.date}</td>
+      <td class="title">${d.title}</td>
+      <td class="board-cell">${boards_html}${tldv_note ? " " + tldv_note : ""}<br>${recNote}</td>
+      <td style="font-size:11px;color:var(--yellow)">${verdict.text}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function filterBoard(board) {
+  document.querySelectorAll(".filter-btn").forEach(b => b.classList.remove("active"));
+  event.target.classList.add("active");
+  renderTable(board);
+}
+
+renderTable("");
+</script>
+
+<h2 style="margin-top:32px">📌 Observações para Review</h2>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:12px">
+
+<div style="background:var(--sur);border:1px solid var(--border);border-radius:8px;padding:14px">
+  <h3 style="color:var(--red);margin-top:0">⚠️ 4D Imobi — Provável cruzamento errado</h3>
+  <p style="font-size:12px;color:var(--muted);margin:6px 0">
+    As reuniões de <strong>4D imobi</strong> mencionam cards de <strong>B3/Listados</strong> (TAR-10083, TAR-9876) e <strong>CERC/Billing</strong>. Esses boards são de billing — <strong>não pertencem ao 4D imobi</strong>. Foram mencionados provavelmente por comparação de problemas.
+  </p>
+  <p style="font-size:12px;margin:6px 0">
+    <strong>Ação necessária:</strong> Remover links de B3/Listados e CERC/Billing do <code>## Contexto</code> das 7 reuniões 4D imobi.
+  </p>
+</div>
+
+<div style="background:var(--sur);border:1px solid var(--border);border-radius:8px;padding:14px">
+  <h3 style="color:var(--yellow);margin-top:0">⚡ Cards recorrentes — não são necessariamente erro</h3>
+  <p style="font-size:12px;color:var(--muted);margin:6px 0">
+    TAR-10083 (cobrança indevida USD) e TAR-9876 (lançamento manual) aparecem em <strong>32 reuniões</strong> — são blockers em aberto discutidos em quase todas as daily. Não são cruzamentos errados, mas sim issues persistentes do projeto.
+  </p>
+  <p style="font-size:12px;margin:6px 0">
+    <strong>Decisão necessária:</strong> Manter como link (são relevantes) ou remover do contexto por serem redundantes?
+  </p>
+</div>
+
+<div style="background:var(--sur);border:1px solid var(--border);border-radius:8px;padding:14px">
+  <h3 style="color:var(--accent);margin-top:0">🔄 Status Kaba/BAT/BOT — Evolução natural</h3>
+  <p style="font-size:12px;color:var(--muted);margin:6px 0">
+    Meetings Kaba/BAT/BOT transitam entre boards: cedo mencionavam B3/Listados + CERC/Billing; depois migraram para Delphos/SVD. Isso reflete a <strong>progressão real do projeto</strong> — não é erro.
+  </p>
+  <p style="font-size:12px;margin:6px 0">
+    A partir de abril: predominância de Delphos/SVD e CERC/Billing. Board BAT/ConectaBot aparece pontualmente.
+  </p>
+</div>
+
+<div style="background:var(--sur);border:1px solid var(--border);border-radius:8px;padding:14px">
+  <h3 style="color:var(--green);margin-top:0">✅ Daily B3 — Ligação legítima</h3>
+  <p style="font-size:12px;color:var(--muted);margin:6px 0">
+    As reuniões <strong>Daily Operações/Infra/Suporte B3</strong> mencionam legitimamente B3/Listados + B3/UIF+NW+NT + CERC/Billing — são os boards de operação B3 que a daily cobre.
+  </p>
+  <p style="font-size:12px;margin:6px 0">
+    Os 5 boards都是很自然的引用 — a daily é justamente sobre esses sistemas de billing.
+  </p>
+</div>
+
+<div style="background:var(--sur);border:1px solid var(--border);border-radius:8px;padding:14px">
+  <h3 style="color:var(--purple);margin-top:0">🔗 tl;dv integrations — Card espelho</h3>
+  <p style="font-size:12px;color:var(--muted);margin:6px 0">
+    O board <code>tl;dv integrations</code> contém cards criados automaticamente pelo bot para cada reunião gravada. O card da própria reunião aparece no contexto — isso <strong>não é um cruzamento real</strong>, é o identity card da reunião.
+  </p>
+  <p style="font-size:12px;margin:6px 0">
+    <strong>Ação:</strong> Filtrar o card "dessa reunião" do board tl;dv integrations na seção <code>## Contexto</code> — deixar apenas os cards de boards externos mencionados.
+  </p>
+</div>
+
+<div style="background:var(--sur);border:1px solid var(--border);border-radius:8px;padding:14px">
+  <h3 style="color:var(--orange);margin-top:0">📊 B3/Balcão — Appears late em Kaba/BAT/BOT</h3>
+  <p style="font-size:12px;color:var(--muted);margin:6px 0">
+    Cards de B3/Balcão aparecem no Kaba/BAT/BOT a partir de março (5 cards por reunião). Isso é consistente com a migração ECB17→KE20 que está em curso no board <code>B3/Balcao-KE20 Modernização</code>.
+  </p>
+  <p style="font-size:12px;margin:6px 0">
+    Também pode indicar que o Kaba/BAT/BOT está discutindo tópicos que envolvem o Balcão. Verificar se essa conexão faz sentido.
+  </p>
+</div>
+
+</div>
+
+<h2 style="margin-top:28px">🛠️ Ações Propostas</h2>
+<ol style="font-size:12px;line-height:2;padding-left:20px">
+  <li><strong>4D Imobi:</strong> Remover links B3/Listados e CERC/Billing das seções <code>## Contexto</code> das 7 reuniões</li>
+  <li><strong>tl;dv integrations:</strong> Excluir o card-espelho da própria reunião do contexto ao fazer crosslink</li>
+  <li><strong>Cards recorrentes:</strong> Decidir se TAR-10083/TAR-9876 devem aparecer em todas as 32+ reuniões ou apenas nas mais relevantes</li>
+  <li><strong>Delphos Integração 2026:</strong> Board muito pequeno (1-2 cards por reunião) — verificar se os cards existem de fato nesse board</li>
+  <li><strong>Fundação Hydra (2026-04-17):</strong> Mentions Delphos/SVD — verificar se Hydra tem trabalho legítimo nesse board</li>
+</ol>
+
+</div>
+</body>
+</html>

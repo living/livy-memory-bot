@@ -43,6 +43,12 @@
       "confidence": "high"
     },
     {
+      "from_id": "pr:living/livy-memory-bot:24",
+      "to_id": "project:Livy Memory",
+      "role": "belongs_to",
+      "confidence": "high"
+    },
+    {
       "from_id": "pr:living/livy-memory-bot:5",
       "to_id": "project:Livy Memory",
       "role": "belongs_to",

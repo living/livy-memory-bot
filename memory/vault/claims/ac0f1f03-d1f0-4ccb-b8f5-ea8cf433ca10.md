@@ -1,0 +1,12 @@
+# Claim ac0f1f03-d1f0-4ccb-b8f5-ea8cf433ca10
+
+- source: tldv
+- entity_type: meeting
+- entity_id: 
+- claim_type: status
+- confidence: 0.700
+- event_timestamp: 2026-04-01T17:59:51.147+00:00
+- superseded_by: f6b389a8-017a-4a0d-ab58-8d5271834898
+
+## Text
+[Tech] Reunião de Cadência 4D imobi

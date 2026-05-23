@@ -1,0 +1,7 @@
+{
+  "interval_hours": 4,
+  "last_escalated_at": null,
+  "last_reduced_at": null,
+  "consecutive_budget_warnings": 0,
+  "consecutive_healthy_runs": 1
+}

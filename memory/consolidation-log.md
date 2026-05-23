@@ -661,3 +661,126 @@ QUALITY_GUARDRAIL_CONSECUTIVE_TRIGGER = 3   # era 2
 
 ---
 
+
+
+## Consolidation 2026-05-22T10:01:43.009164+00:00
+{
+  "run_at": "2026-05-22T10:01:43.009134+00:00",
+  "tldv": {
+    "events_processed": 0,
+    "events_skipped": 0,
+    "status": "success"
+  },
+  "github": {
+    "events_processed": 0,
+    "events_skipped": 0,
+    "status": "success"
+  },
+  "metrics": {
+    "github": {
+      "key_count": 12,
+      "size_bytes": 1236,
+      "content_key_count": 12,
+      "content_size_bytes": 1620,
+      "decision_key_count": 0,
+      "decision_size_bytes": 2,
+      "linkage_key_count": 0,
+      "linkage_size_bytes": 2
+    },
+    "tldv": {
+      "key_count": 88,
+      "size_bytes": 8280,
+      "content_key_count": 41,
+      "content_size_bytes": 6355,
+      "decision_key_count": 0,
+      "decision_size_bytes": 2,
+      "linkage_key_count": 0,
+      "linkage_size_bytes": 2
+    },
+    "trello": {
+      "key_count": 187,
+      "size_bytes": 17204,
+      "content_key_count": 187,
+      "content_size_bytes": 29359,
+      "decision_key_count": 0,
+      "decision_size_bytes": 2,
+      "linkage_key_count": 0,
+      "linkage_size_bytes": 2
+    }
+  },
+  "snapshot_created": false,
+  "watchdog_alerts": [],
+  "quality": {
+    "total_claims": 2221,
+    "pct_decision": 24.178298063935166,
+    "pct_linkage": 11.436289959477714,
+    "pct_status": 46.64565511031068,
+    "pct_needs_review": 0.0,
+    "pct_with_evidence": 99.86492570914004,
+    "passed": true,
+    "failed_kpis": [],
+    "consecutive_bad_cycles": 0,
+    "alert_emitted": false
+  }
+}
+
+## Consolidation 2026-05-23T10:01:47.335995+00:00
+{
+  "run_at": "2026-05-23T10:01:47.335806+00:00",
+  "tldv": {
+    "events_processed": 0,
+    "events_skipped": 0,
+    "status": "success"
+  },
+  "github": {
+    "events_processed": 0,
+    "events_skipped": 0,
+    "status": "success"
+  },
+  "metrics": {
+    "tldv": {
+      "key_count": 88,
+      "size_bytes": 8280,
+      "content_key_count": 41,
+      "content_size_bytes": 6355,
+      "decision_key_count": 0,
+      "decision_size_bytes": 2,
+      "linkage_key_count": 0,
+      "linkage_size_bytes": 2
+    },
+    "github": {
+      "key_count": 12,
+      "size_bytes": 1236,
+      "content_key_count": 12,
+      "content_size_bytes": 1620,
+      "decision_key_count": 0,
+      "decision_size_bytes": 2,
+      "linkage_key_count": 0,
+      "linkage_size_bytes": 2
+    },
+    "trello": {
+      "key_count": 179,
+      "size_bytes": 16468,
+      "content_key_count": 179,
+      "content_size_bytes": 28103,
+      "decision_key_count": 0,
+      "decision_size_bytes": 2,
+      "linkage_key_count": 0,
+      "linkage_size_bytes": 2
+    }
+  },
+  "snapshot_created": false,
+  "watchdog_alerts": [],
+  "quality": {
+    "total_claims": 2221,
+    "pct_decision": 24.178298063935166,
+    "pct_linkage": 11.436289959477714,
+    "pct_status": 46.64565511031068,
+    "pct_needs_review": 0.0,
+    "pct_with_evidence": 99.86492570914004,
+    "passed": true,
+    "failed_kpis": [],
+    "consecutive_bad_cycles": 0,
+    "alert_emitted": false
+  }
+}

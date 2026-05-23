@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SVD — Evolução do Sistema de Vistorias Delphos</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #252936;
+    --border: #2e3348;
+    --text: #e2e4ef;
+    --muted: #8b8fa8;
+    --accent: #7c6af5;
+    --accent2: #4fd1c5;
+    --green: #48bb78;
+    --yellow: #ecc94b;
+    --orange: #ed8936;
+    --red: #fc8181;
+    --pink: #f687b3;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    padding: 24px;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+  header {
+    text-align: center;
+    padding: 48px 0 40px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 40px;
+  }
+  .badge {
+    display: inline-block;
+    background: var(--accent);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    padding: 4px 12px;
+    border-radius: 20px;
+    margin-bottom: 16px;
+  }
+  h1 {
+    font-size: clamp(28px, 5vw, 42px);
+    font-weight: 800;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 12px;
+  }
+  .subtitle {
+    color: var(--muted);
+    font-size: 16px;
+    margin-bottom: 8px;
+  }
+  .meta {
+    display: flex;
+    gap: 16px;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-top: 16px;
+  }
+  .meta-item {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 16px;
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .meta-item strong { color: var(--accent2); }
+
+  /* Timeline */
+  .timeline {
+    position: relative;
+    padding-left: 32px;
+    margin: 32px 0;
+  }
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 7px;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    background: linear-gradient(to bottom, var(--accent), var(--accent2));
+    border-radius: 2px;
+  }
+  .timeline-item {
+    position: relative;
+    margin-bottom: 28px;
+  }
+  .timeline-item::before {
+    content: '';
+    position: absolute;
+    left: -28px;
+    top: 10px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    border: 2px solid var(--accent);
+    background: var(--bg);
+  }
+  .timeline-item.done::before { background: var(--green); border-color: var(--green); }
+  .timeline-item.open::before { background: var(--orange); border-color: var(--orange); }
+  .timeline-date {
+    font-size: 12px;
+    color: var(--muted);
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
+  }
+  .timeline-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    transition: border-color 0.2s;
+  }
+  .timeline-card:hover { border-color: var(--accent); }
+  .timeline-card.open { border-left: 3px solid var(--orange); }
+  .timeline-card h3 {
+    font-size: 16px;
+    font-weight: 700;
+    margin-bottom: 4px;
+    color: var(--accent2);
+  }
+  .timeline-card .pr {
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+  .timeline-card .pr a { color: var(--accent); text-decoration: none; }
+  .timeline-card .desc {
+    font-size: 14px;
+    color: var(--text);
+    margin-bottom: 10px;
+  }
+  .chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .chip {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 20px;
+    background: var(--surface2);
+    color: var(--muted);
+    border: 1px solid var(--border);
+  }
+  .chip.lines { background: rgba(124,106,245,0.15); color: var(--accent); border-color: rgba(124,106,245,0.3); }
+  .chip.done { background: rgba(72,187,120,0.15); color: var(--green); border-color: rgba(72,187,120,0.3); }
+  .chip.open { background: rgba(237,137,54,0.15); color: var(--orange); border-color: rgba(237,137,54,0.3); }
+
+  /* Stats */
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 16px;
+    margin: 32px 0;
+  }
+  .stat {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    text-align: center;
+  }
+  .stat .num {
+    font-size: 32px;
+    font-weight: 800;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+  .stat .label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+  .stat .sub { font-size: 11px; color: var(--muted); margin-top: 4px; }
+
+  /* Sections */
+  h2 {
+    font-size: 20px;
+    font-weight: 700;
+    margin: 40px 0 16px;
+    color: var(--text);
+    border-left: 3px solid var(--accent);
+    padding-left: 12px;
+  }
+  .section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 20px;
+  }
+  .section h3 {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--accent2);
+    margin-bottom: 12px;
+  }
+
+  /* Table */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    margin-top: 12px;
+  }
+  th {
+    text-align: left;
+    padding: 10px 12px;
+    background: var(--surface2);
+    color: var(--muted);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 1px solid var(--border);
+  }
+  td {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text);
+  }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--surface2); }
+  .status-done { color: var(--green); font-weight: 600; }
+  .status-open { color: var(--orange); font-weight: 600; }
+
+  /* Architecture */
+  .arch-diagram {
+    background: var(--surface2);
+    border-radius: 12px;
+    padding: 20px;
+    margin: 16px 0;
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    line-height: 1.8;
+    overflow-x: auto;
+    white-space: pre;
+    color: var(--accent2);
+  }
+
+  /* Meetings */
+  .meeting-item {
+    background: var(--surface2);
+    border-radius: 8px;
+    padding: 14px 16px;
+    margin-bottom: 10px;
+    border-left: 3px solid var(--accent);
+  }
+  .meeting-item .date { font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+  .meeting-item .name { font-size: 14px; font-weight: 600; margin-bottom: 6px; }
+  .meeting-item .topics { font-size: 13px; color: var(--muted); }
+  .meeting-item .topics span { color: var(--text); }
+
+  /* Footer */
+  footer {
+    text-align: center;
+    margin-top: 60px;
+    padding: 24px;
+    border-top: 1px solid var(--border);
+    font-size: 12px;
+    color: var(--muted);
+  }
+  footer a { color: var(--accent); }
+
+  @media (max-width: 600px) {
+    body { padding: 16px; }
+    .timeline { padding-left: 24px; }
+    .timeline-item::before { left: -20px; top: 8px; }
+    .timeline::before { left: 5px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="badge">Projeto Ativo</div>
+  <h1>SVD — Sistema de Vistorias Delphos</h1>
+  <p class="subtitle">Evolução completa dos sistemas SVR / SOR da Delphos</p>
+  <p class="subtitle" style="font-size:14px;">Cliente: Delphos &nbsp;|&nbsp; Repo: <strong>living/delphos-svd</strong> &nbsp;|&nbsp; Stack: C# (.NET 10)</p>
+  <div class="meta">
+    <div class="meta-item"><strong>8</strong> Sprints</div>
+    <div class="meta-item"><strong>6</strong> PRs merged</div>
+    <div class="meta-item"><strong>1</strong> PR open</div>
+    <div class="meta-item"><strong>16 dias</strong> de desenvolvimento</div>
+    <div class="meta-item">Última atualização: <strong>2026-04-30</strong></div>
+  </div>
+</header>
+
+<div class="stats">
+  <div class="stat">
+    <div class="num">+77K</div>
+    <div class="label">Linhas de código</div>
+    <div class="sub">todas PRs combinadas</div>
+  </div>
+  <div class="stat">
+    <div class="num">6</div>
+    <div class="label">PRs merged</div>
+    <div class="sub">em 9 dias (SP1→SP6)</div>
+  </div>
+  <div class="stat">
+    <div class="num">1</div>
+    <div class="label">PR em deploy</div>
+    <div class="sub">DinD + nginx</div>
+  </div>
+  <div class="stat">
+    <div class="num">8</div>
+    <div class="label">Reuniões TLDV</div>
+    <div class="sub">KABA + Delphos + Hydra</div>
+  </div>
+</div>
+
+<h2>Cronologia — Sprints</h2>
+
+<div class="timeline">
+
+  <div class="timeline-item done">
+    <div class="timeline-date">2026-04-14</div>
+    <div class="timeline-card done">
+      <h3>SP1 — Infra Core</h3>
+      <div class="pr">PR <a href="#">#2</a> &nbsp;|&nbsp; +1.058 −2 &nbsp;|&nbsp; autor: lincolnqjunior</div>
+      <div class="desc">Setup inicial: .NET 10, Entity Framework Core, Serilog (logging), Health Checks, container Dockerfile</div>
+      <div class="chips">
+        <span class="chip lines">+1.058 linhas</span>
+        <span class="chip done">✅ merged</span>
+        <span class="chip">EF Core</span>
+        <span class="chip">Serilog</span>
+        <span class="chip">Docker</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="timeline-item done">
+    <div class="timeline-date">2026-04-15</div>
+    <div class="timeline-card done">
+      <h3>SP2 — Auth &amp; RBAC</h3>
+      <div class="pr">PR <a href="#">#4</a> &nbsp;|&nbsp; +3.196 −66 &nbsp;|&nbsp; autor: lincolnqjunior</div>
+      <div class="desc">Autenticação via JWT Supabase, CurrentTenant, 3 perfis de acesso, endpoints /auth/me e /vistorias/em-andamento</div>
+      <div class="chips">
+        <span class="chip lines">+3.196 linhas</span>
+        <span class="chip done">✅ merged</span>
+        <span class="chip">Supabase JWT</span>
+        <span class="chip">RBAC</span>
+        <span class="chip">3 perfis</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="timeline-item done">
+    <div class="timeline-date">2026-04-17</div>
+    <div class="timeline-card done">
+      <h3>SP3 — Vistorias Core</h3>
+      <div class="pr">PR <a href="#">#6</a> &nbsp;|&nbsp; +13.024 −56 &nbsp;|&nbsp; autor: lincolnqjunior</div>
+      <div class="desc">State machine de vistorias, CRUD completo, módulos Espião e Ajudante, Azure Service Bus, fixtures legadas</div>
+      <div class="chips">
+        <span class="chip lines">+13.024 linhas</span>
+        <span class="chip done">✅ merged</span>
+        <span class="chip">State Machine</span>
+        <span class="chip">CRUD</span>
+        <span class="chip">Azure SB</span>
+        <span class="chip">Espião/Ajudante</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="timeline-item done">
+    <div class="timeline-date">2026-04-20</div>
+    <div class="timeline-card done">
+      <h3>SP4 — Video Vonage</h3>
+      <div class="pr">PR <a href="#">#8</a> &nbsp;|&nbsp; +11.285 −7 &nbsp;|&nbsp; autor: lincolnqjunior</div>
+      <div class="desc">Integração Vonage/OpenTok — criação de sessão de video, geração de tokens, archive de video, PWA VideoCall</div>
+      <div class="chips">
+        <span class="chip lines">+11.285 linhas</span>
+        <span class="chip done">✅ merged</span>
+        <span class="chip">Vonage</span>
+        <span class="chip">OpenTok</span>
+        <span class="chip">PWA</span>
+        <span class="chip">VideoCall</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="timeline-item done">
+    <div class="timeline-date">2026-04-23</div>
+    <div class="timeline-card done">
+      <h3>SP5 — Hydra Adapter</h3>
+      <div class="pr">PR <a href="#">#9</a> &nbsp;|&nbsp; +1.168 −125 &nbsp;|&nbsp; autor: lincolnqjunior</div>
+      <div class="desc">Adapter Hydra para comunicação bidirecional com comandos e session-events via webhook</div>
+      <div class="chips">
+        <span class="chip lines">+1.168 linhas</span>
+        <span class="chip done">✅ merged</span>
+        <span class="chip">Hydra</span>
+        <span class="chip">Webhook</span>
+        <span class="chip">Bidirecional</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="timeline-item done">
+    <div class="timeline-date">2026-04-23</div>
+    <div class="timeline-card done">
+      <h3>SP6 — Web Shell + Design System</h3>
+      <div class="pr">PR <a href="#">#12</a> &nbsp;|&nbsp; +6.770 −0 &nbsp;|&nbsp; autor: lincolnqjunior</div>
+      <div class="desc">Shell web integrado + design system + autenticação</div>
+      <div class="chips">
+        <span class="chip lines">+6.770 linhas</span>
+        <span class="chip done">✅ merged</span>
+        <span class="chip">Web Shell</span>
+        <span class="chip">Design System</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="timeline-item done">
+    <div class="timeline-date">2026-04-29</div>
+    <div class="timeline-card done">
+      <h3>SP6.5 — Local Dev</h3>
+      <div class="pr">PR <a href="#">#13</a> &nbsp;|&nbsp; +41.595 −113 &nbsp;|&nbsp; autor: lincolnqjunior</div>
+      <div class="desc">Ambiente local com Supabase, seed mascarado (dados de teste), testes pgTAP, Playwright com autenticação real</div>
+      <div class="chips">
+        <span class="chip lines">+41.595 linhas</span>
+        <span class="chip done">✅ merged</span>
+        <span class="chip">Supabase</span>
+        <span class="chip">pgTAP</span>
+        <span class="chip">Playwright</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="timeline-item open">
+    <div class="timeline-date">2026-04-30 🔄</div>
+    <div class="timeline-card open">
+      <h3>Deploy — DinD Production</h3>
+      <div class="pr">PR <a href="#">#15</a> &nbsp;|&nbsp; +352 −0 &nbsp;|&nbsp; autor: lincolnqjunior</div>
+      <div class="desc">Docker-in-Docker para deploy em produção, nginx, docker-compose, scripts de deployment</div>
+      <div class="chips">
+        <span class="chip lines">+352 linhas</span>
+        <span class="chip open">🔄 open</span>
+        <span class="chip">Docker-in-Docker</span>
+        <span class="chip">nginx</span>
+        <span class="chip">compose</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<h2>Arquitetura</h2>
+
+<div class="section">
+  <h3>Stack Tecnológico</h3>
+  <table>
+    <tr><th>Componente</th><th>Tecnologia</th></tr>
+    <tr><td>Backend</td><td>C# (.NET 10), Entity Framework Core</td></tr>
+    <tr><td>Auth</td><td>Supabase JWT, RBAC (3 perfis)</td></tr>
+    <tr><td>Banco</td><td>Supabase (PostgreSQL)</td></tr>
+    <tr><td>Video</td><td>Vonage/OpenTok (sessão, tokens, archive)</td></tr>
+    <tr><td>Mensageria</td><td>Azure Service Bus</td></tr>
+    <tr><td>Frontend</td><td>PWA VideoCall, Web Shell + Design System</td></tr>
+    <tr><td>Adapter IA</td><td>Hydra (comandos bidirecionais + webhook)</td></tr>
+    <tr><td>Infra</td><td>Docker-in-Docker (em deploy)</td></tr>
+  </table>
+</div>
+
+<div class="section">
+  <h3>Diagrama de Arquitetura</h3>
+  <div class="arch-diagram">delphos-svd (C# / .NET 10)
+├── SP1: Infra Core (EF Core, Serilog, Docker)
+├── SP2: Auth & RBAC (Supabase JWT, 3 perfis)
+├── SP3: Vistorias Core (state machine, CRUD, Azure SB)
+│   └── Espião / Ajudante (módulos de suporte)
+├── SP4: Video Vonage (sessão, tokens, archive, PWA)
+├── SP5: Hydra Adapter (comandos bidirecionais + webhook)
+├── SP6: Web Shell + Design System
+├── SP6.5: Local Dev (Supabase, pgTAP, Playwright)
+└── Deploy: DinD, nginx, compose (em produção)</div>
+</div>
+
+<h2>Repositórios</h2>
+
+<table>
+  <tr><th>Repo</th><th>Criado</th><th>Stack</th><th>Status</th></tr>
+  <tr>
+    <td><strong>delphos-svd</strong></td>
+    <td>2026-04-14</td>
+    <td>C# (.NET 10)</td>
+    <td class="status-open">Em desenvolvimento</td>
+  </tr>
+  <tr>
+    <td>svr-delphos</td>
+    <td>2025-07-03</td>
+    <td>JavaScript</td>
+    <td class="status-done">Legado (维护)</td>
+  </tr>
+  <tr>
+    <td>livy-delphos-jobs</td>
+    <td>2026-02-26</td>
+    <td>Python/HTML</td>
+    <td class="status-done">Operacional (reports)</td>
+  </tr>
+  <tr>
+    <td>delphos-measure-poc</td>
+    <td>2024-08-27</td>
+    <td>—</td>
+    <td>POC arquivado</td>
+  </tr>
+</table>
+
+<h2>Reuniões</h2>
+
+<div class="meeting-item">
+  <div class="date">2026-04-29 — Status Kaba/BAT/BOT</div>
+  <div class="name">SVD em deploy — "status operacional sendo colocado no ar"</div>
+  <div class="topics">Tópicos: <span>Incidente de domínio expirado, plugin e front-end isolado, discussão fila com Bruno Esteves</span></div>
+</div>
+
+<div class="meeting-item">
+  <div class="date">2026-04-22 — Status Geral</div>
+  <div class="name">Acompanhamento SP3 + SP4 + Adapter Pipeline</div>
+  <div class="topics">Tópicos: <span>SP4 Video Vonage, SP3 Vistorias Core + Espião/Ajudante, BPA de Envio de Email, Adapter Automação Pipeline — bugs em paralelo</span></div>
+</div>
+
+<div class="meeting-item">
+  <div class="date">2026-04-20 — Status Delphos</div>
+  <div class="name">Status Delphos</div>
+  <div class="topics">Tópicos: <span>Status geral Delphos — tags: svd, delphos</span></div>
+</div>
+
+<div class="meeting-item">
+  <div class="date">2026-04-17 — Fundação Hydra</div>
+  <div class="name">Marco zero do SVD</div>
+  <div class="topics">Tópicos: <span>Acesso a repositórios GitHub do Hydra e SVD, alinhamento sobre permissões (Verciel/BS), discussão sobre criação de back-end — tags: svd, hydra</span></div>
+</div>
+
+<div class="meeting-item">
+  <div class="date">2026-04-14 — Reunião de priorização</div>
+  <div class="name">Svr / Sor — Priorização de requisitos</div>
+  <div class="topics">Cards Trello: <span>Estimativa Evolução SVR - SOR, Priorização de requisitos — DONE ✅</span></div>
+</div>
+
+<h2>Trello — Cards</h2>
+
+<table>
+  <tr><th>Card</th><th>Lista</th><th>Status</th></tr>
+  <tr><td>Estimativa Evolução SVR - SOR</td><td>DONE</td><td class="status-done">✅ Entregue</td></tr>
+  <tr><td>POC Delphos</td><td>Concluído 🎉</td><td class="status-done">✅ Entregue</td></tr>
+  <tr><td>Reuniao Delphos</td><td>Concluído 🎉</td><td class="status-done">✅ Entregue</td></tr>
+  <tr><td>Svr / Sor - Priorização de requisitos</td><td>DONE</td><td class="status-done">✅ Entregue</td></tr>
+</table>
+
+<h2>Pendências</h2>
+
+<div class="section">
+  <table>
+    <tr><th>Item</th><th>Status</th><th>Prioridade</th></tr>
+    <tr>
+      <td>PR #15 — Deploy DinD (Docker-in-Docker, nginx, compose)</td>
+      <td class="status-open">🔄 open</td>
+      <td>Alta</td>
+    </tr>
+    <tr>
+      <td>Colocar SVD em produção</td>
+      <td class="status-open">🔄 em andamento</td>
+      <td>Alta</td>
+    </tr>
+    <tr>
+      <td>Plugin e front-end isolado</td>
+      <td>Em desenvolvimento</td>
+      <td>Média</td>
+    </tr>
+  </table>
+</div>
+
+<footer>
+  <p>Gerado por <strong>Livy Memory Agent</strong> &nbsp;|&nbsp; Fontes: GitHub PRs + Trello + TLDV Meetings + SSOT Claims</p>
+  <p>Consolidação: <a href="#">memory/consolidation/SVD-evolucao-completa.md</a> &nbsp;|&nbsp; Topic: <a href="#">memory/curated/svd-sistema-vistorias-delphos.md</a></p>
+  <p style="margin-top:8px;">2026-04-30 21:31 UTC &nbsp;|&nbsp; Living Consultoria</p>
+</footer>
+
+</body>
+</html>

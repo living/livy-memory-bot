@@ -1,0 +1,12 @@
+# Claim fda5429c-bd5d-4902-aa1d-8bad75ca5b4d
+
+- source: tldv
+- entity_type: meeting
+- entity_id: 6a0aff4c819eac0013dde58c
+- claim_type: timeline_event
+- confidence: 0.800
+- event_timestamp: 2026-05-18T12:00:12.555+00:00
+- superseded_by: -
+
+## Text
+Meeting tagged with 'delphos'

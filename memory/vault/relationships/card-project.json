@@ -79,6 +79,12 @@
       "confidence": "high"
     },
     {
+      "from_id": "card:trello:69f1f592fcdcce8457f3abdc",
+      "to_id": "project:Delphos Integração 2026",
+      "role": "belongs_to",
+      "confidence": "high"
+    },
+    {
       "from_id": "card:trello:681b63bdc37c9de66d917914",
       "to_id": "project:BAT/ConectaBot",
       "role": "belongs_to",
@@ -501,6 +507,12 @@
     {
       "from_id": "card:trello:6923583ba27cce03abc6c3cd",
       "to_id": "project:Living/M.I.C.I",
+      "role": "belongs_to",
+      "confidence": "high"
+    },
+    {
+      "from_id": "card:trello:6697cdb1b388dea00a594cec",
+      "to_id": "project:Elcano/Robôs OCR e Navios",
       "role": "belongs_to",
       "confidence": "high"
     },
@@ -1058,6 +1070,12 @@
     },
     {
       "from_id": "card:trello:680fc18b041d86709e34da0b",
+      "to_id": "project:BAT/ConectaBot",
+      "role": "belongs_to",
+      "confidence": "high"
+    },
+    {
+      "from_id": "card:trello:69f0c26457a5542167ef4302",
       "to_id": "project:BAT/ConectaBot",
       "role": "belongs_to",
       "confidence": "high"

@@ -115,6 +115,18 @@
       "confidence": "high"
     },
     {
+      "from_id": "card:trello:69f1f592fcdcce8457f3abdc",
+      "to_id": "person:esteves",
+      "role": "assignee",
+      "confidence": "high"
+    },
+    {
+      "from_id": "card:trello:69f1f592fcdcce8457f3abdc",
+      "to_id": "person:marcio rocha",
+      "role": "assignee",
+      "confidence": "high"
+    },
+    {
       "from_id": "card:trello:681b63bdc37c9de66d917914",
       "to_id": "person:esteves",
       "role": "assignee",
@@ -403,12 +415,6 @@
       "confidence": "high"
     },
     {
-      "from_id": "card:trello:69de344c31afe08c6c8dda56",
-      "to_id": "person:victorliving",
-      "role": "assignee",
-      "confidence": "high"
-    },
-    {
       "from_id": "card:trello:67f8188c6c25e3bce6bdb2b3",
       "to_id": "person:victorliving",
       "role": "assignee",
@@ -643,12 +649,6 @@
       "confidence": "high"
     },
     {
-      "from_id": "card:trello:69cecc0e1ccc370f61ae91c3",
-      "to_id": "person:victorliving",
-      "role": "assignee",
-      "confidence": "high"
-    },
-    {
       "from_id": "card:trello:6902354c7ae40dc27bc2880b",
       "to_id": "person:Sergio Fraga",
       "role": "assignee",
@@ -705,12 +705,6 @@
     {
       "from_id": "card:trello:6923583ba27cce03abc6c3cd",
       "to_id": "person:esteves",
-      "role": "assignee",
-      "confidence": "high"
-    },
-    {
-      "from_id": "card:trello:69d7bb43995d717f074f3b72",
-      "to_id": "person:victorliving",
       "role": "assignee",
       "confidence": "high"
     },
@@ -861,12 +855,6 @@
     {
       "from_id": "card:trello:6835c028d2ba510a24f706d2",
       "to_id": "person:LuizR",
-      "role": "assignee",
-      "confidence": "high"
-    },
-    {
-      "from_id": "card:trello:69d8f50d097267a768563f3f",
-      "to_id": "person:victorliving",
       "role": "assignee",
       "confidence": "high"
     },
@@ -1075,12 +1063,6 @@
       "confidence": "high"
     },
     {
-      "from_id": "card:trello:69d3a822a6d76475542cc3f6",
-      "to_id": "person:victorliving",
-      "role": "assignee",
-      "confidence": "high"
-    },
-    {
       "from_id": "card:trello:67ed2eabd14d9c221e646bac",
       "to_id": "person:esteves",
       "role": "assignee",
@@ -1149,18 +1131,6 @@
     {
       "from_id": "card:trello:692d85e48b797fc98854e451",
       "to_id": "person:esteves",
-      "role": "assignee",
-      "confidence": "high"
-    },
-    {
-      "from_id": "card:trello:69d64b30731832986691ea8f",
-      "to_id": "person:victorliving",
-      "role": "assignee",
-      "confidence": "high"
-    },
-    {
-      "from_id": "card:trello:69d6b5a301407d8e175f0272",
-      "to_id": "person:victorliving",
       "role": "assignee",
       "confidence": "high"
     },
@@ -1255,12 +1225,6 @@
       "confidence": "high"
     },
     {
-      "from_id": "card:trello:69dce31cf8e11fcdd90bed66",
-      "to_id": "person:victorliving",
-      "role": "assignee",
-      "confidence": "high"
-    },
-    {
       "from_id": "card:trello:69bab0b91988e671a38c7cf7",
       "to_id": "person:victorliving",
       "role": "assignee",
@@ -1292,12 +1256,6 @@
     },
     {
       "from_id": "card:trello:69b9c84f7154c45d4699f448",
-      "to_id": "person:victorliving",
-      "role": "assignee",
-      "confidence": "high"
-    },
-    {
-      "from_id": "card:trello:69d64b2fe65e688808704dd9",
       "to_id": "person:victorliving",
       "role": "assignee",
       "confidence": "high"
@@ -1423,6 +1381,12 @@
       "confidence": "high"
     },
     {
+      "from_id": "card:trello:69f0c26457a5542167ef4302",
+      "to_id": "person:marcio rocha",
+      "role": "assignee",
+      "confidence": "high"
+    },
+    {
       "from_id": "card:trello:68cc58943806e9eea43bff23",
       "to_id": "person:marcio rocha",
       "role": "assignee",
@@ -1539,12 +1503,6 @@
     {
       "from_id": "card:trello:68b1fb1337f8e6af63bcd16f",
       "to_id": "person:marcio rocha",
-      "role": "assignee",
-      "confidence": "high"
-    },
-    {
-      "from_id": "card:trello:69d8063fe598be246290297e",
-      "to_id": "person:victorliving",
       "role": "assignee",
       "confidence": "high"
     },
