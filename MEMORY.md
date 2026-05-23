@@ -376,4 +376,18 @@ Script `build_trello_pr_crosslink.py` cria edges em `memory/vault/relationships/
 
 Topic file: `memory/curated/livy-memory-agent.md`
 
+### 2026-05-23 — Backfill lessons: Mai 7–23 (GitHub 98 / Trello 29 / TLDV 34)
+
+Extensão do backfill W1-W5 para o período Mai 7–23 via `honcho_capture.py` com as 3 fontes:
+
+| Fonte | Lições | Detalhe |
+|---|---|---|
+| GitHub PRs | 98 | 8 repos (delphos-svd 18, bot-ai-api 18, bot-ai-app 10, RetailAuditRulesDashboard 8, insight-funds 11, elcano-robo-ocr 1, RetailAuditInfraDashboard 3, llm-rag-api 1); cycle_time em frontmatter |
+| Trello cards | 29 | effort (custom fields) + pr_refs preenchidos; 74 skipped (já existentes do W1-W5) |
+| TLDV meetings | 34 | per-meeting extraction; reuniões de Abr 24 – Mai 21 |
+
+**Todos indexados ao Honcho** via `POST /v3/workspaces/{id}/conclusions`.
+
+Commit: `0659bf1` | Topic file: `memory/curated/livy-memory-agent.md`
+
 _Last updated: 2026-05-23__
