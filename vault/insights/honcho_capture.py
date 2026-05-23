@@ -660,16 +660,21 @@ def get_updated_trello_cards(since_days: int, after: str | None = None, before: 
     Date range: after + before (in addition to lookback cutoff)."""
     try:
         import os, urllib.request
-        TRELLO_KEY = os.environ.get("TRELLO_KEY", "")
+        TRELLO_API_KEY = os.environ.get("TRELLO_API_KEY", "")
         TRELLO_TOKEN = os.environ.get("TRELLO_TOKEN", "")
         TRELLO_BASE = "https://api.trello.com/1"
-        if not TRELLO_KEY or not TRELLO_TOKEN:
-            print(f"    [WARN] TRELLO_KEY or TRELLO_TOKEN not set", file=sys.stderr)
+        if not TRELLO_API_KEY or not TRELLO_TOKEN:
+            print(f"    [WARN] TRELLO_API_KEY or TRELLO_TOKEN not set", file=sys.stderr)
             return []
-        cutoff = datetime.now(timezone.utc) - timedelta(days=since_days)
+        # When after/before are provided, use them as the primary date filter.
+        # The since_days cutoff only applies when no explicit after/before is given.
+        if after:
+            cutoff = datetime.fromisoformat(after.replace("Z", "+00:00")).replace(tzinfo=timezone.utc)
+        else:
+            cutoff = datetime.now(timezone.utc) - timedelta(days=since_days)
         # Fetch all boards the token can access
         req = urllib.request.Request(
-            f"{TRELLO_BASE}/members/me/boards?key={TRELLO_KEY}&token={TRELLO_TOKEN}&fields=id,name",
+            f"{TRELLO_BASE}/members/me/boards?key={TRELLO_API_KEY}&token={TRELLO_TOKEN}&fields=id,name",
             headers={"Accept": "application/json"}
         )
         with urllib.request.urlopen(req, timeout=15) as resp:
@@ -682,7 +687,7 @@ def get_updated_trello_cards(since_days: int, after: str | None = None, before: 
             # Fetch cards for this board
             try:
                 req2 = urllib.request.Request(
-                    f"{TRELLO_BASE}/boards/{board_id}/cards?key={TRELLO_KEY}&token={TRELLO_TOKEN}"
+                    f"{TRELLO_BASE}/boards/{board_id}/cards?key={TRELLO_API_KEY}&token={TRELLO_TOKEN}"
                     "&fields=id,name,desc,dateLastActivity,shortUrl&idList&limit=1000",
                     headers={"Accept": "application/json"}
                 )
@@ -724,7 +729,7 @@ def get_updated_trello_cards(since_days: int, after: str | None = None, before: 
         return []
 
 
-def extract_trello_lesson_via_llm(card_name: str, card_desc: str, board_name: str, url: str, updated: str, model: str) -> str | None:
+def extract_trello_lesson_via_llm(card_name: str, card_desc: str, board_name: str, url: str, updated: str, model: str, card_id: str = "") -> str | None:
     """Extract lesson from a Trello card via LLM."""
     user_prompt = f"""Card: {card_name}
 Board: {board_name}
@@ -772,7 +777,7 @@ skip_reason: trivial
         payload = {
             "model": model,
             "messages": [
-                {"role": "system", "content": system.format(board_name_slug=slugify(board_name))},
+                {"role": "system", "content": system.format(board_name_slug=slugify(board_name), card_id=card_id, card_name=card_name, board_name=board_name)},
                 {"role": "user", "content": user_prompt},
             ],
             "temperature": 0.3,
@@ -841,7 +846,7 @@ def run(
                     continue
                 summary["sources"]["trello"]["processed"] += 1
                 print(f"  [PROC] Card: {name[:50]}")
-                content = extract_trello_lesson_via_llm(name, desc, board_name, url, updated, model)
+                content = extract_trello_lesson_via_llm(name, desc, board_name, url, updated, model, card_id)
                 if content is None:
                     summary["sources"]["trello"]["errors"] += 1
                     summary["errors"].append(f"trello/{card_id}: LLM call failed")
