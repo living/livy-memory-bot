@@ -298,15 +298,22 @@ def build_trello_lesson_path(updated_at: str, board_name: str, card_id: str, car
 
 
 def extract_project_tag(name: str) -> str | None:
-    """Extract project tag from meeting name. E.g. 'DELPHOS Sprint' -> 'DELPHOS'."""
+    """Extract project tag from meeting name (case-insensitive).
+    Returns the first known tag found in the name (left-to-right).
+    E.g. 'Status Kaba/BAT/BOT' -> 'KABA' (first occurrence in name).
+    """
     import re
-
-    # Look for uppercase words (2-10 chars) that could be project names
-    tags = re.findall(r"\b([A-Z]{2,10})\b", name)
-    KNOWN = {"DELPHOS", "BAT", "HYDRA", "FORGE", "TLDV", "LIVY", "SVD", "KABA"}
-    for tag in tags:
-        if tag in KNOWN:
-            return tag
+    KNOWN = {"DELPHOS", "BAT", "HYDRA", "FORGE", "TLDV", "LIVY", "SVD", "KABA", "BOT"}
+    name_upper = name.upper()
+    # Find all known tags that appear in the name, in order of appearance
+    found = []
+    for tag in KNOWN:
+        if tag in name_upper:
+            idx = name_upper.index(tag)
+            found.append((idx, tag))
+    if found:
+        found.sort(key=lambda x: x[0])
+        return found[0][1]
     return None
 
 
