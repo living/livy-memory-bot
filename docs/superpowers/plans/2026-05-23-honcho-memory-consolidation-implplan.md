@@ -476,11 +476,14 @@ git commit -m "QW-3d: honcho_capture — add Trello cards support"
 
 ### QW-3e: Add TLDV Meeting Synthesis to `honcho_capture.py`
 
-**Note:** TLDV meetings are NOT individually converted to lessons (too granular). Instead, synthesize lessons from multiple meetings about the same topic.
+**Note:** TLDV meetings are NOT individually converted to lessons (too granular). Instead, synthesize lessons from multiple meetings about the same topic. Use **Azure Blob** for transcript content — not Supabase.
 
 **Files:**
 - Modify: `vault/insights/honcho_capture.py` — add `--source tldv-synthesis` flag
-- Use: `vault/research/tldv_client.py` — `fetch_meeting()` provides summaries/decisions
+- Use: `vault/research/azure_blob_client.py` — `AzureBlobClient.fetch_transcript()` for raw transcript
+- Use: `vault/research/tldv_client.py` — meeting metadata (name, date, tags)
+
+**Transcript source priority (per spec):** Azure Blob → Supabase (fallback)
 
 - [ ] **Step 1: Verify tldv_client provides decisions**
 
@@ -498,40 +501,103 @@ for name, method in inspect.getmembers(c, predicate=inspect.ismethod):
 " 2>&1 | head -20
 ```
 
-- [ ] **Step 2: Add synthesis function**
+- [ ] **Step 2: Add synthesis function using Azure Blob**
 
 ```python
-def synthesize_tldv_lessons(org: str, since_days: int, model: str) -> list[str]:
+def synthesize_tldv_lessons(since_days: int, model: str) -> list[str]:
     """
-    For TLDV: fetch meetings from last N days, group by project/topic,
-    extract decisions from summaries, synthesize into lessons.
+    For TLDV: fetch meetings from last N days (via tldv_client),
+    load raw transcript from Azure Blob for each meeting,
+    group by project/topic, extract decisions, synthesize into lessons.
     NOT one lesson per meeting — synthesize across meetings about same topic.
+
+    Transcript source: Azure Blob primary, Supabase fallback.
     """
     from vault.research.tldv_client import TLDVClient
+    from vault.research.azure_blob_client import AzureBlobClient
+
     client = TLDVClient()
+    azure = AzureBlobClient()
     meetings = client.fetch_recent_meetings(days=since_days)
-    
+
     # Group by project from meeting name/tags
     by_project = {}
     for meeting in meetings:
         name = meeting.get("name", "")
-        # Extract project tag (e.g., "DELPHOS", "BAT", "HYDRA")
-        project = extract_project_tag(name)  # simple heuristic
-        by_project.setdefault(project, []).append(meeting)
-    
+        meeting_id = meeting.get("id", "")
+        project = extract_project_tag(name)
+        if project:
+            by_project.setdefault(project, []).append((meeting, meeting_id))
+
     lessons = []
-    for project, project_meetings in by_project.items():
-        if len(project_meetings) < 2:
+    for project, meeting_list in by_project.items():
+        if len(meeting_list) < 2:
             continue  # need 2+ meetings to synthesize
-        decisions = []
-        for m in project_meetings:
-            if m.get("summaries", {}).get("decisions"):
-                decisions.extend(m["summaries"]["decisions"])
-        if decisions:
-            lesson = synthesize_via_llm(project, project_meetings, decisions, model)
-            if lesson:
-                lessons.append(lesson)
+
+        # Load transcripts from Azure Blob for each meeting
+        transcript_texts = []
+        for meeting, meeting_id in meeting_list:
+            transcript = azure.fetch_transcript(meeting_id)
+            if transcript:
+                transcript_texts.append({
+                    "meeting_id": meeting_id,
+                    "name": meeting.get("name", ""),
+                    "transcript": transcript[:2000],  # truncate for LLM
+                })
+
+        if not transcript_texts:
+            continue
+
+        # Synthesize via LLM
+        lesson = synthesize_tldv_via_llm(project, transcript_texts, model)
+        if lesson:
+            lessons.append(lesson)
+
     return lessons
+
+
+def synthesize_tldv_via_llm(project: str, transcripts: list[dict], model: str) -> str | None:
+    """Synthesize multiple meeting transcripts into one lesson via LLM."""
+    transcript_summary = "
+
+".join(
+        f"=== {t['name']} ===
+{t['transcript'][:1500]}"
+        for t in transcripts
+    )
+    prompt = f"""You are a senior engineer synthesizing multiple meeting transcripts into one concise lesson.
+Project: {project}
+
+TRANSCRIPTS:
+{transcript_summary}
+
+Task: Identify recurring decisions, agreements, and action items across these meetings.
+Output ONLY valid YAML frontmatter + lesson body in Portuguese (BR). No code fences.
+
+Rules:
+- type: lesson
+- source: tldv
+- source_ref: "tldv/{project}/synthesis"
+- date: YYYY-MM-DD (today)
+- subject: "[Síntese] {project} — N reuniões"
+- tags: [{project}, synthesis, meetings]
+
+Format:
+## O que aconteceu
+[What was discussed across these meetings]
+
+## Decisões identificadas
+[List of specific decisions made]
+
+## Lessons
+- [lesson 1]
+- [lesson 2]
+- [lesson 3]
+
+## Source
+Auto-generated from TLDV transcripts (Azure Blob)
+"""
+    return extract_via_llm(prompt, model)
 ```
 
 - [ ] **Step 3: Add `--source tldv-synthesis` to CLI**
