@@ -1,77 +1,150 @@
 # Spec — Camada de Sabedoria: Vault Lessons + Honcho
 
 **Data:** 2026-05-23
+**Revisão:** pós-audit
 **Autor:** Lincoln + Livy Memory
-**Status:** Draft
+**Status:** Approved
 
 ---
 
 ## Contexto
 
-A pipeline actual ingere dados de TLDV, GitHub e Trello → SSOT (state.json com 2221 claims). Decisões técnicas, links entre entities e estado de projetos estão documentados. Mas há uma lacuna:
+A pipeline actual ingere dados de TLDV, GitHub e Trello → SSOT (state.json com 2221 claims). Decisões técnicas, links entre entities e estado de projectos estão documentados. Mas há uma lacuna:
 
 - **Facts** estão no SSOT (decisões, claims, relationships)
 - **Sabedoria** (lições aprendidas, contexto de bugs, rationale de decisões) não existe como camada separada
-- Agentes não se "lembram" de padrões — cada sessão é effectively um fresh start sem memória semanticamente pesquisável
+- Agentes não se "lembram" de padrões — cada sessão é effectively um fresh start
 - Não há como perguntar "já vimos este erro antes?" ou "o que aprendemos sobre quality guardrails?"
 
 **Necessidade:** Uma camada de sabedoria derivada das fontes cruas, pesquisável semanticamente, que alimente os agentes (main + memory) e heartbeats com contexto acumulado.
 
 ---
 
-## Arquitectura — 3 Camadas
+## Arquitectura — 4 Camadas (Decidida)
 
 ```
-FONTES CRUAS                 CAMADA FACTS         CAMADA SABEDORIA
-─────────────               ─────────────        ─────────────────
-GitHub API                   vault/crons/         vault/insights/
-Trello API    (ETL) ──────►  SSOT (state.json)   lessons/*.md
-TLDV / Supabase               facts/claims           │
-                                  │              honcho_capture
-                                  │                 │
-                                  ▼                 ▼
-                             research-         HONCHO
-                             pipeline           (cache semântica)
+┌─────────────────────────────────────────────────────────────┐
+│                     AGENTE (main / memory)                   │
+│                                                             │
+│  honcho_search_conclusions  ←→  honcho_ask                  │
+│       (peer reasoning)          (context injection)          │
+├─────────────────────────────────────────────────────────────┤
+│                        HONCHO                               │
+│  Peer model: owner, agent-main, agent-memory-agent         │
+│  Reasoning: extrai conclusões, não só armazena              │
+│  Self-hosted: http://100.121.74.111:8000 (Tailscale-only)  │
+├─────────────────────────────────────────────────────────────┤
+│                     VAULT (disk)                           │
+│  lessons/         ← honcho_capture.py (NOVO)                │
+│  claims/          ← research_* (existente)                 │
+│  decisions/       ← consolidations (existente)             │
+├─────────────────────────────────────────────────────────────┤
+│                   CLAUDE MEM                               │
+│  19,922 obs · 8,610 summaries · 1,838 sessões             │
+│  Papel: busca em histórico conversacional (18 anos)        │
+│  Mantido como search backup durante maturação do Honcho    │
+└─────────────────────────────────────────────────────────────┘
+
+FONTES (ETL existente):
+  GitHub ──► research_github ──► vault/claims/
+  Trello ──► research_trello  ──► vault/claims/
+  TLDV   ──► research_tldv   ──► vault/claims/
+              honcho_capture.py (NOVO) ──► lessons/
 ```
 
-### Camadas
+### Pilares da arquitectura (invioláveis)
 
-| Camada | Fonte | Quem escreve | Quem lê |
+| Camada | Função | Quem escreve | Storage |
 |---|---|---|---|
-| **Facts (RAW)** | GitHub, Trello, TLDV | `vault/crons/research_*.py` | SSOT consumers |
-| **Lessons (Sabedoria)** | Lessons extraídas das fontes | `vault/insights/honcho_capture.py` | Agentes, heartbeats |
-| **Honcho (Cache)** | Lessons do vault | `honcho_capture` (lê lessons) | Retrieval rápido |
+| **Facts** | Source of truth | `vault/crons/research_*.py` | `vault/claims/`, `vault/decisions/` |
+| **Sabedoria** | Lições derivadas | `honcho_capture.py` | `vault/lessons/` |
+| **Cache semântica** | Retrieval rápido | `honcho_capture` (lê lessons) | Honcho (peer memory) |
+| **Histórico** | Busca em conversa | OpenClaw auto | Claude Mem (SQLite) |
+
+### Decisões arquitecturais (feitas, não abrir)
+
+1. **Claude Mem + Honcho não se mergeiam.** Paradigmas ortogonais.
+   - Claude Mem = motor de **busca** sobre histórico (encontra "onde discutimos X")
+   - Honcho = motor de **raciocínio** sobre pessoas/projectos/decisões
+   - Melhor ter os dois com papéis claros do que forçar integração desnecessária
+
+2. **Honcho é cache, não storage primário.** Se Honcho morrer, lessons continuam no vault.
+
+3. **ObservationFeed mantém.** Não corrompe o modelo de peer.
+
+4. **Claude Mem desligado:** Só após Honcho ter 6 meses de peer memory maduro.
+
+5. **RAW facts não são modificados por conclusions.** Separação estrita.
+
+---
+
+## Arquitectura Detalhada
+
+```
+FONTES CRUAS              PIPELINE              STORAGE              RETRIEVAL
+─────────────            ────────              ───────              ─────────
+GitHub API  ────────►  research_*       ───►  vault/claims/  ───► agents
+Trello API      (já existente)            vault/decisions/       via honcho_
+TLDV/Supabase                          vault/lessons/          search/ask
+                                        (lessons/ = novo)
+                    honcho_capture.py
+                      │
+                      ▼
+                  HONCHO (cache)
+                  peer: agent-memory-agent
+                  peer: agent-main
+                  peer: owner (7426291192)
+```
+
+**Separação RAW / Sabedoria:**
+- RAW facts → `vault/claims/`, `vault/decisions/` — source of truth
+- Sabedoria/lições → `vault/lessons/` — reasoning derivado
+- Honcho = cache de leitura rápida — lê do vault, não escreve no vault
 
 ---
 
 ## Princípio Fundamental: Separação RAW / Sabedoria
 
-**RAW (SSOT):**
+**RAW (Vault claims/decisions):**
 - Source of truth para facts
-- Escrito **só** por `vault/crons/`
+- Escrito **só** por `vault/crons/research_*.py`
 - Schema rigoroso: `Claim`, `Evidence`, `SourceRef`
-- Nunca modificado por conclusions
+- Nunca modificado por conclusions ou lições
 
 **Sabedoria (Lessons):**
 - Derivada — não é source of truth
 - Escrita **só** por `honcho_capture.py`
-- Lida fontes cruas (não o SSOT) para permitir reprocessamento
-- Armazenada em `memory/vault/lessons/` como markdown
+- Lê fontes cruas (não o SSOT) para permitir reprocessamento por período
+- Armazenada em `vault/lessons/` como markdown
 - Honcho é cache de leitura rápida — não storage primário
 
-**Regra de ouro:** Facts no SSOT. Lições no vault/lessons. Honcho é cache. Se Honcho morrer, lessons continuam no vault.
+**Regra de ouro:** Facts no Vault. Lições no vault/lessons. Honcho é cache. Se Honcho morrer, lessons continuam no vault.
 
 ---
 
-## Componentes
+## Estado Actual (2026-05-23)
+
+| Componente | Estado |
+|---|---|
+| Honcho plugin | ✅ Enabled, self-hosted `http://100.121.74.111:8000` |
+| Peers Honcho | ✅ owner, agent-main, agent-memory-agent, 7426291192 |
+| honcho_capture.py | ❌ Não existe |
+| `vault/lessons/` | ❌ Não existe (Gap 1 — blocker) |
+| Cron honcho-lessons-capture | ❌ Não existe (Gap 4) |
+| Claude Mem | ✅ 19,922 obs, 8,610 summaries — mantido como backup |
+| vault-query fallback | ⚠️ Promise mas não implementado (Gap 5) |
+
+---
+
+## Componentes a Criar
 
 ### 1. `vault/insights/honcho_capture.py`
 
-**Responsabilidade:** ETL que lê fontes cruas (não o SSOT), gera lições estruturadas e escreve em `memory/vault/lessons/`.
+**Responsabilidade:** ETL que lê fontes cruas (não o SSOT), gera lições estruturadas e escreve em `vault/lessons/`.
 
 **Input:** GitHub API (PRs, issues, comments), Trello API (cards, checklists, comments), TLDV/Supabase (transcripts, summaries)
 
-**Output:** Markdown files em `memory/vault/lessons/` com frontmatter.
+**Output:** Markdown files em `vault/lessons/` com frontmatter.
 
 **Formato de cada lesson:**
 ```yaml
@@ -86,7 +159,7 @@ why_it_matters: "..."
 lesson: "..."
 tags: [vault, quality-guardrail, enriched-claims]
 confidence: HIGH        # HIGH | MEDIUM | LOW
-oai_model: null        # LLM used to generate (null if fact-only)
+oai_model: fastest   # LLM used to generate
 processed: false
 ---
 ```
@@ -102,9 +175,9 @@ processed: false
 | Quality guardrail alert | vault | Detecção de drift |
 | Stale recovery | vault | Mudança de threshold |
 
-### 2. `vault/insights/lessons/` (storage)
+### 2. `vault/lessons/` (storage primário de lições)
 
-**Responsabilidade:** Storage primário de lições.
+**Responsabilidade:** Storage primário de lições (Honcho é cache).
 
 **Estrutura:**
 ```
@@ -115,22 +188,13 @@ memory/vault/lessons/
   ...
 ```
 
-### 3. Honcho (cache semântica)
-
-**Responsabilidade:** Cache de leitura rápida para retrieval semântico.
-
-**Operações:**
-- `honcho_capture.py` → writes lessons to Honcho (via `honcho.observations.create`)
-- Agentes → leem via `honcho_search_conclusions`, `honcho_ask`
-
-**Se Honcho offline:** Agentes leem directamente de `vault/insights/lessons/` via skill `vault-query`.
-
-### 4. Cron `honcho-lessons-capture`
+### 3. Cron `honcho-lessons-capture`
 
 **Responsabilidade:** Extrair lições diariamente às 07h BRT.
 
 ```bash
 # Cron: 0 10 * * * (BRT = UTC-3, 07h BRT)
+# Session target: isolated (agent memory-agent)
 vault/insights/honcho_capture.py run --days 1
 ```
 
@@ -174,40 +238,83 @@ briefing = honcho_ask(
 Lincoln pode perguntar "o que a gente já decidiu sobre X?" →
 `honcho_search_conclusions(query=X)` → lições relacionadas.
 
----
+### Fallback (Honcho offline)
 
-## Quick Wins Implementáveis
-
-### Quick Win 1 — Ativar Honcho como cache
-- Habilitar plugin `openclaw-honcho` (actualmente disabled)
-- Criar `honcho_capture.py` mínimo que lê GitHub PRs
-- Alimentar Honcho com PRs dos últimos 30 dias
-- Testar retrieval no próximo /new
-
-### Quick Win 2 — Lessons do Vault (markdown)
-- Criar `memory/vault/lessons/`
-- Escrever 5 lessons manuais das decisões de ontem
-- Criar `vault/insights/lesson_template.md`
-- Testar `honcho_search_conclusions` sobre lessons
-
-### Quick Win 3 — Integração no Heartbeat
-- Modificar `vault-insights-weekly-generate` para usar `honcho_ask`
-- Adicionar campo "lições da semana" no resumo
+Agentes leem directamente de `vault/lessons/` via skill `vault-query`.
 
 ---
 
-## Decisões de Design Abertas
+## Quick Wins (Execução Ordenada)
 
-1. **LLM para extracção de rationale:** Usar qual modelo? (OmniRoute? OpenAI? MiniMax?)
-2. **Granularidade das lessons:** Uma lesson por PR? Por decisão? Por tema?
-3. **Deduplicação:** Se o mesmo erro acontece em dois PRs, é uma lesson ou duas?
-4. **Retenção:** Lessons expiram? Threshold temporal?
+### QW-1 — Criar folder `vault/lessons/` + template (5 min)
+```bash
+mkdir -p memory/vault/lessons
+# Criar lessons/template.md
+```
+
+### QW-2 — Escrever 3-5 lessons manuais (30 min)
+Lições de decisões reais já tomadas:
+1. Stale thresholds por entity (pattern de 2026-05-22)
+2. JWT TLDV renewal via BrowserBox (pattern recorrente)
+3. Cron job disappearing → detecção e recovery (2026-05-21)
+4. Azure blob pipeline vs TLDV API split (2026-05-22)
+5. Descoberta de 64 meetings com insights_json=null (max_tokens=600 bug)
+
+### QW-3 — Criar `honcho_capture.py` mínimo (2-4h)
+Lê GitHub PRs (via `research_github_cron.py` existing), gera lessons, escreve em `vault/lessons/`.
+**Modelo:** `fastest` (GPT-5-mini ou equivalente) — lições curtas, não precisa reasoning pesado.
+
+### QW-4 — Criar cron `honcho-lessons-capture` (15 min)
+```bash
+openclaw cron add \
+  --name "honcho-lessons-capture" \
+  --schedule "cron 0 10 * * *" \
+  --sessionTarget isolated \
+  --agentId memory-agent \
+  --model fastest \
+  --payload.kind agentTurn \
+  --payload.message "vault/insights/honcho_capture.py run --days 1" \
+  --description "Extrai lições de GitHub/Trello/TLDV e escreve em vault/lessons/"
+```
+
+### QW-5 — Validar retrieval no Honcho (15 min)
+Após QW-2: testar `honcho_search_conclusions` sobre as lessons escritas manualmente.
+
+---
+
+## Decisões de Design (Recomendadas)
+
+| Decisão | Recomendação |
+|---|---|
+| LLM para extracção | `fastest` (GPT-5-mini) — lições curtas |
+| Granularidade | **Por decisão** (não por PR) — mais granular, menos ruído |
+| Deduplicação | Hash de `what_happened + subject` → ID único |
+| Retenção | lessons nunca expiram; relevância avaliada no retrieval |
+| Fallback Honcho→disk | Implementar na skill vault-query (Gap 5) |
 
 ---
 
 ## Progressão
 
-1. **Phase 1 (Quick Win 1+2):** Honcho enabled + lessons em markdown + retrieval básico
-2. **Phase 2:** `honcho_capture.py` ETL mínimo → GitHub PRs → lessons
-3. **Phase 3:** Trello + TLDV no ETL
-4. **Phase 4:** Integração nos heartbeats + agentes
+1. **Phase 1 (QW-1 + QW-2):** `vault/lessons/` criado + 5 lessons manuais
+2. **Phase 2 (QW-3 + QW-4):** `honcho_capture.py` ETL mínimo + cron
+3. **Phase 3 (QW-5):** Validação retrieval + fallback vault-query
+4. **Phase 4:** Trello + TLDV no ETL
+5. **Phase 5:** Integração nos heartbeats + agentes
+6. **Phase 6:** Avaliar se Honcho pode substituir Claude Mem como source primária
+
+---
+
+## Checklist de Execução
+
+- [ ] QW-1: Criar `vault/lessons/` + template
+- [ ] QW-2: Escrever 3-5 lessons manuais
+- [ ] QW-3: Criar `honcho_capture.py` mínimo
+- [ ] QW-4: Criar cron `honcho-lessons-capture`
+- [ ] QW-5: Validar retrieval no Honcho
+- [ ] Gap 5: Implementar fallback Honcho→disk na skill vault-query
+- [ ] Gap 6: Validar schema de decisões
+
+---
+
+_Last updated: 2026-05-23_
