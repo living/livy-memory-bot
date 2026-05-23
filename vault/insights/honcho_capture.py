@@ -52,7 +52,7 @@ Rules:
 - type: lesson
 - source: github
 - source_ref: "{source_ref}"
-- date: YYYY-MM-DD (BRT = UTC-3)
+- date: {item_date} (BRT = UTC-3)
 - subject: "{item_type} #N — title"
 - author: extracted from data or 'unknown'
 - tags: [category tags]
@@ -90,6 +90,7 @@ def extract_lesson_via_llm(
     pr_url: str,
     model: str,
     source_type: str = "pr",
+    item_date: str | None = None,
 ) -> str | None:
     """Call LLM to extract a lesson from a PR or Issue. Returns YAML+body or None on failure."""
     if source_type == "issues":
@@ -109,7 +110,12 @@ URL: {pr_url}"""
         import urllib.request
         import urllib.error
 
-        system_prompt = SYSTEM_PROMPT_TEMPLATE.format(item_type=item_type, source_ref=source_ref)
+        if item_date is None:
+            try:
+                item_date = (datetime.fromisoformat(merged_at.replace("Z", "+00:00")) - timedelta(hours=3)).strftime("%Y-%m-%d")
+            except Exception:
+                item_date = "YYYY-MM-DD"
+        system_prompt = SYSTEM_PROMPT_TEMPLATE.format(item_type=item_type, source_ref=source_ref, item_date=item_date)
         payload = {
             "model": model,
             "messages": [
@@ -170,9 +176,8 @@ def list_org_repos(org: str) -> list[str]:
         return []
 
 
-def get_merged_prs(org: str, repo: str, since_days: int) -> list[dict]:
-    """Return list of merged PRs from repo in last N days via gh pr list.
-    Date filtering is done in Python (gh pr list has no --merged-after flag)."""
+def get_merged_prs(org: str, repo: str, since_days: int = 1, after: str | None = None, before: str | None = None) -> list[dict]:
+    """Return merged PRs from repo. Date range: lookback cutoff + optional after/before range."""
     cutoff = datetime.now(timezone.utc) - timedelta(days=since_days)
     try:
         result = subprocess.run(
@@ -190,8 +195,17 @@ def get_merged_prs(org: str, repo: str, since_days: int) -> list[dict]:
         for pr in all_prs:
             try:
                 merged = datetime.fromisoformat(pr["mergedAt"].replace("Z", "+00:00"))
-                if merged >= cutoff:
-                    prs.append(pr)
+                if merged < cutoff:
+                    continue
+                if after:
+                    after_dt = datetime.fromisoformat(after).replace(tzinfo=timezone.utc)
+                    if merged < after_dt:
+                        continue
+                if before:
+                    before_dt = datetime.fromisoformat(before).replace(tzinfo=timezone.utc)
+                    if merged > before_dt:
+                        continue
+                prs.append(pr)
             except (KeyError, ValueError):
                 continue
         prs.sort(key=lambda p: p.get("mergedAt", ""), reverse=True)
@@ -205,8 +219,8 @@ def count_merged_prs(org: str, repo: str, since_days: int) -> int:
     return len(get_merged_prs(org, repo, since_days))
 
 
-def get_closed_issues(org: str, repo: str, since_days: int) -> list[dict]:
-    """Return closed issues from last N days via gh issue list."""
+def get_closed_issues(org: str, repo: str, since_days: int = 1, after: str | None = None, before: str | None = None) -> list[dict]:
+    """Return closed issues from last N days. Date range: lookback cutoff + optional after/before."""
     cutoff = datetime.now(timezone.utc) - timedelta(days=since_days)
     try:
         result = subprocess.run(
@@ -224,8 +238,17 @@ def get_closed_issues(org: str, repo: str, since_days: int) -> list[dict]:
         for issue in all_issues:
             try:
                 closed = datetime.fromisoformat(issue["closedAt"].replace("Z", "+00:00"))
-                if closed >= cutoff:
-                    issues.append(issue)
+                if closed < cutoff:
+                    continue
+                if after:
+                    after_dt = datetime.fromisoformat(after).replace(tzinfo=timezone.utc)
+                    if closed < after_dt:
+                        continue
+                if before:
+                    before_dt = datetime.fromisoformat(before).replace(tzinfo=timezone.utc)
+                    if closed > before_dt:
+                        continue
+                issues.append(issue)
             except (KeyError, ValueError):
                 continue
         issues.sort(key=lambda i: i.get("closedAt", ""), reverse=True)
@@ -524,6 +547,8 @@ def run(
     dry_run: bool,
     min_activity: int,
     source: str = "github-prs",
+    after: str | None = None,
+    before: str | None = None,
 ) -> dict:
     """
     Main extraction loop. Returns JSON-serializable summary.
@@ -562,7 +587,7 @@ def run(
         }
 
     for repo in repos:
-        prs = get_merged_prs(org, repo, since_days)
+        prs = get_merged_prs(org, repo, since_days, after=after, before=before)
         summary["sources"][repo] = {
             "prs_found": len(prs),
             "processed": 0,
@@ -577,6 +602,7 @@ def run(
             title = pr["title"]
             body = pr.get("body") or ""
             merged_at = pr["mergedAt"]
+            item_date = (datetime.fromisoformat(merged_at.replace("Z", "+00:00")) - timedelta(hours=3)).strftime("%Y-%m-%d")
             url = pr["url"]
             labels = pr.get("labels", []) or []
 
@@ -600,7 +626,7 @@ def run(
             print(f"  [PROC] PR #{number}: {title[:60]}")
 
             content = extract_lesson_via_llm(
-                org, repo, number, title, body, merged_at, url, model, source_type="pr"
+                org, repo, number, title, body, merged_at, url, model, source_type="pr", item_date=item_date
             )
             if content is None:
                 summary["sources"][repo]["errors"] += 1
@@ -626,7 +652,7 @@ def run(
 
         # ── GitHub Issues ────────────────────────────────────────────────────
         if source in ("github-all", "github-issues"):
-            issues = get_closed_issues(org, repo, since_days)
+            issues = get_closed_issues(org, repo, since_days, after=after, before=before)
             summary["sources"][repo]["issues_found"] = len(issues)
             print(f"\n[honcho_capture] {org}/{repo}: {len(issues)} closed issues in last {since_days} days")
             for issue in issues:
@@ -634,6 +660,7 @@ def run(
                 title = issue["title"]
                 body = issue.get("body") or ""
                 closed_at = issue["closedAt"]
+                item_date = (datetime.fromisoformat(closed_at.replace("Z", "+00:00")) - timedelta(hours=3)).strftime("%Y-%m-%d")
                 url = issue["url"]
                 labels = issue.get("labels", []) or []
 
@@ -655,7 +682,7 @@ def run(
                 print(f"  [PROC] Issue #{number}: {title[:60]}")
 
                 content = extract_lesson_via_llm(
-                    org, repo, number, title, body, closed_at, url, model, source_type="issues"
+                    org, repo, number, title, body, closed_at, url, model, source_type="issues", item_date=item_date
                 )
                 if content is None:
                     summary["sources"][repo]["errors"] += 1
@@ -763,6 +790,10 @@ if __name__ == "__main__":
     parser.add_argument("--source", default="github-prs",
                         choices=["github-prs", "github-issues", "github-all", "trello", "tldv-synthesis"],
                         help="Source type to process (default: github-prs)")
+    parser.add_argument("--after", type=str, default=None,
+                        help="ISO date YYYY-MM-DD — only PRs/issues merged/closed on or after this date")
+    parser.add_argument("--before", type=str, default=None,
+                        help="ISO date YYYY-MM-DD — only PRs/issues merged/closed on or before this date")
     args = parser.parse_args()
 
     result = run(
@@ -773,5 +804,7 @@ if __name__ == "__main__":
         dry_run=args.dry_run,
         min_activity=args.min_activity,
         source=args.source,
+        after=args.after,
+        before=args.before,
     )
     print(json.dumps(result, indent=2, ensure_ascii=False))
