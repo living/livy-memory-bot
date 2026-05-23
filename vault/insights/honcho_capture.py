@@ -294,6 +294,14 @@ def build_trello_lesson_path(updated_at: str, board_name: str, card_id: str, car
     return LESSONS_DIR / f"{date_str}-{slug}-{subhash}.md"
 
 
+def build_tldv_lesson_path(meeting_id: str, meeting_name: str, meeting_date: str) -> Path:
+    """Build lesson path for a TLDV meeting. Uses meeting_id for uniqueness."""
+    slug = slugify(meeting_name)
+    source_ref = f"tldv/{meeting_id}"
+    subhash = hashlib.sha256(source_ref.encode()).hexdigest()[:6]
+    return LESSONS_DIR / f"{meeting_date}-{slug}-{subhash}.md"
+
+
 # ─── TLDV SYNTHESIS ───────────────────────────────────────────────────────────
 
 
@@ -382,21 +390,22 @@ Auto-generated from TLDV transcripts (Azure Blob)
         return None
 
 
-def synthesize_tldv_lessons(since_days: int, model: str, dry_run: bool = False,
+def extract_tldv_lessons(since_days: int, model: str, dry_run: bool = False,
                           after: str | None = None, before: str | None = None) -> list[str]:
     """
-    Synthesize lessons from TLDV meetings via Azure Blob transcripts.
-    Group meetings by project (from name tags like DELPHOS, BAT, HYDRA).
-    Only synthesize when 2+ meetings for same project exist in the date range.
-    Transcript source: Azure Blob primary.
-
+    Extract one lesson per TLDV meeting transcript (individual, not grouped).
     Fetches all meetings in lookback window, then filters by after/before range.
+    For each meeting with a transcript, extracts a full lesson with:
+      - to-do / action items
+      - decisions made
+      - blockers / open questions
+      - participants
+    Transcript source: Azure Blob primary + Supabase fallback.
     """
     from vault.research.tldv_client import TLDVClient
     from vault.capture.azure_blob_client import load_transcript_segments
 
-    # Use longer lookback to ensure we cover the after/before range
-    effective_days = max(since_days, 90)  # at least 90 days for backfill
+    effective_days = max(since_days, 90)
     client = TLDVClient(lookback_days=effective_days)
 
     try:
@@ -405,7 +414,7 @@ def synthesize_tldv_lessons(since_days: int, model: str, dry_run: bool = False,
         print(f"    [WARN] TLDV client error: {e}", file=sys.stderr)
         return []
 
-    # Filter meetings by after/before range
+    # Filter by date range
     if after or before:
         after_dt = datetime.fromisoformat(after).replace(tzinfo=timezone.utc) if after else None
         before_dt = datetime.fromisoformat(before).replace(tzinfo=timezone.utc) if before else None
@@ -426,57 +435,124 @@ def synthesize_tldv_lessons(since_days: int, model: str, dry_run: bool = False,
         meetings = filtered
         print(f"    [TLDV] {len(meetings)} meetings in date range")
 
-    # Group by project from meeting name (extract uppercase project tags)
-    by_project: dict[str, list[tuple[dict, str]]] = {}
+    lessons = []
     for meeting in meetings:
-        name = meeting.get("name", "")
         meeting_id = meeting.get("meeting_id", "") or meeting.get("id", "")
         if not meeting_id:
             continue
-        project = extract_project_tag(name)
-        if project:
-            by_project.setdefault(project, []).append((meeting, meeting_id))
 
-    lessons = []
-    for project, meeting_list in by_project.items():
-        if len(meeting_list) < 2:
-            continue  # need 2+ meetings to synthesize
-
-        transcript_texts = []
-        for meeting, meeting_id in meeting_list:
-            try:
-                segments = load_transcript_segments(meeting_id)
-                if segments:
-                    transcript = " ".join(s.get("text", "") or "" for s in segments)
-                    # Use created_at for date, fallback to updated_at
-                    date_val = meeting.get("created_at") or meeting.get("updated_at", "")
-                    # Normalize ISO timestamp to date string
-                    if date_val:
-                        try:
-                            date_str = datetime.fromisoformat(date_val.replace("Z", "+00:00"))
-                            date_str = date_str.strftime("%Y-%m-%d")
-                        except Exception:
-                            date_str = str(date_val)[:10]
-                    else:
-                        date_str = ""
-                    transcript_texts.append({
-                        "meeting_id": meeting_id,
-                        "name": meeting.get("name", ""),
-                        "date": date_str,
-                        "transcript": transcript[:3000],  # truncate for LLM
-                    })
-            except Exception:
+        # Extract transcript
+        try:
+            segments = load_transcript_segments(meeting_id)
+            if not segments:
                 continue
-
-        if not transcript_texts:
+            transcript = " ".join(s.get("text", "") or "" for s in segments)
+            if len(transcript.strip()) < 50:
+                continue
+        except Exception:
             continue
 
-        print(f"  [PROC] {project}: synthesizing {len(transcript_texts)} meetings")
-        lesson_date = datetime.now().strftime("%Y-%m-%d")
-        lesson = synthesize_tldv_via_llm(project, transcript_texts, model, lesson_date=lesson_date, n_meetings=len(transcript_texts))
+        # Date in BRT
+        date_val = meeting.get("created_at") or meeting.get("updated_at", "")
+        try:
+            date_br = datetime.fromisoformat(date_val.replace("Z", "+00:00")) - timedelta(hours=3)
+            date_str = date_br.strftime("%Y-%m-%d")
+        except Exception:
+            date_str = datetime.now().strftime("%Y-%m-%d")
+
+        name = meeting.get("name", "meeting")
+        project = extract_project_tag(name) or "general"
+
+        print(f"  [PROC] TLDV: {name[:50]} ({date_str})")
+        lesson = extract_tldv_lesson_via_llm(
+            meeting_id=meeting_id,
+            meeting_name=name,
+            meeting_date=date_str,
+            project=project,
+            transcript=transcript[:8000],  # generous but bounded
+            model=model,
+        )
         if lesson:
             lessons.append(lesson)
     return lessons
+
+
+def extract_tldv_lesson_via_llm(
+    meeting_id: str,
+    meeting_name: str,
+    meeting_date: str,
+    project: str,
+    transcript: str,
+    model: str,
+) -> str | None:
+    """Extract a structured lesson from a single meeting transcript."""
+    prompt = f"""You are a senior engineer extracting a structured lesson from a meeting transcript.
+Extract ALL of the following with maximum fidelity:
+
+1. **To-do / Action items**: exact tasks assigned, who is responsible
+2. **Decisions made**: specific conclusions reached, with context
+3. **Blockers / Open questions**: what is blocked, why, who can unblock
+4. **Deliverables / Outcomes**: what was produced, shipped, or decided
+5. **Participant list**: names mentioned in the meeting
+
+Meeting: {meeting_name}
+Date: {meeting_date}
+Project: {project}
+Transcript excerpt (first 6000 chars):
+{transcript[:6000]}
+
+Output ONLY valid YAML frontmatter + lesson body in Portuguese (BR). No code fences.
+
+Rules:
+- type: lesson
+- source: tldv
+- source_ref: "tldv/{meeting_id}"
+- date: {meeting_date}
+- subject: "{meeting_name}"
+- project: {project}
+- tags: [{project.lower()}, tldv, meeting]
+
+Format:
+## Meeting: {meeting_name} ({meeting_date})
+
+### To-do / Action Items
+- [person]: [exact task] (deadline or context if available)
+
+### Decisões
+- [decision made and why]
+
+### Blockers / Open Questions
+- [blocker or open question]
+
+### Deliverables / Outcomes
+- [what was produced or decided]
+
+### Participantes
+- [list of names mentioned]
+
+## Source
+Auto-generated from TLDV transcript (Azure Blob)
+"""
+
+    try:
+        import urllib.request
+        payload = {
+            "model": model,
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": 0.3,
+            "max_tokens": 1200,
+        }
+        req = urllib.request.Request(
+            "https://api.openai.com/v1/chat/completions",
+            data=json.dumps(payload).encode(),
+            headers={"Authorization": f"Bearer {OPENAI_API_KEY}", "Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            return json.loads(resp.read())["choices"][0]["message"]["content"]
+    except Exception as e:
+        print(f"    [WARN] LLM call failed: {e}", file=sys.stderr)
+        return None
 
 
 def get_updated_trello_cards(since_days: int, after: str | None = None, before: str | None = None) -> list[dict]:
@@ -508,7 +584,7 @@ def get_updated_trello_cards(since_days: int, after: str | None = None, before: 
             try:
                 req2 = urllib.request.Request(
                     f"{TRELLO_BASE}/boards/{board_id}/cards?key={TRELLO_KEY}&token={TRELLO_TOKEN}"
-                    "&fields=id,name,desc,dateLastUpdate,shortUrl&idList&limit=1000",
+                    "&fields=id,name,desc,dateLastActivity,shortUrl&idList&limit=1000",
                     headers={"Accept": "application/json"}
                 )
                 with urllib.request.urlopen(req2, timeout=15) as r:
@@ -517,7 +593,7 @@ def get_updated_trello_cards(since_days: int, after: str | None = None, before: 
                 continue
             for card in board_cards:
                 try:
-                    updated_str = card.get("dateLastUpdate", "")
+                    updated_str = card.get("dateLastActivity", "")
                     if not updated_str:
                         continue
                     updated = datetime.fromisoformat(updated_str.replace("Z", "+00:00"))
@@ -535,13 +611,13 @@ def get_updated_trello_cards(since_days: int, after: str | None = None, before: 
                         "id": card.get("id", ""),
                         "name": card.get("name", ""),
                         "desc": card.get("desc", "") or "",
-                        "dateLastUpdate": updated_str,
+                        "dateLastActivity": updated_str,
                         "shortUrl": card.get("shortUrl", ""),
                         "_board_name": board_name,
                     })
                 except Exception:
                     continue
-        cards.sort(key=lambda c: c.get("dateLastUpdate", ""), reverse=True)
+        cards.sort(key=lambda c: c.get("dateLastActivity", ""), reverse=True)
         print(f"    [TRELLO] {len(cards)} cards in date range")
         return cards
     except Exception as e:
@@ -650,7 +726,7 @@ def run(
                 name = card.get("name", "")
                 desc = card.get("desc", "") or ""
                 board_name = card.get("_board_name", "")
-                updated = card.get("dateLastUpdate", "")
+                updated = card.get("dateLastActivity", "")
                 url = card.get("shortUrl", "")
                 subject = f"Trello: {name} [{board_name}]"
                 source_ref = f"trello/{card.get('id', '')}"
@@ -684,23 +760,32 @@ def run(
                     summary["sources"]["trello"]["errors"] += 1
                     summary["errors"].append(f"trello/{card_id}: write failed — {e}")
         elif source == "tldv-synthesis":
-            lessons = synthesize_tldv_lessons(since_days, model, dry_run, after=after, before=before)
-            summary["sources"]["tldv"] = {"found": len(lessons), "processed": 0, "errors": 0}
-            for lesson in lessons:
+            raw_lessons = extract_tldv_lessons(since_days, model, dry_run, after=after, before=before)
+            summary["sources"]["tldv"] = {"found": len(raw_lessons), "processed": 0, "errors": 0}
+            for lesson in raw_lessons:
                 fm = parse_frontmatter(lesson)
-                subject = fm.get("subject", "tldv-synthesis")
-                date_str = datetime.now().strftime("%Y-%m-%d")
-                slug = slugify(subject)
-                path = LESSONS_DIR / f"{date_str}-{slug}-tldv-synthesis.md"
+                subject = fm.get("subject", "meeting")
+                date_str = fm.get("date", datetime.now().strftime("%Y-%m-%d"))
+                # Extract meeting_id from source_ref: "tldv/{id}"
+                source_ref = fm.get("source_ref", "tldv/unknown")
+                meeting_id = source_ref.split("/")[-1] if "/" in source_ref else "unknown"
+                path = build_tldv_lesson_path(meeting_id, subject, date_str)
                 if path.exists():
                     print(f"  [SKIP] {path.name} already exists")
                     summary["skipped"] += 1
                     continue
-                if not dry_run:
+                if dry_run:
+                    print(f"  [DRY] Would write: {path.name}")
+                    summary["sources"]["tldv"]["processed"] += 1
+                    continue
+                try:
                     path.write_text(lesson.strip() + "\n")
                     print(f"    [WROTE] {path.name}")
-                summary["lessons_written"] += 1
-                summary["sources"]["tldv"]["processed"] += 1
+                    summary["lessons_written"] += 1
+                    summary["sources"]["tldv"]["processed"] += 1
+                except Exception as e:
+                    summary["sources"]["tldv"]["errors"] += 1
+                    summary["errors"].append(f"tldv/{meeting_id}: write failed — {e}")
         return summary
 
     # GitHub sources: discover or validate repos
