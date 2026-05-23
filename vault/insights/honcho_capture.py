@@ -120,6 +120,7 @@ Rules:
 - date: {item_date} (BRT = UTC-3)
 - subject: "{item_type} #N — title"
 - author: extracted from data or 'unknown'
+- cycle_time: {cycle_time}  (time from first commit to merge, e.g. "2h 30m")
 - tags: [category tags]
 
 Format:
@@ -156,6 +157,7 @@ def extract_lesson_via_llm(
     model: str,
     source_type: str = "pr",
     item_date: str | None = None,
+    created_at: str = "",
 ) -> str | None:
     """Call LLM to extract a lesson from a PR or Issue. Returns YAML+body or None on failure."""
     if source_type == "issues":
@@ -164,11 +166,29 @@ def extract_lesson_via_llm(
     else:
         source_ref = f"{org}/{repo}/pull/{pr_number}"
         item_type = "PR"
+    # Compute cycle_time: merged_at - created_at
+    cycle_time = ""
+    if created_at and merged_at:
+        try:
+            c = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
+            m = datetime.fromisoformat(merged_at.replace("Z", "+00:00"))
+            delta = m - c
+            total_minutes = int(delta.total_seconds() / 60)
+            if total_minutes < 60:
+                cycle_time = f"{total_minutes}m"
+            elif total_minutes < 1440:
+                cycle_time = f"{total_minutes//60}h {total_minutes%60}m"
+            else:
+                cycle_time = f"{total_minutes//1440}d {(total_minutes%1440)//60}h"
+        except Exception:
+            cycle_time = ""
     user_prompt = f"""{item_type} #{pr_number}: {pr_title}
 
 {('Body:\n' + pr_body) if pr_body else '(no body)'}
 
-Closed: {merged_at}
+Created: {created_at}
+Merged: {merged_at}
+Cycle time: {cycle_time}
 URL: {pr_url}"""
 
     try:
@@ -180,7 +200,7 @@ URL: {pr_url}"""
                 item_date = (datetime.fromisoformat(merged_at.replace("Z", "+00:00")) - timedelta(hours=3)).strftime("%Y-%m-%d")
             except Exception:
                 item_date = "YYYY-MM-DD"
-        system_prompt = SYSTEM_PROMPT_TEMPLATE.format(item_type=item_type, source_ref=source_ref, item_date=item_date)
+        system_prompt = SYSTEM_PROMPT_TEMPLATE.format(item_type=item_type, source_ref=source_ref, item_date=item_date, cycle_time=cycle_time or "N/A")
         payload = {
             "model": model,
             "messages": [
@@ -243,14 +263,16 @@ def list_org_repos(org: str) -> list[str]:
 
 def get_merged_prs(org: str, repo: str, since_days: int = 1, after: str | None = None, before: str | None = None) -> list[dict]:
     """Return merged PRs from repo. Date range: lookback cutoff + optional after/before range."""
-    cutoff = datetime.now(timezone.utc) - timedelta(days=since_days)
+    # cutoff only applies when no explicit date range given
+    has_explicit_range = bool(after or before)
+    cutoff = datetime.now(timezone.utc) - timedelta(days=since_days) if not has_explicit_range else None
     try:
         result = subprocess.run(
             ["gh", "pr", "list",
              "--repo", f"{org}/{repo}",
              "--state", "merged",
              "--limit", "100",
-             "--json", "number,title,body,mergedAt,url,labels"],
+             "--json", "number,title,body,mergedAt,url,labels,createdAt"],
             capture_output=True, text=True, timeout=30,
         )
         if result.returncode != 0:
@@ -260,7 +282,7 @@ def get_merged_prs(org: str, repo: str, since_days: int = 1, after: str | None =
         for pr in all_prs:
             try:
                 merged = datetime.fromisoformat(pr["mergedAt"].replace("Z", "+00:00"))
-                if merged < cutoff:
+                if cutoff and merged < cutoff:
                     continue
                 if after:
                     after_dt = datetime.fromisoformat(after).replace(tzinfo=timezone.utc)
@@ -279,14 +301,15 @@ def get_merged_prs(org: str, repo: str, since_days: int = 1, after: str | None =
         return []
 
 
-def count_merged_prs(org: str, repo: str, since_days: int) -> int:
+def count_merged_prs(org: str, repo: str, since_days: int, after: str | None = None, before: str | None = None) -> int:
     """Fast count of merged PRs in period — used for min-activity filtering."""
-    return len(get_merged_prs(org, repo, since_days))
+    return len(get_merged_prs(org, repo, since_days, after=after, before=before))
 
 
 def get_closed_issues(org: str, repo: str, since_days: int = 1, after: str | None = None, before: str | None = None) -> list[dict]:
     """Return closed issues from last N days. Date range: lookback cutoff + optional after/before."""
-    cutoff = datetime.now(timezone.utc) - timedelta(days=since_days)
+    has_explicit_range = bool(after or before)
+    cutoff = datetime.now(timezone.utc) - timedelta(days=since_days) if not has_explicit_range else None
     try:
         result = subprocess.run(
             ["gh", "issue", "list",
@@ -303,7 +326,7 @@ def get_closed_issues(org: str, repo: str, since_days: int = 1, after: str | Non
         for issue in all_issues:
             try:
                 closed = datetime.fromisoformat(issue["closedAt"].replace("Z", "+00:00"))
-                if closed < cutoff:
+                if cutoff and closed < cutoff:
                     continue
                 if after:
                     after_dt = datetime.fromisoformat(after).replace(tzinfo=timezone.utc)
@@ -939,7 +962,7 @@ def run(
         all_repos = list_org_repos(org)
         discovered = []
         for repo in all_repos:
-            count = count_merged_prs(org, repo, since_days)
+            count = count_merged_prs(org, repo, since_days, after=after, before=before)
             if count >= min_activity:
                 discovered.append((repo, count))
         repos = [r[0] for r in discovered]
@@ -970,6 +993,7 @@ def run(
             title = pr["title"]
             body = pr.get("body") or ""
             merged_at = pr["mergedAt"]
+            created_at = pr.get("createdAt", "")
             item_date = (datetime.fromisoformat(merged_at.replace("Z", "+00:00")) - timedelta(hours=3)).strftime("%Y-%m-%d")
             url = pr["url"]
             labels = pr.get("labels", []) or []
@@ -994,7 +1018,8 @@ def run(
             print(f"  [PROC] PR #{number}: {title[:60]}")
 
             content = extract_lesson_via_llm(
-                org, repo, number, title, body, merged_at, url, model, source_type="pr", item_date=item_date
+                org, repo, number, title, body, merged_at, url, model,
+                source_type="pr", item_date=item_date, created_at=created_at
             )
             if content is None:
                 summary["sources"][repo]["errors"] += 1
