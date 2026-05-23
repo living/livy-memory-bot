@@ -13,13 +13,13 @@ tags: [kaba, tldv, meeting]
 - Nenhuma tarefa específica foi atribuída durante a reunião.
 
 ### Decisões
-- Foi decidido que o OmniRouter é uma ferramenta útil para gerenciar múltiplos modelos de código, permitindo alternar entre diferentes APIs sem necessidade de reconfiguração manual.
+- Foi decidido que o OmniRouter será utilizado para gerenciar múltiplas assinaturas de modelos de código, permitindo alternar entre eles conforme necessário.
 
 ### Blockers / Open Questions
-- Não houve participantes suficientes na reunião, o que pode ter bloqueado discussões mais profundas sobre o projeto.
+- Não foram identificados bloqueios específicos, mas a ausência de alguns participantes pode ter limitado a discussão.
 
 ### Deliverables / Outcomes
-- Discussão sobre a eficácia de diferentes modelos de código, como Cloud Code, OmniRouter e GLM, mas sem resultados concretos ou entregáveis definidos.
+- Discussão sobre o uso de diferentes modelos de código, como Cloud Code, OmniRouter e GLM, e suas respectivas vantagens e custos.
 
 ### Participantes
 - Victor

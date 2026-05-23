@@ -10,21 +10,20 @@ tags: [kaba, tldv, meeting]
 ## Meeting: Status Kaba/BAT/BOT (2026-04-14)
 
 ### To-do / Action Items
-- Robert: Validar a proposta e enviar para o Sandro da The Office.
-- Vinícius: Coordenar os testes do pacote preparado com Luiz.
-- Robert: Enviar a proposta para o Thiago da Elcano.
-- Felipe e Bianca: Participar da reunião final às 10 horas.
+- Robert: Responder o e-mail do Sandro da The Office sobre a proposta (contexto: está cobrando uma posição).
+- Vinícius: Coordenar os testes (contexto: Thiago não pode testar).
+- Robert: Validar a proposta que já está pronta e enviar.
 
 ### Decisões
-- Foi decidido que o Logic App não será utilizado devido a preocupações arquiteturais e de compliance, optando-se por uma solução que mantenha o controle sobre o engine de fluxo.
+- A equipe decidiu que o uso do Logic App não é recomendado devido a consequências arquiteturais graves e a perda de controle sobre o engine de fluxo. A proposta de usar Power BI ou uma ferramenta própria para alertas foi discutida, considerando a cultura da empresa.
 
 ### Blockers / Open Questions
-- A proposta para o Sandro da The Office ainda não foi respondida, e não há uma posição definida sobre a reunião.
-- Thiago não testou o que foi entregue, e a responsabilidade dos testes foi transferida para Vinícius.
+- A reunião final com Felipe e Bianca foi adiada duas vezes e está marcada para hoje às 10 horas.
+- A equipe não tem clareza sobre a posição a ser dada ao Sandro da The Office.
 
 ### Deliverables / Outcomes
-- O pacote para os testes foi preparado e está pronto para ser enviado.
-- Um estudo sobre o Logic App foi compartilhado, apresentando as implicações e recomendações.
+- O pacote para os testes foi gerado e está pronto para ser enviado.
+- A proposta para o cliente está pronta e será validada por Robert antes do envio.
 
 ### Participantes
 - Robert
@@ -33,10 +32,12 @@ tags: [kaba, tldv, meeting]
 - Bianca
 - Sandro (da The Office)
 - Lincoln
-- Vinícius
 - Thiago
+- Vinícius
 - Di
 - Paulo
+- Yá
+- Cloyd
 
 ## Source
 Auto-generated from TLDV transcript (Azure Blob)

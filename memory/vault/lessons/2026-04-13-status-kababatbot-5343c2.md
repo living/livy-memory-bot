@@ -10,21 +10,21 @@ tags: [kaba, tldv, meeting]
 ## Meeting: Status Kaba/BAT/BOT (2026-04-13)
 
 ### To-do / Action Items
-- Esteves: Documentar as horas gastas e enviar para Bianca (prazo: hoje ou amanhã).
-- Robert: Levantar todas as horas gastas no projeto.
-- Fábio: Retornar sobre as propostas dos projetos Conecta Cheque e Neo Grid (prazo: hoje).
+- Esteves: Criar documentação sobre as horas gastas e enviar para Bianca (prazo: hoje ou amanhã).
+- Robert: Levantar todas as horas gastas no projeto e detalhar as atividades.
+- Fábio: Retornar sobre as propostas dos projetos Conecta Cheque e Neo Grid.
 
 ### Decisões
-- O projeto voltou, e será necessário embutir horas para o ambiente de desenvolvimento, que está temporariamente gratuito.
-- Foi decidido que o Rabbit será utilizado em vez do Service Boy para a infraestrutura.
+- O projeto KABA foi reiniciado, e será necessário cobrar horas para o ambiente de desenvolvimento.
+- O uso do Rabbit foi decidido em vez do Service Boy para a infraestrutura do projeto.
 
 ### Blockers / Open Questions
-- A equipe está aguardando decisões sobre a infraestrutura atual e a criação de um microserviço para a APD.
-- Fábio ainda não decidiu sobre a simplificação do sistema dinâmico do Conecta Cheque.
+- A decisão sobre a infraestrutura atual ou a criação de um microserviço ainda não foi tomada.
+- Fábio precisa decidir sobre as regras do Conecta Cheque e retornar com essa informação.
 
 ### Deliverables / Outcomes
-- Acesso temporário ao dashboard foi liberado para Herculano.
-- A documentação sobre as horas gastas e as atividades a serem realizadas será enviada para Bianca.
+- Acesso temporário ao dashboard foi liberado para Herculano para que ele possa pegar os relatórios dos Voices.
+- A documentação sobre as horas gastas no projeto KABA será enviada para Bianca.
 
 ### Participantes
 - Vitor

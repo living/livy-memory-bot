@@ -10,26 +10,26 @@ tags: [kaba, tldv, meeting]
 ## Meeting: Status Kaba/BAT/BOT (2026-04-08)
 
 ### To-do / Action Items
-- Marcio Rocha: Melhorar a documentação sobre lessons learned e as regras de negócio para a entidade de vinhos.
-- Lincoln: Revisar a proposta da Delfos e discutir o custo real do negócio com Victor.
+- Marcio Rocha: Levantar os dados da Viu e melhorar a entidade para vinhos, incluindo a hierarquia (sem prazo definido).
+- Lincoln: Revisar a proposta da Delfos junto com Marcio Rocha (sem prazo definido).
+- Victor: Fornecer informações sobre o custo real do negócio e a viabilidade da criação de grupos no Twilio (sem prazo definido).
 
 ### Decisões
-- Foi decidido que Pedro atuará como Product Owner (PO) e que outras pessoas da equipe de marketing também serão incluídas no projeto para garantir uma visão mais ampla.
+- Foi decidido que Pedro atuará como PO e conhecedor da aplicação, e que outras pessoas do marketing também serão incluídas no projeto para garantir mais conhecimento e suporte.
 
 ### Blockers / Open Questions
-- Não está claro como as regras de negócio estão sendo migradas e quem pode fornecer mais informações sobre isso.
-- A dúvida sobre a escolha do banco de dados (SQL vs. Postgres) ainda precisa ser sedimentada.
+- Não há clareza sobre as regras de negócio e como elas estão sendo migradas. Marcio Rocha levantou a questão de que as regras de negócio para vinhos ainda não foram definidas claramente.
 
 ### Deliverables / Outcomes
-- Discussão sobre a proposta da Delfos e a necessidade de revisar os epics enviados.
+- Discussão sobre a proposta da Delfos e a necessidade de entender melhor os custos e a estrutura do projeto.
 
 ### Participantes
 - Marcio Rocha
 - Lincoln
 - Victor
 - Steve
-- Pedro
 - Fabiana
+- Pedro
 - Ana
 - Robich
 

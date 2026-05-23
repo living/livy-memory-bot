@@ -654,10 +654,42 @@ Auto-generated from TLDV transcript (Azure Blob)
         return None
 
 
+def _get_card_metadata(card_id: str, card_desc: str, api_key: str, token: str, base: str) -> dict:
+    """Fetch custom fields (effort) and extract PR references from card description.
+    
+    Returns: {\"effort\": int|None, \"pr_refs\": [str]}"""
+    effort = None
+    pr_refs = []
+    # Extract PR URLs from description
+    import re
+    pr_urls = re.findall(r'https?://github\.com/([\w-]+)/([\w.-]+)/pull/(\d+)', card_desc)
+    for org, repo, pr_num in pr_urls:
+        pr_refs.append(f"{org}/{repo}#{pr_num}")
+    # Fetch custom fields for this card
+    try:
+        req = urllib.request.Request(
+            f"{base}/cards/{card_id}/customFields?key={api_key}&token={token}",
+            headers={"Accept": "application/json"}
+        )
+        with urllib.request.urlopen(req, timeout=10) as r:
+            fields = json.loads(r.read())
+        for field in fields:
+            name = field.get("name", "").lower()
+            if "effort" in name or "horas" in name or "hora" in name:
+                val = field.get("value")
+                if val:
+                    # number type
+                    effort = val.get("number")
+    except Exception:
+        pass
+    return {"effort": effort, "pr_refs": pr_refs}
+
+
 def get_updated_trello_cards(since_days: int, after: str | None = None, before: str | None = None) -> list[dict]:
     """Return Trello cards updated in date range via ALL boards the token can access.
     Fetches all boards via /1/members/me/boards, then cards from each board.
-    Date range: after + before (in addition to lookback cutoff)."""
+    Date range: after + before (in addition to lookback cutoff).
+    Each card dict includes effort (from custom fields) and pr_refs (from desc URLs)."""
     try:
         import os, urllib.request
         TRELLO_API_KEY = os.environ.get("TRELLO_API_KEY", "")
@@ -711,13 +743,17 @@ def get_updated_trello_cards(since_days: int, after: str | None = None, before: 
                         before_dt = datetime.fromisoformat(before).replace(tzinfo=timezone.utc)
                         if updated > before_dt:
                             continue
+                    card_id = card.get("id", "")
+                    meta = _get_card_metadata(card_id, card.get("desc", "") or "", TRELLO_API_KEY, TRELLO_TOKEN, TRELLO_BASE)
                     cards.append({
-                        "id": card.get("id", ""),
+                        "id": card_id,
                         "name": card.get("name", ""),
                         "desc": card.get("desc", "") or "",
                         "dateLastActivity": updated_str,
                         "shortUrl": card.get("shortUrl", ""),
                         "_board_name": board_name,
+                        "effort": meta["effort"],
+                        "pr_refs": meta["pr_refs"],
                     })
                 except Exception:
                     continue
@@ -729,13 +765,18 @@ def get_updated_trello_cards(since_days: int, after: str | None = None, before: 
         return []
 
 
-def extract_trello_lesson_via_llm(card_name: str, card_desc: str, board_name: str, url: str, updated: str, model: str, card_id: str = "") -> str | None:
+def extract_trello_lesson_via_llm(card_name: str, card_desc: str, board_name: str, url: str, updated: str, model: str, card_id: str = "", effort: int | None = None, pr_refs: list[str] | None = None) -> str | None:
     """Extract lesson from a Trello card via LLM."""
+    pr_refs_str = "\n".join([f"- {r}" for r in (pr_refs or [])]) if pr_refs else "None"
+    effort_str = str(effort) if effort is not None else "Not specified"
     user_prompt = f"""Card: {card_name}
 Board: {board_name}
 Description: {card_desc or '(no description)'}
 Updated: {updated}
 URL: {url}
+Effort (hours): {effort_str}
+Linked PRs:
+{pr_refs_str}
 
 Extract a lesson if this card represents a meaningful decision, process change, or architectural choice.
 If it's a routine task or backlog item, return skip_reason=trivial."""
@@ -749,6 +790,8 @@ Rules:
 - source_ref: "trello/{card_id}"
 - date: YYYY-MM-DD (BRT = UTC-3)
 - subject: "Trello: {card_name} [{board_name}]"
+- effort: {effort}  (hours, omit if not specified)
+- pr_refs: [{pr_refs_str}]  (list of org/repo#pr, omit if none)
 - tags: [trello, {board_name_slug}]
 
 Format:
@@ -777,7 +820,7 @@ skip_reason: trivial
         payload = {
             "model": model,
             "messages": [
-                {"role": "system", "content": system.format(board_name_slug=slugify(board_name), card_id=card_id, card_name=card_name, board_name=board_name)},
+                {"role": "system", "content": system.format(board_name_slug=slugify(board_name), card_id=card_id, card_name=card_name, board_name=board_name, effort=effort_str, pr_refs_str=", ".join(pr_refs) if pr_refs else "none")},
                 {"role": "user", "content": user_prompt},
             ],
             "temperature": 0.3,
@@ -832,6 +875,8 @@ def run(
                 board_name = card.get("_board_name", "")
                 updated = card.get("dateLastActivity", "")
                 url = card.get("shortUrl", "")
+                effort = card.get("effort")
+                pr_refs = card.get("pr_refs") or []
                 subject = f"Trello: {name} [{board_name}]"
                 source_ref = f"trello/{card.get('id', '')}"
                 path = build_trello_lesson_path(updated, board_name, card_id, name)
@@ -846,7 +891,7 @@ def run(
                     continue
                 summary["sources"]["trello"]["processed"] += 1
                 print(f"  [PROC] Card: {name[:50]}")
-                content = extract_trello_lesson_via_llm(name, desc, board_name, url, updated, model, card_id)
+                content = extract_trello_lesson_via_llm(name, desc, board_name, url, updated, model, card_id, effort, pr_refs)
                 if content is None:
                     summary["sources"]["trello"]["errors"] += 1
                     summary["errors"].append(f"trello/{card_id}: LLM call failed")

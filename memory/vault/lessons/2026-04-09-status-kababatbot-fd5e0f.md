@@ -10,21 +10,21 @@ tags: [kaba, tldv, meeting]
 ## Meeting: Status Kaba/BAT/BOT (2026-04-09)
 
 ### To-do / Action Items
-- [Esteves]: Corrigir o texto para que apareça a fila certa.
-- [Unknown]: Investigar o backup que causou problemas e verificar se ele contém a versão funcional anterior.
-- [Unknown]: Parar o processo Proxess para verificar se a contagem na fila aumenta.
-- [Unknown]: Chamar a Tuque para verificar o que ela diz sobre as correções.
-- [Unknown]: Marcar um horário para explicar para o Lincoln.
+- [Não foi especificado um responsável]: Corrigir o texto para que apareça a fila certa.
+- [Não foi especificado um responsável]: Investigar o backup que causou problemas para verificar se contém o que funcionava antes.
+- [Não foi especificado um responsável]: Subir a correção do texto.
+- [Não foi especificado um responsável]: Chamar a Tuque para verificar o que ela diz sobre as correções.
+- [Não foi especificado um responsável]: Marcar um horário para explicar para o Lincoln.
 
 ### Decisões
-- Decidiu-se que a correção do texto deve ser feita antes de prosseguir com outras prioridades, pois isso está impedindo o funcionamento adequado do sistema.
+- Decidiu-se que a correção do texto deve ser feita antes de continuar com as prioridades totais, pois o texto atual está causando problemas.
 
 ### Blockers / Open Questions
-- A contagem na fila não está aumentando devido ao consumo do processo Proxess, que precisa ser parado para verificar se a contagem volta ao normal.
-- É necessário descobrir se o backup contém a versão que funcionava antes dos problemas.
+- A contagem não está aumentando devido a um processo que está consumindo as mensagens. É necessário desligar o Proxess para verificar se a contagem aumenta.
+- Não está claro se o backup contém as informações que funcionavam antes.
 
 ### Deliverables / Outcomes
-- Foi decidido que a correção do texto será feita e subida ainda hoje.
+- A correção do texto foi identificada como uma prioridade para ser subida.
 
 ### Participantes
 - Esteves

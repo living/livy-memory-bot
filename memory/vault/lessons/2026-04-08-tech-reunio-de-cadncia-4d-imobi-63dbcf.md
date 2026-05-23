@@ -10,17 +10,16 @@ tags: [general, tldv, meeting]
 ## Meeting: [Tech] Reunião de Cadência 4D imobi (2026-04-08)
 
 ### To-do / Action Items
-- Patrícia Ribeiro: Encontrar os prints iniciais da conversa com a usuária Luisa para verificar o histórico de mensagens.
-- André Chaves: Melhorar a clareza da mensagem que solicita a concordância do usuário com os termos de uso.
+- Patrícia Ribeiro: Melhorar a clareza da mensagem que solicita a concordância dos usuários com os termos de uso.
 
 ### Decisões
-- A equipe decidiu que a mensagem que solicita a concordância do usuário deve ser reformulada para deixar claro que a pessoa precisa clicar em "concordo" para continuar.
+- A equipe decidiu que a mensagem que solicita a concordância dos usuários deve ser reformulada para que fique mais clara e que os usuários saibam que precisam digitar a palavra "concordo".
 
 ### Blockers / Open Questions
-- A sincronização das mensagens da usuária Luisa estava com problemas, dificultando a visualização do histórico de conversas. Este problema precisa ser resolvido para que a equipe possa entender melhor a situação.
+- Não foi identificado um bloqueio específico, mas há uma questão sobre a clareza da comunicação com os usuários, que pode afetar a experiência deles.
 
 ### Deliverables / Outcomes
-- Foi sugerido um novo modelo de parcelas para um fundo de obras, totalizando 18 parcelas de 7.925, resultando em um total de 142.650.
+- A equipe discutiu e chegou a um consenso sobre a necessidade de reformular a mensagem de consentimento para os usuários.
 
 ### Participantes
 - André Chaves
