@@ -18,18 +18,21 @@ DEFAULT_CONTAINER_NAME = "transcripts"
 class AzureBlobClient:
     """Load meeting transcript blobs from Azure Storage."""
 
-    DEFAULT_CONTAINER_NAME = "transcripts"
+    DEFAULT_CONTAINER_NAME = "living-meeting-hub"
 
     def __init__(
         self,
         connection_string: str | None = None,
         container_name: str | None = None,
     ) -> None:
-        self._connection_string = (
-            connection_string
-            if connection_string is not None
-            else os.environ.get("AZURE_STORAGE_CONNECTION_STRING", "")
-        )
+        # Support both full connection string and individual account+key
+        raw = connection_string if connection_string is not None else os.environ.get("AZURE_STORAGE_CONNECTION_STRING", "")
+        if not raw:
+            acct = os.environ.get("AZURE_STORAGE_ACCOUNT_NAME", "")
+            key = os.environ.get("AZURE_STORAGE_ACCOUNT_KEY", "")
+            if acct and key:
+                raw = f"DefaultEndpointsProtocol=https;AccountName={acct};AccountKey={key};EndpointSuffix=core.windows.net"
+        self._connection_string = raw
         self._container_name = container_name or self.DEFAULT_CONTAINER_NAME
 
     def _build_blob_path(self, meeting_id: str) -> str:

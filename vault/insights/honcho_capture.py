@@ -317,13 +317,15 @@ def extract_project_tag(name: str) -> str | None:
     return None
 
 
-def synthesize_tldv_via_llm(project: str, transcripts: list[dict], model: str) -> str | None:
+def synthesize_tldv_via_llm(project: str, transcripts: list[dict], model: str, lesson_date: str | None = None, n_meetings: int = 0) -> str | None:
     """Synthesize multiple meeting transcripts into one lesson via LLM."""
+    if lesson_date is None:
+        lesson_date = datetime.now().strftime("%Y-%m-%d")
     transcript_summary = "\n\n".join(
         f"=== {t['name']} ({t['date']}) ===\n{t['transcript'][:2000]}"
         for t in transcripts
     )
-    prompt = f"""You are a senior engineer synthesizing multiple meeting transcripts into one concise lesson.
+    prompt = f"""You are a senior engineer synthesizing {n_meetings} meeting transcripts into one concise lesson.
 Project: {project}
 
 TRANSCRIPTS:
@@ -336,8 +338,8 @@ Rules:
 - type: lesson
 - source: tldv
 - source_ref: "tldv/{project}/synthesis"
-- date: YYYY-MM-DD (today)
-- subject: "[Síntese] {project} — N reuniões"
+- date: {lesson_date}
+- subject: "[Síntese] {project} — {n_meetings} reuniões"
 - tags: [{project.lower()}, synthesis, meetings]
 
 Format:
@@ -391,12 +393,11 @@ def synthesize_tldv_lessons(since_days: int, model: str, dry_run: bool = False,
     Fetches all meetings in lookback window, then filters by after/before range.
     """
     from vault.research.tldv_client import TLDVClient
-    from vault.research.azure_blob_client import AzureBlobClient
+    from vault.capture.azure_blob_client import load_transcript_segments
 
     # Use longer lookback to ensure we cover the after/before range
     effective_days = max(since_days, 90)  # at least 90 days for backfill
     client = TLDVClient(lookback_days=effective_days)
-    azure = AzureBlobClient()
 
     try:
         meetings = client.fetch_events_since(None)
@@ -444,8 +445,9 @@ def synthesize_tldv_lessons(since_days: int, model: str, dry_run: bool = False,
         transcript_texts = []
         for meeting, meeting_id in meeting_list:
             try:
-                transcript = azure.fetch_transcript(meeting_id)
-                if transcript:
+                segments = load_transcript_segments(meeting_id)
+                if segments:
+                    transcript = " ".join(s.get("text", "") or "" for s in segments)
                     # Use created_at for date, fallback to updated_at
                     date_val = meeting.get("created_at") or meeting.get("updated_at", "")
                     # Normalize ISO timestamp to date string
@@ -470,7 +472,8 @@ def synthesize_tldv_lessons(since_days: int, model: str, dry_run: bool = False,
             continue
 
         print(f"  [PROC] {project}: synthesizing {len(transcript_texts)} meetings")
-        lesson = synthesize_tldv_via_llm(project, transcript_texts, model)
+        lesson_date = datetime.now().strftime("%Y-%m-%d")
+        lesson = synthesize_tldv_via_llm(project, transcript_texts, model, lesson_date=lesson_date, n_meetings=len(transcript_texts))
         if lesson:
             lessons.append(lesson)
     return lessons
