@@ -373,25 +373,50 @@ Auto-generated from TLDV transcripts (Azure Blob)
         return None
 
 
-def synthesize_tldv_lessons(since_days: int, model: str, dry_run: bool = False) -> list[str]:
+def synthesize_tldv_lessons(since_days: int, model: str, dry_run: bool = False,
+                          after: str | None = None, before: str | None = None) -> list[str]:
     """
     Synthesize lessons from TLDV meetings via Azure Blob transcripts.
     Group meetings by project (from name tags like DELPHOS, BAT, HYDRA).
-    Only synthesize when 2+ meetings for same project exist.
+    Only synthesize when 2+ meetings for same project exist in the date range.
     Transcript source: Azure Blob primary.
+
+    Fetches all meetings in lookback window, then filters by after/before range.
     """
     from vault.research.tldv_client import TLDVClient
     from vault.research.azure_blob_client import AzureBlobClient
 
-    client = TLDVClient(lookback_days=since_days)
+    # Use longer lookback to ensure we cover the after/before range
+    effective_days = max(since_days, 90)  # at least 90 days for backfill
+    client = TLDVClient(lookback_days=effective_days)
     azure = AzureBlobClient()
 
-    # Fetch meeting list from TLDV (use fetch_events_since with None to use lookback_days)
     try:
         meetings = client.fetch_events_since(None)
     except Exception as e:
         print(f"    [WARN] TLDV client error: {e}", file=sys.stderr)
         return []
+
+    # Filter meetings by after/before range
+    if after or before:
+        after_dt = datetime.fromisoformat(after).replace(tzinfo=timezone.utc) if after else None
+        before_dt = datetime.fromisoformat(before).replace(tzinfo=timezone.utc) if before else None
+        filtered = []
+        for m in meetings:
+            date_val = m.get("created_at") or m.get("updated_at") or ""
+            if not date_val:
+                continue
+            try:
+                dt = datetime.fromisoformat(date_val.replace("Z", "+00:00"))
+                if after_dt and dt < after_dt:
+                    continue
+                if before_dt and dt > before_dt:
+                    continue
+                filtered.append(m)
+            except Exception:
+                continue
+        meetings = filtered
+        print(f"    [TLDV] {len(meetings)} meetings in date range")
 
     # Group by project from meeting name (extract uppercase project tags)
     by_project: dict[str, list[tuple[dict, str]]] = {}
@@ -444,28 +469,70 @@ def synthesize_tldv_lessons(since_days: int, model: str, dry_run: bool = False) 
     return lessons
 
 
-def get_updated_trello_cards(since_days: int) -> list[dict]:
-    """Return Trello cards updated in last N days via existing TrelloClient."""
+def get_updated_trello_cards(since_days: int, after: str | None = None, before: str | None = None) -> list[dict]:
+    """Return Trello cards updated in date range via ALL boards the token can access.
+    Fetches all boards via /1/members/me/boards, then cards from each board.
+    Date range: after + before (in addition to lookback cutoff)."""
     try:
-        from vault.research.trello_client import TrelloClient
-        client = TrelloClient()
-        boards = client.list_boards()
+        import os, urllib.request
+        TRELLO_KEY = os.environ.get("TRELLO_KEY", "")
+        TRELLO_TOKEN = os.environ.get("TRELLO_TOKEN", "")
+        TRELLO_BASE = "https://api.trello.com/1"
+        if not TRELLO_KEY or not TRELLO_TOKEN:
+            print(f"    [WARN] TRELLO_KEY or TRELLO_TOKEN not set", file=sys.stderr)
+            return []
         cutoff = datetime.now(timezone.utc) - timedelta(days=since_days)
+        # Fetch all boards the token can access
+        req = urllib.request.Request(
+            f"{TRELLO_BASE}/members/me/boards?key={TRELLO_KEY}&token={TRELLO_TOKEN}&fields=id,name",
+            headers={"Accept": "application/json"}
+        )
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            boards = json.loads(resp.read())
+        print(f"    [TRELLO] Found {len(boards)} boards")
         cards = []
         for board in boards:
+            board_id = board["id"]
+            board_name = board["name"]
+            # Fetch cards for this board
             try:
-                board_cards = client.get_board_cards(board["id"])
-                for card in board_cards:
-                    try:
-                        updated = datetime.fromisoformat(card["dateLastUpdate"].replace("Z", "+00:00"))
-                        if updated >= cutoff:
-                            card["_board_name"] = board.get("name", "")
-                            cards.append(card)
-                    except Exception:
-                        continue
+                req2 = urllib.request.Request(
+                    f"{TRELLO_BASE}/boards/{board_id}/cards?key={TRELLO_KEY}&token={TRELLO_TOKEN}"
+                    "&fields=id,name,desc,dateLastUpdate,shortUrl&idList&limit=1000",
+                    headers={"Accept": "application/json"}
+                )
+                with urllib.request.urlopen(req2, timeout=15) as r:
+                    board_cards = json.loads(r.read())
             except Exception:
                 continue
+            for card in board_cards:
+                try:
+                    updated_str = card.get("dateLastUpdate", "")
+                    if not updated_str:
+                        continue
+                    updated = datetime.fromisoformat(updated_str.replace("Z", "+00:00"))
+                    if updated < cutoff:
+                        continue
+                    if after:
+                        after_dt = datetime.fromisoformat(after).replace(tzinfo=timezone.utc)
+                        if updated < after_dt:
+                            continue
+                    if before:
+                        before_dt = datetime.fromisoformat(before).replace(tzinfo=timezone.utc)
+                        if updated > before_dt:
+                            continue
+                    cards.append({
+                        "id": card.get("id", ""),
+                        "name": card.get("name", ""),
+                        "desc": card.get("desc", "") or "",
+                        "dateLastUpdate": updated_str,
+                        "shortUrl": card.get("shortUrl", ""),
+                        "_board_name": board_name,
+                    })
+                except Exception:
+                    continue
         cards.sort(key=lambda c: c.get("dateLastUpdate", ""), reverse=True)
+        print(f"    [TRELLO] {len(cards)} cards in date range")
         return cards
     except Exception as e:
         print(f"    [WARN] Trello client error: {e}", file=sys.stderr)
@@ -556,7 +623,77 @@ def run(
     If repos is None, discover active repos (those with merged PRs in period).
     Filter to repos with >= min_activity merged PRs.
     """
-    # Discover repos if not specified
+    # Short-circuit: non-GitHub sources skip repo discovery entirely
+    if source in ("trello", "tldv-synthesis"):
+        summary = {
+            "lessons_written": 0,
+            "sources": {},
+            "skipped": 0,
+            "errors": [],
+        }
+        if source == "trello":
+            cards = get_updated_trello_cards(since_days, after=after, before=before)
+            summary["sources"]["trello"] = {"cards_found": len(cards), "processed": 0, "skipped_existing": 0, "errors": 0}
+            print(f"\n[honcho_capture] Trello: {len(cards)} cards updated in last {since_days} days")
+            for card in cards:
+                card_id = card.get("id", "")
+                name = card.get("name", "")
+                desc = card.get("desc", "") or ""
+                board_name = card.get("_board_name", "")
+                updated = card.get("dateLastUpdate", "")
+                url = card.get("shortUrl", "")
+                subject = f"Trello: {name} [{board_name}]"
+                source_ref = f"trello/{card.get('id', '')}"
+                path = build_trello_lesson_path(updated, board_name, card_id, name)
+                if path.exists():
+                    print(f"  [SKIP] {path.name} already exists")
+                    summary["sources"]["trello"]["skipped_existing"] += 1
+                    summary["skipped"] += 1
+                    continue
+                if dry_run:
+                    print(f"  [DRY] Would write: {path.name}")
+                    summary["sources"]["trello"]["processed"] += 1
+                    continue
+                summary["sources"]["trello"]["processed"] += 1
+                print(f"  [PROC] Card: {name[:50]}")
+                content = extract_trello_lesson_via_llm(name, desc, board_name, url, updated, model)
+                if content is None:
+                    summary["sources"]["trello"]["errors"] += 1
+                    summary["errors"].append(f"trello/{card_id}: LLM call failed")
+                    continue
+                fm = parse_frontmatter(content)
+                if fm.get("skip_reason") == "trivial":
+                    print(f"    [SKIP] Trivial card")
+                    summary["skipped"] += 1
+                    continue
+                try:
+                    path.write_text(content.strip() + "\n")
+                    print(f"    [WROTE] {path.name}")
+                    summary["lessons_written"] += 1
+                except Exception as e:
+                    summary["sources"]["trello"]["errors"] += 1
+                    summary["errors"].append(f"trello/{card_id}: write failed — {e}")
+        elif source == "tldv-synthesis":
+            lessons = synthesize_tldv_lessons(since_days, model, dry_run, after=after, before=before)
+            summary["sources"]["tldv"] = {"found": len(lessons), "processed": 0, "errors": 0}
+            for lesson in lessons:
+                fm = parse_frontmatter(lesson)
+                subject = fm.get("subject", "tldv-synthesis")
+                date_str = datetime.now().strftime("%Y-%m-%d")
+                slug = slugify(subject)
+                path = LESSONS_DIR / f"{date_str}-{slug}-tldv-synthesis.md"
+                if path.exists():
+                    print(f"  [SKIP] {path.name} already exists")
+                    summary["skipped"] += 1
+                    continue
+                if not dry_run:
+                    path.write_text(lesson.strip() + "\n")
+                    print(f"    [WROTE] {path.name}")
+                summary["lessons_written"] += 1
+                summary["sources"]["tldv"]["processed"] += 1
+        return summary
+
+    # GitHub sources: discover or validate repos
     if repos is None:
         print(f"[honcho_capture] Discovering repos in org {org} with >= {min_activity} merged PRs in last {since_days} days...")
         all_repos = list_org_repos(org)
@@ -570,21 +707,12 @@ def run(
     else:
         print(f"[honcho_capture] Processing {len(repos)} repos: {repos}")
 
-    # Short-circuit: non-GitHub sources don't need repo discovery
-    if source in ("trello", "tldv-synthesis"):
-        summary = {
-            "lessons_written": 0,
-            "sources": {},
-            "skipped": 0,
-            "errors": [],
-        }
-    else:
-        summary = {
-            "lessons_written": 0,
-            "sources": {},
-            "skipped": 0,
-            "errors": [],
-        }
+    summary = {
+        "lessons_written": 0,
+        "sources": {},
+        "skipped": 0,
+        "errors": [],
+    }
 
     for repo in repos:
         prs = get_merged_prs(org, repo, since_days, after=after, before=before)
@@ -703,76 +831,6 @@ def run(
                 except Exception as e:
                     summary["sources"][repo]["errors"] += 1
                     summary["errors"].append(f"{org}/{repo} issue#{number}: write failed — {e}")
-
-    # ── Trello Cards ──────────────────────────────────────────────────────────
-    if source == "trello":
-        cards = get_updated_trello_cards(since_days)
-        summary["sources"]["trello"] = {"cards_found": len(cards), "processed": 0, "skipped_existing": 0, "errors": 0}
-        print(f"\n[honcho_capture] Trello: {len(cards)} cards updated in last {since_days} days")
-        for card in cards:
-            card_id = card.get("id", "")
-            name = card.get("name", "")
-            desc = card.get("desc", "") or ""
-            board_name = card.get("_board_name", "")
-            updated = card.get("dateLastUpdate", "")
-            url = card.get("shortUrl", "")
-            path = build_trello_lesson_path(updated, board_name, card_id, name)
-
-            if path.exists():
-                print(f"  [SKIP] {path.name} already exists")
-                summary["sources"]["trello"]["skipped_existing"] += 1
-                summary["skipped"] += 1
-                continue
-
-            if dry_run:
-                print(f"  [DRY] Would write: {path.name}")
-                summary["sources"]["trello"]["processed"] += 1
-                continue
-
-            summary["sources"]["trello"]["processed"] += 1
-            print(f"  [PROC] Card: {name[:50]}")
-
-            content = extract_trello_lesson_via_llm(name, desc, board_name, url, updated, model)
-            if content is None:
-                summary["sources"]["trello"]["errors"] += 1
-                summary["errors"].append(f"trello/{card_id}: LLM call failed")
-                continue
-
-            fm = parse_frontmatter(content)
-            if fm.get("skip_reason") == "trivial":
-                print(f"  [SKIP] Trivial card")
-                summary["skipped"] += 1
-                continue
-
-            try:
-                path.write_text(content.strip() + "\n")
-                print(f"  [WROTE] {path.name}")
-                summary["lessons_written"] += 1
-            except Exception as e:
-                summary["sources"]["trello"]["errors"] += 1
-                summary["errors"].append(f"trello/{card_id}: write failed — {e}")
-
-    # ── TLDV Synthesis ──────────────────────────────────────────────────────
-    if source == "tldv-synthesis":
-        summary["sources"]["tldv"] = {"found": 0, "processed": 0, "errors": 0}
-        lessons = synthesize_tldv_lessons(since_days, model, dry_run)
-        summary["sources"]["tldv"]["found"] = len(lessons)
-        for lesson in lessons:
-            fm = parse_frontmatter(lesson)
-            subject = fm.get("subject", "tldv-synthesis")
-            date_str = datetime.now().strftime("%Y-%m-%d")
-            slug = slugify(subject)
-            path = LESSONS_DIR / f"{date_str}-{slug}-tldv-synthesis.md"
-            if path.exists():
-                print(f"  [SKIP] {path.name} already exists")
-                summary["skipped"] += 1
-                continue
-            if not dry_run:
-                path.write_text(lesson.strip() + "\n")
-                print(f"  [WROTE] {path.name}")
-            summary["lessons_written"] += 1
-            summary["sources"]["tldv"]["processed"] += 1
-        return summary
 
     return summary
 
