@@ -36,17 +36,17 @@ def slugify(text: str) -> str:
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
 MODEL = "gpt-4o-mini"
 
-SYSTEM_PROMPT = """You are a senior engineer writing a concise lesson from a GitHub PR.
+SYSTEM_PROMPT_TEMPLATE = """You are a senior engineer writing a concise lesson from a GitHub {item_type}.
 Output ONLY valid YAML frontmatter + lesson body in Portuguese (BR).
 No markdown code fences around the YAML. No commentary.
 
 Rules:
 - type: lesson
 - source: github
-- source_ref: "{org}/{repo}/pull/{pr_number}"
+- source_ref: "{source_ref}"
 - date: YYYY-MM-DD (BRT = UTC-3)
-- subject: "PR #N — title"
-- author: extracted from PR data or 'unknown'
+- subject: "{item_type} #N — title"
+- author: extracted from data or 'unknown'
 - tags: [category tags]
 
 Format:
@@ -62,9 +62,9 @@ Format:
 - [lesson 3 — specific, actionable]
 
 ## Source
-[GitHub PR URL]
+[GitHub URL]
 
-If the PR is trivial (typo fix, chore, dependency bump, docs-only) with no meaningful decision or lesson, output ONLY:
+If the item is trivial (typo fix, chore, dependency bump, docs-only) with no meaningful decision or lesson, output ONLY:
 ---
 type: lesson
 skip_reason: trivial
@@ -81,24 +81,31 @@ def extract_lesson_via_llm(
     merged_at: str,
     pr_url: str,
     model: str,
+    source_type: str = "pr",
 ) -> str | None:
-    """Call LLM to extract a lesson from a PR. Returns YAML+body or None on failure."""
-    source_ref = f"{org}/{repo}/pull/{pr_number}"
-    user_prompt = f"""PR #{pr_number}: {pr_title}
+    """Call LLM to extract a lesson from a PR or Issue. Returns YAML+body or None on failure."""
+    if source_type == "issues":
+        source_ref = f"{org}/{repo}/issues/{pr_number}"
+        item_type = "Issue"
+    else:
+        source_ref = f"{org}/{repo}/pull/{pr_number}"
+        item_type = "PR"
+    user_prompt = f"""{item_type} #{pr_number}: {pr_title}
 
 {('Body:\n' + pr_body) if pr_body else '(no body)'}
 
-Merged: {merged_at}
+Closed: {merged_at}
 URL: {pr_url}"""
 
     try:
         import urllib.request
         import urllib.error
 
+        system_prompt = SYSTEM_PROMPT_TEMPLATE.format(item_type=item_type, source_ref=source_ref)
         payload = {
             "model": model,
             "messages": [
-                {"role": "system", "content": SYSTEM_PROMPT.format(org=org, repo=repo, pr_number=pr_number)},
+                {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt},
             ],
             "temperature": 0.3,
@@ -190,13 +197,42 @@ def count_merged_prs(org: str, repo: str, since_days: int) -> int:
     return len(get_merged_prs(org, repo, since_days))
 
 
+def get_closed_issues(org: str, repo: str, since_days: int) -> list[dict]:
+    """Return closed issues from last N days via gh issue list."""
+    cutoff = datetime.now(timezone.utc) - timedelta(days=since_days)
+    try:
+        result = subprocess.run(
+            ["gh", "issue", "list",
+             "--repo", f"{org}/{repo}",
+             "--state", "closed",
+             "--limit", "100",
+             "--json", "number,title,body,closedAt,url,labels"],
+            capture_output=True, text=True, timeout=30,
+        )
+        if result.returncode != 0:
+            return []
+        all_issues = json.loads(result.stdout)
+        issues = []
+        for issue in all_issues:
+            try:
+                closed = datetime.fromisoformat(issue["closedAt"].replace("Z", "+00:00"))
+                if closed >= cutoff:
+                    issues.append(issue)
+            except (KeyError, ValueError):
+                continue
+        issues.sort(key=lambda i: i.get("closedAt", ""), reverse=True)
+        return issues
+    except Exception:
+        return []
+
+
 # ─── MAIN ────────────────────────────────────────────────────────────────────
 
 LESSONS_DIR = Path(__file__).parent.parent.parent / "memory" / "vault" / "lessons"
 DEFAULT_ORG = "living"
 
 
-def build_lesson_path(merged_at: str, org: str, repo: str, pr_number: int, subject: str) -> Path:
+def build_lesson_path(merged_at: str, org: str, repo: str, pr_number: int, subject: str, source_type: str = "pr") -> Path:
     """Build idempotent lesson path: YYYY-MM-DD-slug-subhash.md"""
     date_brazil = None
     try:
@@ -205,7 +241,10 @@ def build_lesson_path(merged_at: str, org: str, repo: str, pr_number: int, subje
         date_brazil = datetime.now()
     date_str = date_brazil.strftime("%Y-%m-%d")
     slug = slugify(subject)
-    source_ref = f"{org}/{repo}/pull/{pr_number}"
+    if source_type == "issues":
+        source_ref = f"{org}/{repo}/issues/{pr_number}"
+    else:
+        source_ref = f"{org}/{repo}/pull/{pr_number}"
     subhash = hashlib.sha256(source_ref.encode()).hexdigest()[:6]
     return LESSONS_DIR / f"{date_str}-{slug}-{subhash}.md"
 
@@ -217,6 +256,7 @@ def run(
     model: str,
     dry_run: bool,
     min_activity: int,
+    source: str = "github-prs",
 ) -> dict:
     """
     Main extraction loop. Returns JSON-serializable summary.
@@ -265,7 +305,7 @@ def run(
             labels = pr.get("labels", []) or []
 
             subject = f"PR #{number} — {title}"
-            path = build_lesson_path(merged_at, org, repo, number, subject)
+            path = build_lesson_path(merged_at, org, repo, number, subject, source_type="pr")
 
             # Idempotency check
             if path.exists():
@@ -284,7 +324,7 @@ def run(
             print(f"  [PROC] PR #{number}: {title[:60]}")
 
             content = extract_lesson_via_llm(
-                org, repo, number, title, body, merged_at, url, model
+                org, repo, number, title, body, merged_at, url, model, source_type="pr"
             )
             if content is None:
                 summary["sources"][repo]["errors"] += 1
@@ -308,6 +348,59 @@ def run(
                 summary["sources"][repo]["errors"] += 1
                 summary["errors"].append(f"{org}/{repo}#{number}: write failed — {e}")
 
+        # ── GitHub Issues ────────────────────────────────────────────────────
+        if source in ("github-all", "github-issues"):
+            issues = get_closed_issues(org, repo, since_days)
+            summary["sources"][repo]["issues_found"] = len(issues)
+            print(f"\n[honcho_capture] {org}/{repo}: {len(issues)} closed issues in last {since_days} days")
+            for issue in issues:
+                number = issue["number"]
+                title = issue["title"]
+                body = issue.get("body") or ""
+                closed_at = issue["closedAt"]
+                url = issue["url"]
+                labels = issue.get("labels", []) or []
+
+                subject = f"Issue #{number} — {title}"
+                path = build_lesson_path(closed_at, org, repo, number, subject, source_type="issues")
+
+                if path.exists():
+                    print(f"  [SKIP] {path.name} already exists")
+                    summary["sources"][repo]["skipped_existing"] += 1
+                    summary["skipped"] += 1
+                    continue
+
+                if dry_run:
+                    print(f"  [DRY] Would write: {path.name}")
+                    summary["sources"][repo]["processed"] += 1
+                    continue
+
+                summary["sources"][repo]["processed"] += 1
+                print(f"  [PROC] Issue #{number}: {title[:60]}")
+
+                content = extract_lesson_via_llm(
+                    org, repo, number, title, body, closed_at, url, model, source_type="issues"
+                )
+                if content is None:
+                    summary["sources"][repo]["errors"] += 1
+                    summary["errors"].append(f"{org}/{repo} issue#{number}: LLM call failed")
+                    continue
+
+                fm = parse_frontmatter(content)
+                if fm.get("skip_reason") == "trivial":
+                    print(f"    [SKIP] Trivial issue")
+                    summary["skipped"] += 1
+                    summary["sources"][repo]["skipped_existing"] += 1
+                    continue
+
+                try:
+                    path.write_text(content.strip() + "\n")
+                    print(f"    [WROTE] {path.name}")
+                    summary["lessons_written"] += 1
+                except Exception as e:
+                    summary["sources"][repo]["errors"] += 1
+                    summary["errors"].append(f"{org}/{repo} issue#{number}: write failed — {e}")
+
     return summary
 
 
@@ -321,6 +414,9 @@ if __name__ == "__main__":
                         help="Min merged PRs in period to process a repo (default: 1)")
     parser.add_argument("--model", type=str, default=MODEL, help=f"OpenAI model (default: {MODEL})")
     parser.add_argument("--dry-run", action="store_true", help="Show what would be written")
+    parser.add_argument("--source", default="github-prs",
+                        choices=["github-prs", "github-issues", "github-all", "trello", "tldv-synthesis"],
+                        help="Source type to process (default: github-prs)")
     args = parser.parse_args()
 
     result = run(
@@ -330,5 +426,6 @@ if __name__ == "__main__":
         model=args.model,
         dry_run=args.dry_run,
         min_activity=args.min_activity,
+        source=args.source,
     )
     print(json.dumps(result, indent=2, ensure_ascii=False))
