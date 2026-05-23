@@ -101,13 +101,29 @@ vault/
 **Ação:** criar script em `vault/insights/honcho_capture.py`
 **Modelo sugerido:** `fastest` (GPT-5-mini ou equivalente) — rationale de lições é curta, não precisa reasoning pesado
 
-### Gap 3 — `claude-mem` e `honcho` rodando em paralelo
-**Impacto:** mesma interação salva em duas camadas distintas
+### Gap 3 — Claude Mem + Honcho: dual stack temporário
 **Estado atual:**
-- Slot: `openclaw-honcho` ✅
-- Worker `claude-mem` na porta 37777: ainda subindo (mesmo com slot diferente)
-- `observationFeed` do `claude-mem`: ativo, publicando no Telegram
-**Ação:** avaliar se mantém `claude-mem` como backup ou desativa
+| Sistema | Armazenado | Tamanho | Papel |
+|---|---|---|---|
+| Claude Mem | 19,922 observations, 8,610 summaries | 94 MB, 1,838 sessões | **Busca** — histórico conversacional completo |
+| Honcho | 11 sessões (zero histórico) | — | **Raciocínio** — peer representations, conclusões |
+
+**Honcho NÃO substitui o Claude Mem.** Fazem coisas diferentes:
+- **Claude Mem** = motor de **busca** sobre histórico (encontra "onde discutimos X")
+- **Honcho** = motor de **raciocínio** sobre pessoas/projetos/decisões (模型 representa o peer)
+
+**Arquitectura de coexistência (decisão):**
+
+| Fase | Claude Mem | Honcho |
+|---|---|---|
+| **Agora** | Search ativo (18 anos de contexto) | Reasoning ativo (começa do zero) |
+| **30 dias** | Search | Reasoning com 1 mês de peer memory |
+| **Maturidade Honcho** | Mantido como backup | Vira fonte primária de contexto |
+| **Migração** | Export → Honcho feed | Assume 80%+ das necessidades |
+
+**Regra:** não fazer merge — os paradigmas são ortogonais. Um é storage, outro é reasoning. Melhor ter os dois com papéis claros do que forçar uma integração que nenhum dos dois precisa.
+
+**Ação Gap 3:** nenhuma por agora. Documentar a separação. Avaliar novamente em 30 dias.
 
 ### Gap 4 — Cron `honcho-lessons-capture` não existe
 **Impacto:** pipeline de extração de lições não existe como job agendado
@@ -184,7 +200,48 @@ TLDV/Supabase                           vault/lessons/        search/ask
 
 ---
 
-## 5. Decisões de Design — Abertas vs Recomendadas
+## 5. Visão: Stack de Memória Completa Living
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                     AGENTE (main / memory)                   │
+│                                                             │
+│  honcho_search_conclusions  ←→  honcho_ask                  │
+│       (peer reasoning)          (context injection)          │
+├─────────────────────────────────────────────────────────────┤
+│                        HONCHO                                │
+│  Peer model: owner, agent-main, agent-memory-agent, 7426291192│
+│  Reasoning: extrai conclusões, não só armazena               │
+│  Cache semantics + storage (self-hosted desktop-link)        │
+├─────────────────────────────────────────────────────────────┤
+│                     VAULT (disk)                            │
+│  lessons/ ← honcho_capture.py (novo)                        │
+│  claims/ ← research_* (existente)                           │
+│  decisions/ ← consolidations (existente)                     │
+├─────────────────────────────────────────────────────────────┤
+│                   CLAUDE MEM                                │
+│  19,922 obs · 8,610 summaries · 1,838 sessões               │
+│  Papel: busca em histórico conversacional                   │
+│  Mantido como search backup durante maturação do Honcho     │
+└─────────────────────────────────────────────────────────────┘
+
+FONTES (ETL existente):
+  GitHub ──► research_github ──► vault/claims/
+  Trello ──► research_trello  ──► vault/claims/
+  TLDV   ──► research_tldv    ──► vault/claims/
+  + + + + + + + + + + + + + + + + + + + + + + + + + +
+  + honcho_capture.py (NOVO) extrai lições ──► lessons/
+```
+
+**Pilares da arquitectura:**
+1. **RAW facts** → Vault (disk) — source of truth, schema-rigoroso
+2. **Sabedoria** → lessons/ + Honcho — reasoning derivado
+3. **Histórico** → Claude Mem — busca em 18 anos de contexto
+4. **Não há merge** — cada camada tem domínio claro
+
+---
+
+## 6. Decisões de Design — Abertas vs Recomendadas
 
 | Decisão | Status | Recomendação |
 |---|---|---|
@@ -192,27 +249,30 @@ TLDV/Supabase                           vault/lessons/        search/ask
 | Granularidade | Aberta | **Por decisão** (não por PR) — mais granular, menos ruído |
 | Deduplicação | Aberta | Hash de `what_happened + subject` → ID único |
 | Retenção | Aberta | lessons nunca expiram; relevância avaliada no retrieval |
-| claude-mem backup? | Aberta | Manter por 30 dias como fallback, depois avaliar |
+| Claude Mem | **Decidido** | Manter como search backup durante maturação Honcho |
+| Merge | **Decidido** | Não fazer — paradigmas ortogonais, papéis claros |
+| ObservationFeed | **Decidido** | Manter (duplica Telegram mas não corrompe) |
+| Desligar Claude Mem | **Bloqueado** | Só após Honcho ter 6 meses de peer memory |
 
 ---
 
-## 6. Checklist de Execução
+## 7. Checklist de Execução
 
 - [ ] QW-1: Criar `memory/vault/lessons/` + template
 - [ ] QW-2: Escrever 3-5 lessons manuais
 - [ ] QW-3: Criar `honcho_capture.py` mínimo
 - [ ] QW-4: Criar cron `honcho-lessons-capture`
 - [ ] QW-5: Validar retrieval no Honcho
-- [ ] Gap 3: Decidir destino do `claude-mem` (manter ou desativar)
+- [x] Gap 3: Decidir destino do `claude-mem` — **DECIDIDO: manter como search backup**
 - [ ] Gap 5: Implementar fallback Honcho→disk na skill vault-query
 - [ ] Gap 6: Validar schema de decisões (1 arquivo existente)
 
 ---
 
-## 7. Nota sobre Spec Original
+## 8. Nota sobre Spec Original
 
 A spec `2026-05-23-honcho-memory-consolidation-design.md` diz "Honcho currently disabled" — **está desatualizada**. O plugin foi habilitado manualmente em 2026-05-23. O spec precisa ser atualizado com o estado real.
 
 ---
 
-_Livy · 2026-05-23_
+_Livy · 2026-05-23 · atualizado 2026-05-23 (visão dual-stack Claude Mem + Honcho)
