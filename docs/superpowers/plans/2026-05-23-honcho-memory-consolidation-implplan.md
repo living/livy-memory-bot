@@ -26,11 +26,12 @@
 | QW-1: `memory/vault/lessons/` + TEMPLATE | ✅ done |
 | QW-2: 5 manual lessons (PR #17,18,19,23,24) | ✅ done |
 | QW-3: `honcho_capture.py` ETL (PRs only) | ✅ done |
-| **QW-3b: GitHub Issues + Comments** | **TODO** |
-| **QW-3d: Trello cards/checklists** | **TODO** |
-| **QW-3e: TLDV synthesis** | **TODO** |
-| **QW-5: `honcho-query` skill** | **TODO** |
-| **QW-6: Validate Honcho retrieval** | **TODO** |
+| QW-3b: GitHub Issues + Comments | ✅ done |
+| QW-3d: Trello cards/checklists | ✅ done |
+| QW-3e: TLDV synthesis | ✅ done |
+| QW-5: `honcho-query` skill | ✅ done |
+| QW-6: Validate Honcho retrieval | ✅ done |
+| **QW-5 (Phase 5): Update `honcho-lessons-capture` cron with all sources** | **✅ done** |
 
 ---
 
@@ -627,14 +628,14 @@ git commit -m "QW-3e: honcho_capture — add TLDV synthesis (multi-meeting lesso
 
 ---
 
-## Phase 5 — Cron Update
+## Phase 5 — Cron Update ✅ DONE
 
-### Task: Update `honcho-lessons-capture` Cron with New Sources
+### Task: Update `honcho-lessons-capture` Cron with New Sources ✅ DONE
 
 **Files:**
-- Modify: cron `honcho-lessons-capture` (via `openclaw cron update`)
+- Modify: `~/.openclaw/cron/jobs.json` (direct edit — openclaw CLI was hanging)
 
-- [ ] **Step 1: Update cron message to include all sources**
+- [x] **Step 1: Updated cron message via direct JSON edit**
 
 Current message:
 ```
