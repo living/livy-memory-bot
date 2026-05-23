@@ -302,6 +302,38 @@ def build_tldv_lesson_path(meeting_id: str, meeting_name: str, meeting_date: str
     return LESSONS_DIR / f"{meeting_date}-{slug}-{subhash}.md"
 
 
+def inject_tldv_frontmatter(lesson_body: str, meeting_id: str, meeting_name: str, meeting_date: str, project: str) -> str:
+    """Inject YAML frontmatter if lesson body doesn't have it.
+    The LLM often skips frontmatter; this ensures every lesson has one.
+    """
+    if lesson_body.strip().startswith("---"):
+        return lesson_body  # already has frontmatter
+
+    import re
+    # Try to extract subject and date from first heading: ## Meeting: {name} ({date})
+    m = re.match(r"##\s+Meeting:\s+(.+?)\s+\((\d{4}-\d{2}-\d{2})\)", lesson_body.strip())
+    if m:
+        extracted_name = m.group(1).strip()
+        extracted_date = m.group(2).strip()
+    else:
+        extracted_name = meeting_name
+        extracted_date = meeting_date
+
+    fm_lines = [
+        "---",
+        f"type: lesson",
+        f"source: tldv",
+        f"source_ref: \"tldv/{meeting_id}\"",
+        f"date: {extracted_date}",
+        f"subject: \"{extracted_name}\"",
+        f"project: {project}",
+        f"tags: [{project.lower()}, tldv, meeting]",
+        "---",
+        "",
+    ]
+    return "\n".join(fm_lines) + lesson_body.strip()
+
+
 # ─── TLDV SYNTHESIS ───────────────────────────────────────────────────────────
 
 
@@ -391,7 +423,7 @@ Auto-generated from TLDV transcripts (Azure Blob)
 
 
 def extract_tldv_lessons(since_days: int, model: str, dry_run: bool = False,
-                          after: str | None = None, before: str | None = None) -> list[str]:
+                          after: str | None = None, before: str | None = None) -> list[tuple[str,str,str,str,str]]:
     """
     Extract one lesson per TLDV meeting transcript (individual, not grouped).
     Fetches all meetings in lookback window, then filters by after/before range.
@@ -473,7 +505,9 @@ def extract_tldv_lessons(since_days: int, model: str, dry_run: bool = False,
             model=model,
         )
         if lesson:
-            lessons.append(lesson)
+            # Inject frontmatter (LLM often skips it)
+            lesson = inject_tldv_frontmatter(lesson, meeting_id, name, date_str, project)
+            lessons.append((meeting_id, name, date_str, project, lesson))
     return lessons
 
 
@@ -762,14 +796,8 @@ def run(
         elif source == "tldv-synthesis":
             raw_lessons = extract_tldv_lessons(since_days, model, dry_run, after=after, before=before)
             summary["sources"]["tldv"] = {"found": len(raw_lessons), "processed": 0, "errors": 0}
-            for lesson in raw_lessons:
-                fm = parse_frontmatter(lesson)
-                subject = fm.get("subject", "meeting")
-                date_str = fm.get("date", datetime.now().strftime("%Y-%m-%d"))
-                # Extract meeting_id from source_ref: "tldv/{id}"
-                source_ref = fm.get("source_ref", "tldv/unknown")
-                meeting_id = source_ref.split("/")[-1] if "/" in source_ref else "unknown"
-                path = build_tldv_lesson_path(meeting_id, subject, date_str)
+            for meeting_id, name, date_str, project, lesson in raw_lessons:
+                path = build_tldv_lesson_path(meeting_id, name, date_str)
                 if path.exists():
                     print(f"  [SKIP] {path.name} already exists")
                     summary["skipped"] += 1
