@@ -339,4 +339,41 @@ Commits: 9f57022 (stale thresholds) + 38c12c3 (archive exclusion).
 Motivo: todas representavam persons já indexados (TLDV person-id variants
 ou confidence variants). Emails das variants merged nos canonicals.
 Resultado: 6 orphans → 0 orphans.
-_Last updated: 2026-05-22_
+### 2026-05-23 — ETL honcho_capture: cycle_time + effort + pr_refs + 99 repos auto-discover
+
+Evolução do ETL `honcho_capture.py` para extração rica de lições:
+
+**Novos campos extraídos:**
+- `cycle_time` — tempo entre primeiro commit e merge (GitHub `createdAt` → `mergedAt`). Formato legível: `19m`, `4h 30m`, `2d 5h`.
+- `effort` — custom field `Effort` (number) dos cards Trello quando preenchido. Value ou `Not specified`.
+- `pr_refs` — URLs GitHub extraídas das descrições dos cards Trello (regex `github.com/([\w-]+)/([\w.-]+)/pull/(\d+)` → `org/repo#N`).
+
+**Bugs corrigidos:**
+- `gh pr list --json` com campo inexistente `commentsCount` → agora usa só `number,title,body,mergedAt,url,labels,createdAt`
+- `count_merged_prs` não propagava `after`/`before` → agora propaga para `get_merged_prs`
+- `get_merged_prs` com range explícito `after`+`before` tinha `cutoff` a bloquear → cutoff é `None` quando há range explícito
+- `get_closed_issues` mesmo problema de cutoff condicional → corrigido
+
+**Auto-discover de repos:** `list_org_repos()` descobre todos os 99 repos activos da org `living` em vez de lista hardcoded.
+
+**Resultado:** backfill completo W1-W5 (Abr 1 – Mai 7):
+- 40 PR lessons com `cycle_time` (todos os repos living)
+- 98+ Trello lessons com `effort` + `pr_refs`
+- 0 PRs em W1 (primeiro merge: 2026-04-07 #2, 2026-04-10 #3)
+- 0 cards Trello em W1 (primeira activity: 2026-04-08)
+
+**Commits:** `7026794` (cycle_time+effort+pr_refs), `a98a9fc` (lessons W3)
+
+Topic file: `memory/curated/livy-memory-agent.md`
+
+### 2026-05-23 — Crosslink Trello ↔ GitHub
+
+Script `build_trello_pr_crosslink.py` cria edges em `memory/vault/relationships/trello-pr.json`:
+- Trello → PR: via `pr_refs` nas descrições dos cards
+- PR → Trello: via URLs `trello.com/c/{card_id}` nos bodies de PR
+
+**Resultado:** 0 edges (cards Trello não têm `pr_refs` preenchidos; PR bodies não têm URLs Trello). Crosslink existe como estrutura — basta preencher `pr_refs` nos cards ou Trello URLs nos PRs para activar.
+
+Topic file: `memory/curated/livy-memory-agent.md`
+
+_Last updated: 2026-05-23__

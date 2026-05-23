@@ -784,3 +784,27 @@ QUALITY_GUARDRAIL_CONSECUTIVE_TRIGGER = 3   # era 2
     "alert_emitted": false
   }
 }
+## Consolidation 2026-05-23T22:45:00+00:00
+
+**Mente Coletiva:** memory-agent (this session)
+**Dry run:** No
+
+### Mudanças de hoje (2026-05-23)
+
+**ETL honcho_capture — Campos novos:**
+- `cycle_time` adicionado ao frontmatter das lessons GitHub (createdAt → mergedAt)
+- `effort` e `pr_refs` capturados dos cards Trello
+- Bugs corrigidos: commentsCount inexistente, cutoff condicional, count_merged_prs
+
+**Backfill completo W1-W5 (Abr 1 – Mai 7):**
+- 40 PR lessons com cycle_time (todos os repos living)
+- 98+ Trello lessons com effort + pr_refs
+- Per-meeting TLDV extraction confirmada (cada reunião = 1 ficheiro)
+
+**Crosslink Trello↔GitHub:**
+- `trello-pr.json` criado com estrutura de edges
+- 0 edges activos (cards sem pr_refs, PRs sem URLs Trello)
+
+**Commits:** `7026794` (cycle_time+effort+pr_refs), `a98a9fc` (lessons W3)
+
+**Meta:** backfill Mai 7+ (continuar na próxima sessão)
