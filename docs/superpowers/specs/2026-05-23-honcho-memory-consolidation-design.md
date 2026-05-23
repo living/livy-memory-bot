@@ -183,6 +183,8 @@ O ETL (Python) e a skill honcho-query (JS) devem usar exactamente este algoritmo
 
 **Regra:** Se arquivo já existe, skip (idempotência garantida pelo path único).
 
+**Lições manuais (QW-2) são atômicas:** o ETL nunca sobrescreve — se alguém editar uma lesson manualmente, o filename permanece o mesmo mas o conteúdo diverge. Rerroar o ETL com o mesmo `source_ref` causa skip porque o path já existe. Isso é intencional: lições manuais têm precedência sobre extracção automatica.
+
 **Formato de cada lesson:**
 ```yaml
 ---
