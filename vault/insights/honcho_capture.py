@@ -1037,24 +1037,66 @@ if __name__ == "__main__":
                         help="Min merged PRs in period to process a repo (default: 1)")
     parser.add_argument("--model", type=str, default=MODEL, help=f"OpenAI model (default: {MODEL})")
     parser.add_argument("--dry-run", action="store_true", help="Show what would be written")
-    parser.add_argument("--source", default="github-prs",
+    parser.add_argument("--source", nargs="*", default=["github-prs"],
                         choices=["github-prs", "github-issues", "github-all", "trello", "tldv-synthesis"],
-                        help="Source type to process (default: github-prs)")
+                        help="Source type(s) to process (default: github-prs). Can specify multiple.")
     parser.add_argument("--after", type=str, default=None,
                         help="ISO date YYYY-MM-DD — only PRs/issues merged/closed on or after this date")
     parser.add_argument("--before", type=str, default=None,
                         help="ISO date YYYY-MM-DD — only PRs/issues merged/closed on or before this date")
     args = parser.parse_args()
 
-    result = run(
-        org=args.org,
-        repos=args.repos,
-        since_days=args.days,
-        model=args.model,
-        dry_run=args.dry_run,
-        min_activity=args.min_activity,
-        source=args.source,
-        after=args.after,
-        before=args.before,
-    )
-    print(json.dumps(result, indent=2, ensure_ascii=False))
+    # Normalize: --source github-prs github-issues trello tldv-synthesis
+    sources = args.source if args.source else ["github-prs"]
+    # Validate each source
+    all_choices = {"github-prs", "github-issues", "github-all", "trello", "tldv-synthesis"}
+    for s in sources:
+        if s not in all_choices:
+            parser.error(f"invalid source: {s}")
+
+    if len(sources) == 1:
+        # Single source: same as before
+        result = run(
+            org=args.org,
+            repos=args.repos,
+            since_days=args.days,
+            model=args.model,
+            dry_run=args.dry_run,
+            min_activity=args.min_activity,
+            source=sources[0],
+            after=args.after,
+            before=args.before,
+        )
+        print(json.dumps(result, indent=2, ensure_ascii=False))
+    else:
+        # Multiple sources: run each sequentially, merge summaries
+        merged = {
+            "lessons_written": 0,
+            "sources": {},
+            "skipped": 0,
+            "errors": [],
+        }
+        for src in sources:
+            print(f"\n{'='*60}")
+            print(f"[honcho_capture] Source: {src}")
+            print(f"{'='*60}")
+            r = run(
+                org=args.org,
+                repos=args.repos,
+                since_days=args.days,
+                model=args.model,
+                dry_run=args.dry_run,
+                min_activity=args.min_activity,
+                source=src,
+                after=args.after,
+                before=args.before,
+            )
+            merged["lessons_written"] += r.get("lessons_written", 0)
+            merged["skipped"] += r.get("skipped", 0)
+            merged["errors"].extend(r.get("errors", []))
+            for k, v in r.get("sources", {}).items():
+                merged["sources"][k] = v
+        print(f"\n{'='*60}")
+        print(f"[honcho_capture] TOTAL SUMMARY")
+        print(f"{'='*60}")
+        print(json.dumps(merged, indent=2, ensure_ascii=False))
