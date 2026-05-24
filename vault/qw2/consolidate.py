@@ -23,7 +23,7 @@ DECISIONS_DIR = _WS / "memory" / "vault" / "decisions"
 # Handles both buggy format (**Source:e**) and correct format (**Source:**)
 
 _ENTRY_RE_RAW = re.compile(
-    r"(?:\n|^)### (\d{4}-\d{2}-\d{2}) [—-] (\w+)\n> ([^\n]+)\n\n- \*\*(\w+(?:\s+\w+)*):\*\* (.+)\n- \*\*(\w+(?:\s+\w+)*):\*\* (.+)\n(?:- \*\*(\w+(?:\s+\w+)*):\*\* (.+)\n)?"
+    r"(?:\n|^)### (\d{4}-\d{2}-\d{2}) [—-] (\w+)\n\n> ([^\n]+)\n\n- \*\*(\w+(?:\s+\w+)*):\*\* (.+)\n- \*\*(\w+(?:\s+\w+)*):\*\* (.+)\n(?:- \*\*(\w+(?:\s+\w+)*):\*\* (.+)\n)?"
 )
 
 # Matches frontmatter and consumes 1-3 trailing newlines before entries
