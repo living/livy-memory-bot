@@ -69,7 +69,7 @@ _Atualizado: 2026-05-23 22:45 UTC (19:45 BRT)_
 
 | Mudança | Impacto |
 |---|---|
-| ✅ PR #13 mergeada (`bccbef7`) — 6 quick wins de insights | Pipeline de insights incorporado ao master |
+| ✅ **QW-2 E2E validado** — 134 decisions, 45 escritas, 0 falhas | Fix: `fetch_tldv` usava `fetch_meeting()` em vez de `fetch_summaries()`; GitHub 1 query org-wide vs per-repo rate limit; `fetch_github` lia `event[payload]` inexistente |
 | ✅ PR #14 mergeada (`a8f3626`) — envio real Telegram no `envia_resumo.py` | Resumo semanal automatizado com dedupe |
 | ✅ PR #15 mergeada (`6ea8005`) — fallback `TELEGRAM_TOKEN` | Compatibilidade com ambiente de produção atual |
 | 🆕 Cron `vault-insights-weekly-validate` | Validação preventiva semanal antes da geração |

@@ -40,6 +40,23 @@
 
 ## 🗂️ Decisões Registradas
 
+### 2026-05-24 — QW-2 Pipeline: RAW → Topic Files (E2E validado)
+
+QW-2 é o pipeline de decisões que extrai de TLDV + GitHub + Trello para topic files em `memory/vault/decisions/`.
+
+**Bugs corrigidos durante validação E2E:**
+- `fetch_tldv`: `fetch_meeting()` retorna `{}` para meetings sem transcript — o campo `decisions`/`topics` está em `fetch_summaries(meeting_id)`
+- `fetch_tldv`: usava campo `id` em vez de `meeting_id` no objeto meeting
+- `fetch_tgithub` (QW-2): lia `event["payload"]` inexistente — GitHubClient retorna eventos normalizados diretamente
+- GitHubClient: tinha 4 repos hardcoded + 1 query/repo (rate limit) — refeito para 1 query org-wide com `is:pr merged:>DATE org:living --paginate`
+
+**Resultado E2E (30 dias):** 134 processados → 45 escritos (TLDV 63 + GitHub 69 + Trello 2), 0 routing failures.
+
+**Arquitetura:** `vault/qw2/run.py` + `fetchers/` (tldv/trello/github) + `router.py` + `writer.py` + `cursor.py` + `filter.py` + `callbacks.py`
+**Commits:** `e5cd05d` (fetch_tldv) → `2c63c8e` (trello) → `5abcb1b` (github org-wide)
+
+Topic file: `memory/curated/livy-memory-agent.md`
+
 ### 2026-04-12 — Crosslink pipeline fix: PR author resolution via `github-login-map.yaml`
 
 Correção do pipeline `vault-crosslink` para resolver autores de PR com mapeamento explícito login→identidade. Resultado validado em produção/desenvolvimento: 729 edges com 31 PR authors resolvidos.
@@ -390,4 +407,4 @@ Extensão do backfill W1-W5 para o período Mai 7–23 via `honcho_capture.py` c
 
 Commit: `0659bf1` | Topic file: `memory/curated/livy-memory-agent.md`
 
-_Last updated: 2026-05-23__
+_Last updated: 2026-05-24_

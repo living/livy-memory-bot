@@ -626,12 +626,53 @@ python3 -m pytest tests/research/ -q           # 321 tests (inclui Trello pipeli
 
 ---
 
+## QW-2 Pipeline — RAW → Topic Files
+
+**Data:** 2026-05-24
+**E2E:** 134 decisions processadas, 45 escritas, 0 routing failures
+
+### Arquitetura
+
+```
+vault/qw2/
+├── run.py              # Entry point, run(source, dry_run, since_days)
+├── fetch_tldv.py       # TLDV summaries extraction
+├── fetch_github.py     # GitHub org-wide merged PRs
+├── fetch_trello.py     # Trello card snapshots
+├── router.py           # Route to topic file by board/project
+├── writer.py           # Append decision to topic file with frontmatter
+├── cursor.py           # Track cursor per source (last_seen_at)
+├── filter.py           # should_skip logic (confidence, length)
+├── callbacks.py        # Pending DM + notification callbacks
+└── rollback.py         # Undo last write run
+```
+
+### Bugs Encontrados e Corrigidos
+
+| Bug | Symptom | Fix |
+|---|---|---|
+| `fetch_tldv` usava `fetch_meeting()` | Meetings retornavam `{}`; 0 decisões | Usar `fetch_summaries(meeting_id)` para decisions/topics |
+| `fetch_tldv` usava `id` em vez de `meeting_id` | Meetings não encontrados na API | Campo correto é `meeting_id` |
+| `fetch_github` lia `event["payload"]` | 0 decisões GitHub mesmo com PRs | GitHubClient retorna eventos normalizados diretamente |
+| GitHubClient: 4 repos hardcoded + per-repo search | Rate limit em 157 repos | 1 query org-wide `is:pr merged:>DATE org:living --paginate` |
+| Trello snapshots sem campo `date` | KeyError em writer | Enriquecer no processor com `datetime.now` |
+
+### Commits
+
+- `e5cd05d` — fix(qw2): fetch_tldv uses fetch_summaries not fetch_meeting
+- `2c63c8e` — fix(qw2): enrich trello snapshots with missing fields
+- `5abcb1b` — fix(qw2): github org-wide search + fix fetch_github field access
+
+---
+
 ## Regras Aprendidas
 
 - `add_frontmatter`: +1 (bom trabalho)
 - `archive_file`: -1 (não archive ainda)
 - `agent_id`: sempre verificar com `openclaw agents list` antes de delegar
 - `accountId`: não reutilizar tokens entre contas Telegram
+- `fetch_tldv`: summaries é endpoint separado de meeting
+- `gh api search`: usar `--paginate` para buscar tudo de uma vez
 
 ## Notas de Operação
 
