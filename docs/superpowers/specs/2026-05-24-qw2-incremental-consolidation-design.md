@@ -14,7 +14,31 @@ QW-2 extrai decisões de TLDV + GitHub + Trello para topic files em `memory/vaul
 2. **Honcho indexing** — decisões indexadas como conclusões no Honcho com supersedes chain
 3. **Fact-check enrichment** — `confidence_level` calculado via `vault/fact_check.py`
 
-**Padrão arquitectural:** Eventually consistent — QW-2 escreve para topic files → consolidação deduplica + enricha → Honcho indexing.
+**Padrão arquitectural:** Eventually consistent — QW-2 escreve para topic files → consolidação deduplica + enricha + adiciona frontmatter → Honcho indexing.
+
+**Topic file format real (existente):**
+```markdown
+### YYYY-MM-DD — source
+
+> Decision text
+
+- **Source:** source_ref
+- **Confidence:** 0.92        ← numeric, 0.0–1.0 (QW-2 original)
+- **Tags:** tag1, tag2
+```
+
+**Após consolidação** (`consolidate.py`), é adicionado frontmatter:
+```markdown
+---
+name: topic-name
+confidence_level: high        ← string: high/medium/low/unverified (fact-check output)
+---
+
+### YYYY-MM-DD — source
+...
+```
+
+**Nota:** Entries existentes (antes da primeira consolidação) não têm frontmatter nem `confidence_level`. Primeira execução do `consolidate.py` adiciona ambos.
 
 ---
 
@@ -90,6 +114,8 @@ QW-2 extrai decisões de TLDV + GitHub + Trello para topic files em `memory/vaul
 --all         Consolida todos os topic files (padrão)
 --topic NAME  Consolida só o topic file NAME (sem .md)
 --dry-run     Não modifica ficheiros, só mostra o que faria
+--reset       Limpa frontmatter confidence_level de todos os topic files
+              (força recalculo de fact-check na próxima execução)
 ```
 
 **Return dict:**
@@ -128,6 +154,27 @@ payload = {
 4. Se existe: constrói content com `supersedes: <old_id>`
 5. Se não existe: constrói content sem supersedes
 6. POST para `POST /v3/workspaces/{workspace}/conclusions`
+
+**POST `/v3/workspaces/{workspace_id}/conclusions`** — Required fields (API schema):
+```json
+{
+  "conclusions": [{
+    "content": "DECISION | {date} | {text[:200]} | {source_ref} | confidence:{level} | tags:{tags}[ | supersedes: {id}]",
+    "observer_id": "agent-memory-agent",   // required by API
+    "observed_id": "agent-main"            // required by API — use agent-main for all
+  }]
+}
+```
+
+**GET `/conclusions/query`** — Requires `filters` with `observer_id` + `observed_id` (not pure semantic):
+```json
+{
+  "query": "source_ref:tldv:abc123",
+  "top_k": 3,
+  "filters": {"observer_id": "agent-memory-agent", "observed_id": "agent-main"}
+}
+```
+Pure semantic query without filters → `422 {"detail":"observer and observed must be specified for semantic search"}`.
 
 **Content format:**
 ```
@@ -179,7 +226,8 @@ def enrich_decisions(decisions: list[dict]) -> list[dict]:
 - Para TLDV: source="tldv" → `official+=1`
 - Para GitHub: source="github" → `official+=1`
 - Para Trello: source="trello" → `indirect+=1`
-- Se a entry já tem `confidence_level`, skip (não recalcula)
+- Se frontmatter já tem `confidence_level`, skip (não recalcula)
+- Usa `score_confidence(official, corroborated, indirect)` → high/medium/low/unverified
 
 ### 3.4 `vault/qw2/run.py` — Flags de Reset
 
@@ -322,6 +370,8 @@ def test_reset_cursors_keeps_dedupe():
 | R1 | Honcho rate limit ao indexar | 🟡 Média | Perde entries | Batch 50, retry 3x, log falhas |
 | R2 | Consolidação reescreve e perde entries | 🔴 Baixa | Critical | `--dry-run` obrigatório antes de `--all` |
 | R3 | `--reset` limpa dedupe e duplica | 🟡 Média | Alto | Consolidação dedupe corre após reset (cron) |
+| R6 | Dedupe regex não captura entries com frontmatter multilinha | 🟢 Baixa | Baixo | Regex com re.DOTALL treat frontmatter como optional group |
+| R7 | Honcho conclusions crescem sem cleanup (dedupe só no topic file) | 🟡 Média | Médio | Adicionar `DELETE /conclusions/{id}` para entries removidas pelo dedupe |
 | R4 | Fact-check lento em topic files grandes | 🟡 Média | Médio | Skip entries com `confidence_level` já calculado |
 | R5 | QW-2 demorar > 1h e overlap com consolidate | 🟡 Média | Médio | Lock com TTL 600s + gap de 1h assume QW-2 < 1h |
 
