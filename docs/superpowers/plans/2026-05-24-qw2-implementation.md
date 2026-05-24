@@ -1100,7 +1100,7 @@ def run(source: str = "all", dry_run: bool = True, since_days: int = 7) -> dict:
         }
 
         # Always dry-run unless confirmed
-        actual_dry_run = dry_run or not is_confirmed()
+        actual_dry_run = dry_run or not is_auto_write_enabled()
         if actual_dry_run:
             print("[QW-2] DRY-RUN — no writes")
 
@@ -1342,7 +1342,7 @@ def handle_reject(claim_id: str) -> str:
 ```python
 # tests/qw3/test_callbacks_idempotent.py
 import pytest
-from vault.qw3.callbacks import handle_confirm, handle_reject, is_confirmed, is_rejected
+from vault.qw3.callbacks import handle_confirm, handle_reject, is_confirmed, is_rejected, is_auto_write_enabled
 
 def test_confirm_idempotent(tmp_path, monkeypatch):
     monkeypatch.setattr("vault.qw3.callbacks.QW2_BASE", tmp_path)
