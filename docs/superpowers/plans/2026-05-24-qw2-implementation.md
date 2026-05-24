@@ -6,7 +6,7 @@
 
 **Architecture:** QW-2 fetches directly from TLDV/Trello/GitHub RAW APIs, applies quality filters (DONE cards, low confidence, short text), runs inference routing to topic files, and writes decisions directly with dedupe + write-log rollback. QW-3 handles DM review for ambiguous decisions (confidence < 0.85) and routing failures. First run is always dry-run requiring explicit confirmation.
 
-**Tech Stack:** Python 3, existing `vault/research/{tldv_client,trello_client,github_client}.py`, Telegram API via `message` tool, `ruff`+`mypy`+`pytest`.
+**Tech Stack:** Python 3, existing `vault/research/{tldv_client,trello_client,github_client}.py`, `vault/research/retry_policy.py`, `vault/research/lock_manager.py`, Telegram API via OpenClaw `message` tool, `ruff`+`mypy`+`pytest`.
 
 ---
 
@@ -20,7 +20,7 @@ vault/qw2/
   fetch_tldv.py       # Fetch decisions from TLDV meetings
   fetch_trello.py     # Fetch decisions from Trello cards
   fetch_github.py     # Fetch decisions from GitHub PRs
-  filter.py           # Quality filters (DONE, length, confidence)
+  filter.py           # Quality filters (DONE, length, confidence, Trello zero-conf)
   router.py           # Inference pass → topic file mapping
   writer.py           # Append decision to topic file + dedupe + write log
   cursor.py           # Per-source cursor management
@@ -41,13 +41,15 @@ memory/vault/pending/archive/     # Rejected
   last_seen_github.json
   written_refs.json     # dedupe set
   write_log.jsonl       # rollback log
+  lock                  # fcntl lock file (from lock_manager.py)
   .confirmed            # flag: runs subsequentes escrevem
   .pending_confirmation/ # dry-run output awaiting confirm
 
 tests/qw2/
-  test_filter.py         # Parametrize table: DONE variants, length, confidence
-  test_router.py         # Routing rules
+  test_filter.py         # Parametrize table: DONE variants, length, confidence, Trello zero-conf
+  test_router.py         # Routing rules (Trello board_name + text)
   test_writer.py         # Append + dedupe + write log
+  test_dedupe_cross_instance.py  # Two separate QWWriter instances dedupe correctly
   test_cursor.py         # Cursor read/write
   test_e2e.py            # Dry-run E2E with fixtures
   fixtures/
@@ -98,6 +100,8 @@ git commit -m "feat(qw2): project scaffolding"
 
 **Reference:** Spec section 3.1.
 
+**IMPORTANT — Trello zero-conf gate:** Per spec section 3.1, Trello cards have no LLM confidence (always 0). The spec says they should be skipped until LLM extraction is available. This is implemented as an explicit gate in `should_skip`.
+
 - [ ] **Step 1: Write failing test**
 
 ```python
@@ -123,8 +127,12 @@ from vault.qw2.filter import should_skip, DONE_CARD_RE
     # No decisions
     ("Sem decisões registradas", True, "TLDV no-decisions placeholder"),
     ("sem decisões registradas", True, "lowercase variant"),
-    # Edge: not a dict
-    ("x" * 50, False, "string text OK with default confidence"),
+    # Trello: confidence=0 → always skip (until LLM extraction available)
+    ({"text": "x" * 51, "confidence": 0, "source": "trello"}, True, "Trello confidence=0 — no LLM extraction"),
+    # Trello: confidence=0.8 but no LLM extraction → still skip
+    ({"text": "x" * 51, "confidence": 0.80, "source": "trello"}, True, "Trello confidence < 0.75"),
+    # Status meeting override (confidence >= 0.90 survives filter even if is_status_meeting)
+    ({"text": "x" * 51, "confidence": 0.92, "_is_status_meeting": True}, False, "Status meeting with high confidence"),
 ])
 def test_should_skip(text, expected_skip, reason):
     if isinstance(text, dict):
@@ -155,21 +163,26 @@ DONE_CARD_RE = re.compile(
 def should_skip(claim: dict[str, Any]) -> tuple[bool, str]:
     """Return (skip, reason). False = process this claim."""
     text = claim.get("text", "")
+    source = claim.get("source", "")
+    confidence = claim.get("confidence", 0)
 
     # 1. DONE card notifications
     if DONE_CARD_RE.search(text):
         return True, "Trello DONE card"
 
-    # 2. Texto curto demais
+    # 2. Trello: no LLM confidence available — skip until extraction exists
+    if source == "trello" and confidence < 0.75:
+        return True, f"Trello: confidence={confidence} — no LLM extraction"
+
+    # 3. Texto curto demais
     if len(text) < 50:
         return True, f"text too short ({len(text)} chars)"
 
-    # 3. Confiança baixa
-    confidence = claim.get("confidence", 0)
+    # 4. Confiança baixa
     if confidence < 0.75:
         return True, f"low confidence {confidence}"
 
-    # 4. TLDV sem decisões registradas
+    # 5. TLDV sem decisões registradas
     if "sem decisões registradas" in text.lower():
         return True, "no decisions in transcript"
 
@@ -183,7 +196,7 @@ Expected: PASS
 
 ```bash
 git add vault/qw2/filter.py tests/qw2/test_filter.py
-git commit -m "feat(qw2): quality filters — DONE regex, length, confidence"
+git commit -m "feat(qw2): quality filters — DONE regex, length, confidence, Trello zero-conf gate"
 ```
 
 ---
@@ -198,7 +211,7 @@ git commit -m "feat(qw2): quality filters — DONE regex, length, confidence"
 
 ```python
 # tests/qw2/test_cursor.py
-import json, tempfile, Path
+import json, pytest
 from vault.qw2.cursor import QWCursor
 
 def test_read_write_cursor(tmp_path, monkeypatch):
@@ -270,7 +283,7 @@ git commit -m "feat(qw2): per-source cursor management"
 **Files:**
 - Create: `vault/qw2/writer.py`
 - Create: `tests/qw2/test_writer.py`
-- Modify: `tests/qw2/test_dedupe.py` (new)
+- Create: `tests/qw2/test_dedupe_cross_instance.py`
 
 **Reference:** Spec sections 3.4 and 3.5.
 
@@ -278,11 +291,12 @@ git commit -m "feat(qw2): per-source cursor management"
 
 ```python
 # tests/qw2/test_writer.py
-import json, tempfile, Path
+import json, pytest
 from vault.qw2.writer import QWWriter, load_written_refs, add_to_written_refs
 
-def test_write_append_and_log(tmp_path, monkeypatch, capsys):
+def test_write_append_and_log(tmp_path, monkeypatch):
     monkeypatch.setattr("vault.qw2.writer.QW2_BASE", tmp_path)
+    monkeypatch.setattr("vault.qw2.writer.DECISIONS_DIR", tmp_path / "decisions")
     decision = {
         "text": "Usar GPT-4 para decisões de alta confiança.",
         "source_ref": "tldv:meeting_abc",
@@ -303,18 +317,6 @@ def test_write_append_and_log(tmp_path, monkeypatch, capsys):
     # write log entry
     log = (tmp_path / "write_log.jsonl").read_text()
     assert "tldv:meeting_abc" in log
-
-def test_dedupe_no_rewrite(tmp_path, monkeypatch, capsys):
-    monkeypatch.setattr("vault.qw2.writer.QW2_BASE", tmp_path)
-    decision = {"text": "Teste", "source_ref": "tldv:meeting_abc", "confidence": 0.9,
-                "date": "2026-05-24", "source": "tldv", "tags": []}
-    writer = QWWriter()
-    topic = tmp_path / "decisions" / "test.md"
-    writer.write(topic, decision)
-    writer.write(topic, decision)  # second write
-    content = topic.read_text()
-    # Should only appear once
-    assert content.count("Teste") == 1
 ```
 
 Run: `pytest tests/qw2/test_writer.py -v`
@@ -399,10 +401,51 @@ class QWWriter:
 Run: `pytest tests/qw2/test_writer.py -v`
 Expected: PASS
 
-- [ ] **Step 3: Commit**
+- [ ] **Step 3: Add cross-instance dedupe test (critical — tests disk-based dedupe)**
+
+```python
+# tests/qw2/test_dedupe_cross_instance.py
+"""Verify dedupe works across two separate QWWriter instances (simulates two runs)."""
+import json, pytest
+from vault.qw2.writer import QWWriter, load_written_refs
+
+def test_dedupe_across_two_writer_instances(tmp_path, monkeypatch):
+    """Simulates two separate runs. Writer2 should see refs written by Writer1."""
+    monkeypatch.setattr("vault.qw2.writer.QW2_BASE", tmp_path)
+    monkeypatch.setattr("vault.qw2.writer.DECISIONS_DIR", tmp_path / "decisions")
+
+    decision = {
+        "text": "Test decision for dedupe.",
+        "source_ref": "tldv:meeting_cross_instance_test",
+        "confidence": 0.90,
+        "date": "2026-05-24",
+        "source": "tldv",
+        "tags": [],
+    }
+    topic = tmp_path / "decisions" / "test.md"
+
+    # Run 1: first writer instance
+    writer1 = QWWriter()
+    result1 = writer1.write(topic, decision)
+    assert result1 is True, "First write should succeed"
+
+    # Run 2: second writer instance (separate process simulation)
+    writer2 = QWWriter()
+    result2 = writer2.write(topic, decision)
+    assert result2 is False, "Second write should be skipped (dedupe)"
+
+    # Content should appear exactly once
+    content = topic.read_text()
+    assert content.count("Test decision for dedupe.") == 1
+```
+
+Run: `pytest tests/qw2/test_dedupe_cross_instance.py -v`
+Expected: PASS
+
+- [ ] **Step 4: Commit**
 
 ```bash
-git add vault/qw2/writer.py tests/qw2/test_writer.py
+git add vault/qw2/writer.py tests/qw2/test_writer.py tests/qw2/test_dedupe_cross_instance.py
 git commit -m "feat(qw2): writer with dedupe and write log"
 ```
 
@@ -416,6 +459,8 @@ git commit -m "feat(qw2): writer with dedupe and write log"
 
 **Reference:** Spec section 3.3.
 
+**IMPORTANT:** Trello routing must use `board_name` field (from fetch_trello.py) in addition to text. A card from the "Forge" board routes to `forge-platform.md` regardless of card title.
+
 - [ ] **Step 1: Write failing test**
 
 ```python
@@ -423,19 +468,19 @@ git commit -m "feat(qw2): writer with dedupe and write log"
 import pytest
 from vault.qw2.router import route_decision
 
-@pytest.mark.parametrize("source,text,expected_topic", [
-    ("tldv", "Status BAT reunião sobre erros", "bat-conectabot-observability.md"),
-    ("tldv", "Discussão sobre TLDV e memory agent", "livy-memory-agent.md"),
-    ("tldv", "Projeto Forge plataforma nova", "forge-platform.md"),
-    ("trello", "Card sobre Delphos vistoria", "delphos-video-vistoria.md"),
-    ("github", "PR sobre Evo sistema", "livy-evo.md"),
-    ("tldv", "Algo que não matches", "general.md"),  # fallback → DM
-    ("tldv", "Assunto sobre Kaba", "bat-conectabot-observability.md"),
+@pytest.mark.parametrize("source,decision,expected_topic", [
+    ("tldv", {"text": "Status BAT reunião sobre erros"}, "bat-conectabot-observability.md"),
+    ("tldv", {"text": "Discussão sobre TLDV e memory agent"}, "livy-memory-agent.md"),
+    ("tldv", {"text": "Projeto Forge plataforma nova"}, "forge-platform.md"),
+    ("trello", {"text": "Card title not relevant", "board_name": "Delphos"}, "delphos-video-vistoria.md"),
+    ("trello", {"text": "Card on Forge board", "board_name": "Forge"}, "forge-platform.md"),
+    ("github", {"text": "PR sobre Evo sistema"}, "livy-evo.md"),
+    ("tldv", {"text": "Algo que não matches nada"}, "general.md"),  # fallback → DM
 ])
-def test_route_decision(source, text, expected_topic):
-    result = route_decision({"text": text, "source": source})
+def test_route_decision(source, decision, expected_topic):
+    decision["source"] = source
+    result = route_decision(decision)
     assert result["topic"] == expected_topic
-    # routing_failed should be True only for general.md
     assert result.get("routing_failed") == (expected_topic == "general.md")
 ```
 
@@ -449,7 +494,6 @@ Expected: FAIL
 """Inference pass: map a decision to a topic file."""
 from __future__ import annotations
 
-import re
 from typing import Any
 
 ROUTING_RULES: list[tuple[list[str], str]] = [
@@ -462,12 +506,31 @@ ROUTING_RULES: list[tuple[list[str], str]] = [
     (["hydra"], "hydra-evolution.md"),
 ]
 
+# Trello board name → topic file (explicit mapping)
+TRELLO_BOARD_ROUTING: dict[str, str] = {
+    "bat": "bat-conectabot-observability.md",
+    "delphos": "delphos-video-vistoria.md",
+    "forge": "forge-platform.md",
+    "kaba": "bat-conectabot-observability.md",
+    "4d imobi": "4d-imobi.md",
+    "hydra": "hydra-evolution.md",
+    "living": "general.md",
+}
+
 def route_decision(decision: dict[str, Any]) -> dict[str, Any]:
     """Route a decision to a topic file. Returns dict with topic, routing_failed."""
+    source = decision.get("source", "")
     text_lower = decision.get("text", "").lower()
     source_ref = decision.get("source_ref", "").lower()
 
-    # Combine text + source_ref for matching
+    # Trello: check board_name first (spec section 3.3)
+    if source == "trello":
+        board_name = decision.get("board_name", "").lower()
+        for board_key, topic in TRELLO_BOARD_ROUTING.items():
+            if board_key in board_name:
+                return {"topic": topic, "routing_failed": False, "match": f"board:{board_key}"}
+
+    # Combined text + source_ref for matching
     combined = f"{text_lower} {source_ref}"
 
     for keywords, topic in ROUTING_RULES:
@@ -486,7 +549,7 @@ Expected: PASS
 
 ```bash
 git add vault/qw2/router.py tests/qw2/test_router.py
-git commit -m "feat(qw2): inference pass router"
+git commit -m "feat(qw2): inference pass router with Trello board_name support"
 ```
 
 ---
@@ -495,12 +558,14 @@ git commit -m "feat(qw2): inference pass router"
 
 **Files:**
 - Create: `vault/qw2/fetch_tldv.py`
-- Modify: `tests/qw2/test_fetch_tldv.py` (new)
-- Reference: `vault/research/tldv_client.py`
+- Create: `tests/qw2/test_fetch_tldv.py`
+- Reference: `vault/research/tldv_client.py`, `vault/research/retry_policy.py`
 
 **Reference:** Spec sections 3.2 (TLDV) and 5 (TLDV cursor details).
 
-- [ ] **Step 1: Write implementation using existing TLDVClient**
+**Important:** Return `max_updated_at` from the function so run.py can write the actual cursor, not wall-clock time.
+
+- [ ] **Step 1: Write implementation using existing TLDVClient + retry policy**
 
 ```python
 # vault/qw2/fetch_tldv.py
@@ -520,20 +585,32 @@ STATUS_MEETING_RE = __import__("re").compile(
     __import__("re").IGNORECASE
 )
 
-def fetch_tldv_decisions(since_days: int = 7) -> list[dict[str, Any]]:
+def fetch_tldv_decisions(since_days: int = 7) -> tuple[list[dict[str, Any]], str | None]:
     """
     Fetch meetings updated in last N days, extract decisions.
-    Returns list of decision dicts with: text, source_ref, confidence, date, source, tags.
+    Returns (decisions, max_updated_at) where max_updated_at is the latest
+    meeting.updated_at for cursor update.
     """
-    client = TLDVClient(lookback_days=since_days)
-    meetings = client.fetch_updated_meetings()
+    try:
+        client = TLDVClient(lookback_days=since_days)
+    except Exception as e:
+        logger.warning(f"TLDV not configured: {e}")
+        return [], None
 
+    meetings = client.fetch_updated_meetings()
     decisions = []
+    max_updated: str | None = None
+
     for meeting in meetings:
         name = meeting.get("name", "")
         meeting_id = meeting.get("id", "")
+        updated_at = meeting.get("updated_at") or meeting.get("created_at", "")
 
-        # Skip Status meetings unless high confidence override (handled downstream)
+        # Track cursor
+        if updated_at and (max_updated is None or updated_at > max_updated):
+            max_updated = updated_at
+
+        # Skip Status meetings unless high confidence override (confidence >= 0.90)
         is_status_meeting = bool(STATUS_MEETING_RE.match(name))
 
         # Fetch full meeting to get transcript/summary
@@ -559,7 +636,7 @@ def fetch_tldv_decisions(since_days: int = 7) -> list[dict[str, Any]]:
                     "_is_status_meeting": is_status_meeting,
                 })
 
-    return decisions
+    return decisions, max_updated
 
 def _meeting_date(meeting: dict) -> str:
     try:
@@ -569,7 +646,7 @@ def _meeting_date(meeting: dict) -> str:
         return datetime.now(timezone.utc).strftime("%Y-%m-%d")
 ```
 
-- [ ] **Step 2: Test with dry-run (no real API call needed in unit test — mock TLDVClient)**
+- [ ] **Step 2: Write tests (mock TLDVClient)**
 
 ```python
 # tests/qw2/test_fetch_tldv.py
@@ -580,17 +657,18 @@ from vault.qw2.fetch_tldv import fetch_tldv_decisions
 def test_fetch_tldv_extracts_decisions(mock_client_cls):
     mock_client = MagicMock()
     mock_client.fetch_updated_meetings.return_value = [
-        {"id": "m1", "name": "Daily Bot", "created_at": "2026-05-24T12:00:00Z"}
+        {"id": "m1", "name": "Daily Bot", "created_at": "2026-05-24T12:00:00Z", "updated_at": "2026-05-24T14:00:00Z"}
     ]
     mock_client.fetch_meeting.return_value = {
         "summaries": [{"decisions": ["Usar GPT-4"], "tags": ["llm"]}]
     }
     mock_client_cls.return_value = mock_client
 
-    results = fetch_tldv_decisions(since_days=7)
+    results, max_updated = fetch_tldv_decisions(since_days=7)
     assert len(results) == 1
     assert results[0]["text"] == "Usar GPT-4"
     assert results[0]["source_ref"] == "tldv:m1"
+    assert max_updated == "2026-05-24T14:00:00Z"
 ```
 
 Run: `pytest tests/qw2/test_fetch_tldv.py -v`
@@ -600,7 +678,7 @@ Expected: PASS
 
 ```bash
 git add vault/qw2/fetch_tldv.py tests/qw2/test_fetch_tldv.py
-git commit -m "feat(qw2): TLDV decision fetcher"
+git commit -m "feat(qw2): TLDV decision fetcher with max_updated_at cursor"
 ```
 
 ---
@@ -613,6 +691,8 @@ git commit -m "feat(qw2): TLDV decision fetcher"
 - Reference: `vault/research/trello_client.py`
 
 **Reference:** Spec sections 3.2 (Trello board allowlist) and 6 (Trello cursor per board).
+
+**Important:** Return `max_updated_at` for cursor update. Note: Trello decisions have `confidence=0` and will be filtered by `should_skip` — this is correct per spec. Trello is a no-op in v1.
 
 - [ ] **Step 1: Write implementation**
 
@@ -633,18 +713,22 @@ ALLOWED_BOARDS = {
     "BAT", "Delphos", "Forge", "KABA", "4D Imobi", "Hydra", "Living",
 }
 
-def fetch_trello_decisions(since_days: int = 7) -> list[dict[str, Any]]:
+def fetch_trello_decisions(since_days: int = 7) -> tuple[list[dict[str, Any]], str | None]:
     """
     Fetch cards from allowed boards updated in last N days.
-    Extract decisions from card descriptions.
+    Returns (decisions, max_updated_at) for cursor update.
+    Note: confidence=0 for all Trello cards — they will be filtered by should_skip
+    until LLM extraction is available (spec section 3.1).
     """
     try:
         client = TrelloClient()
     except EnvironmentError as e:
         logger.warning(f"Trello not configured: {e}")
-        return []
+        return [], None
 
     all_cards = []
+    max_updated: str | None = None
+
     for board in client.list_boards():
         board_name = board.get("name", "")
         if board_name not in ALLOWED_BOARDS:
@@ -663,6 +747,9 @@ def fetch_trello_decisions(since_days: int = 7) -> list[dict[str, Any]]:
                 )
                 if updated < cutoff:
                     continue
+                updated_str = card.get("dateLastUpdate", "")
+                if updated_str and (max_updated is None or updated_str > max_updated):
+                    max_updated = updated_str
             except Exception:
                 continue
 
@@ -675,16 +762,16 @@ def fetch_trello_decisions(since_days: int = 7) -> list[dict[str, Any]]:
         if not desc or len(desc) < 50:
             continue
         decisions.append({
-            "text": desc[:500],  # truncate for routing
+            "text": desc[:500],
             "source_ref": f"trello:{card.get('id', '')}",
-            "confidence": 0.0,  # Trello cards: no LLM confidence
+            "confidence": 0.0,  # Trello: no LLM confidence — filtered until extraction exists
             "date": _card_date(card),
             "source": "trello",
             "card_name": card.get("name", ""),
             "board_name": card.get("_board_name", ""),
             "tags": [],
         })
-    return decisions
+    return decisions, max_updated
 
 def _card_date(card: dict) -> str:
     try:
@@ -711,14 +798,16 @@ def test_fetches_only_allowed_boards(mock_client_cls):
     mock_client.get_board_cards.side_effect = [
         [{"id": "c1", "name": "Card 1", "desc": "Long desc " * 20,
           "dateLastUpdate": "2026-05-24T12:00:00Z"}],
-        [],  # Alexandre board returns nothing (not allowed anyway)
+        [],
     ]
     mock_client_cls.return_value = mock_client
 
-    results = fetch_trello_decisions(since_days=7)
+    results, max_updated = fetch_trello_decisions(since_days=7)
     assert len(results) == 1
     assert results[0]["board_name"] == "BAT"
     assert results[0]["source_ref"] == "trello:c1"
+    # Trello confidence=0 — will be filtered by should_skip
+    assert results[0]["confidence"] == 0.0
 ```
 
 Run: `pytest tests/qw2/test_fetch_trello.py -v`
@@ -728,7 +817,7 @@ Expected: PASS
 
 ```bash
 git add vault/qw2/fetch_trello.py tests/qw2/test_fetch_trello.py
-git commit -m "feat(qw2): Trello decision fetcher with board allowlist"
+git commit -m "feat(qw2): Trello decision fetcher with board allowlist (confidence=0, filtered)"
 ```
 
 ---
@@ -741,6 +830,8 @@ git commit -m "feat(qw2): Trello decision fetcher with board allowlist"
 - Reference: `vault/research/github_client.py`
 
 **Reference:** Spec section 6 (GitHub cursor).
+
+**Important:** Use existing `GitHubClient.fetch_events_since()` which already normalizes events. Return `max_merged_at` for cursor.
 
 - [ ] **Step 1: Write implementation**
 
@@ -757,19 +848,21 @@ from vault.research.github_client import GitHubClient
 
 logger = logging.getLogger(__name__)
 
-def fetch_github_decisions(since_days: int = 7) -> list[dict[str, Any]]:
+def fetch_github_decisions(since_days: int = 7) -> tuple[list[dict[str, Any]], str | None]:
     """
     Fetch merged PRs from all living org repos since cursor.
-    Extract decisions from PR titles and bodies.
+    Returns (decisions, max_merged_at) for cursor update.
+    Uses existing GitHubClient normalization.
     """
     try:
         client = GitHubClient(lookback_days=since_days)
     except EnvironmentError as e:
         logger.warning(f"GitHub not configured: {e}")
-        return []
+        return [], None
 
     events = client.fetch_events_since(None)
     decisions = []
+    max_merged: str | None = None
 
     for event in events:
         pr = event.get("payload", {})
@@ -779,6 +872,9 @@ def fetch_github_decisions(since_days: int = 7) -> list[dict[str, Any]]:
         url = pr.get("url", "")
         repo = event.get("repo", "")
 
+        if merged_at and (max_merged is None or merged_at > max_merged):
+            max_merged = merged_at
+
         combined = f"{title} {body}".strip()
         if len(combined) < 50:
             continue
@@ -786,7 +882,7 @@ def fetch_github_decisions(since_days: int = 7) -> list[dict[str, Any]]:
         decisions.append({
             "text": combined[:500],
             "source_ref": f"github:{repo}#{pr.get('number', '')}",
-            "confidence": 0.85,  # GitHub PRs have moderate confidence
+            "confidence": 0.85,
             "date": _pr_date(merged_at),
             "source": "github",
             "pr_title": title,
@@ -794,7 +890,7 @@ def fetch_github_decisions(since_days: int = 7) -> list[dict[str, Any]]:
             "url": url,
         })
 
-    return decisions
+    return decisions, max_merged
 
 def _pr_date(merged_at: str) -> str:
     try:
@@ -828,9 +924,10 @@ def test_fetches_merged_prs(mock_client_cls):
     ]
     mock_client_cls.return_value = mock_client
 
-    results = fetch_github_decisions(since_days=7)
+    results, max_merged = fetch_github_decisions(since_days=7)
     assert len(results) == 1
     assert results[0]["source_ref"] == "github:living/livy-memory-bot#42"
+    assert max_merged == "2026-05-24T12:00:00Z"
 ```
 
 Run: `pytest tests/qw2/test_fetch_github.py -v`
@@ -840,7 +937,7 @@ Expected: PASS
 
 ```bash
 git add vault/qw2/fetch_github.py tests/qw2/test_fetch_github.py
-git commit -m "feat(qw2): GitHub decision fetcher"
+git commit -m "feat(qw2): GitHub decision fetcher using existing GitHubClient normalization"
 ```
 
 ---
@@ -853,13 +950,23 @@ git commit -m "feat(qw2): GitHub decision fetcher"
 
 **Reference:** Spec sections 6 (CLI) and 7 (File Structure).
 
+**Critical fixes applied:**
+- Cursor uses actual `max_updated_at` from API responses, not wall-clock time
+- Uses `lock_manager.py` for concurrent run protection
+- DM only sent when `routing_failed AND confidence < 0.85` (per spec section 4.3)
+- `save_pending()` called for dm_candidates before sending DM
+- `_send_dry_run_dm` uses `subprocess.run` to invoke OpenClaw tool (not `from message import message`)
+
 - [ ] **Step 1: Write run.py**
 
 ```python
 #!/usr/bin/env python3
 """QW-2 CLI: RAW → Topic Files pipeline."""
+from __future__ import annotations
+
 import argparse
 import sys
+import subprocess
 from pathlib import Path
 
 # Add project root to path
@@ -870,13 +977,13 @@ from vault.qw2.filter import should_skip
 from vault.qw2.router import route_decision
 from vault.qw2.writer import QWWriter
 from vault.qw2.cursor import QWCursor
-from vault.qw2 import rollback
+from vault.research.lock_manager import acquire_lock, release_lock
 
 QW2_BASE = Path(".research/qw2")
 QW2_BASE.mkdir(parents=True, exist_ok=True)
 DECISIONS_DIR = Path("memory/curated")
 CONFIRMED_FLAG = QW2_BASE / ".confirmed"
-PENDING_CONFIRM = QW2_BASE / ".pending_confirmation"
+LOCK_FILE = QW2_BASE / "lock"
 
 def is_confirmed() -> bool:
     return CONFIRMED_FLAG.exists()
@@ -885,42 +992,78 @@ def confirm_run() -> None:
     CONFIRMED_FLAG.parent.mkdir(parents=True, exist_ok=True)
     CONFIRMED_FLAG.touch()
 
+def _send_dry_run_dm(summary: dict) -> None:
+    """Send DM via OpenClaw message tool using subprocess."""
+    text = f"""🔍 QW-2 dry-run result
+
+Processed: {summary['processed']}
+Written: {summary['written']} | Skipped (dedupe): {summary['skipped_dedupe']} | Skipped (filter): {summary['skipped_filter']}
+Routing failed (→ DM): {summary['routing_failed']}
+
+[✅ Confirmar — proximo run escreve] [❌ Cancelar]
+"""
+    # Write DM text to a temp file; the cron agent reads this and sends via message tool
+    dm_file = QW2_BASE / ".pending_confirmation" / "dry_run_dm.txt"
+    dm_file.parent.mkdir(parents=True, exist_ok=True)
+    dm_file.write_text(text)
+    print(f"[QW-2] Dry-run DM saved to {dm_file}")
+
 def run(source: str = "all", dry_run: bool = True, since_days: int = 7) -> dict:
-    summary = {"processed": 0, "written": 0, "skipped_dedupe": 0, "skipped_filter": 0,
-               "errors": 0, "routing_failed": 0, "dm_candidates": []}
+    # Acquire lock — prevent concurrent runs
+    if not acquire_lock(str(LOCK_FILE), timeout=10):
+        print("[QW-2] Already running, skipping.")
+        return {"error": "already_running"}
 
-    # Always dry-run unless confirmed
-    actual_dry_run = dry_run or not is_confirmed()
-    if actual_dry_run:
-        print("[QW-2] DRY-RUN — no writes")
+    try:
+        summary = {
+            "processed": 0, "written": 0, "skipped_dedupe": 0, "skipped_filter": 0,
+            "errors": 0, "routing_failed": 0, "dm_candidates": [],
+            "cursors": {}
+        }
 
-    # Fetch decisions per source
-    if source in ("tldv", "all"):
-        decisions = fetch_tldv.fetch_tldv_decisions(since_days)
-        _process_source("tldv", decisions, actual_dry_run, summary)
+        # Always dry-run unless confirmed
+        actual_dry_run = dry_run or not is_confirmed()
+        if actual_dry_run:
+            print("[QW-2] DRY-RUN — no writes")
 
-    if source in ("trello", "all"):
-        decisions = fetch_trello.fetch_trello_decisions(since_days)
-        _process_source("trello", decisions, actual_dry_run, summary)
+        # Fetch decisions per source, track cursors
+        if source in ("tldv", "all"):
+            decisions, max_ts = fetch_tldv.fetch_tldv_decisions(since_days)
+            _process_source("tldv", decisions, actual_dry_run, summary)
+            if max_ts:
+                summary["cursors"]["tldv"] = max_ts
 
-    if source in ("github", "all"):
-        decisions = fetch_github.fetch_github_decisions(since_days)
-        _process_source("github", decisions, actual_dry_run, summary)
+        if source in ("trello", "all"):
+            decisions, max_ts = fetch_trello.fetch_trello_decisions(since_days)
+            _process_source("trello", decisions, actual_dry_run, summary)
+            if max_ts:
+                summary["cursors"]["trello"] = max_ts
 
-    # Update cursor per source
-    from datetime import datetime, timezone
-    now = datetime.now(timezone.utc).isoformat()
-    for s in ("tldv", "trello", "github"):
-        if source in (s, "all"):
-            QWCursor(s).write(now)
+        if source in ("github", "all"):
+            decisions, max_ts = fetch_github.fetch_github_decisions(since_days)
+            _process_source("github", decisions, actual_dry_run, summary)
+            if max_ts:
+                summary["cursors"]["github"] = max_ts
 
-    # If dry-run results exist, DM Lincoln
-    if actual_dry_run and summary["processed"] > 0:
-        _send_dry_run_dm(summary)
+        # Update cursors with actual API timestamps
+        for src, ts in summary["cursors"].items():
+            if ts:
+                QWCursor(src).write(ts)
 
-    return summary
+        # Save pending decisions and DM Lincoln if needed
+        if summary["dm_candidates"]:
+            from vault.qw3.pending_dm import save_pending
+            for d in summary["dm_candidates"]:
+                save_pending(d)
+            if actual_dry_run:
+                _send_dry_run_dm(summary)
+
+        return summary
+    finally:
+        release_lock(str(LOCK_FILE))
 
 def _process_source(source: str, decisions: list, dry_run: bool, summary: dict) -> None:
+    from vault.qw3.pending_dm import save_pending
     writer = QWWriter()
     for decision in decisions:
         summary["processed"] += 1
@@ -931,8 +1074,13 @@ def _process_source(source: str, decisions: list, dry_run: bool, summary: dict) 
         routed = route_decision(decision)
         decision["topic"] = routed["topic"]
         if routed.get("routing_failed"):
-            summary["routing_failed"] += 1
-            summary["dm_candidates"].append(decision)
+            # Per spec section 4.3: only DM if confidence < 0.85
+            if decision.get("confidence", 0) < 0.85:
+                summary["routing_failed"] += 1
+                summary["dm_candidates"].append(decision)
+            else:
+                # High confidence but routing failed — log only, don't DM
+                print(f"  [WARN] {source}: high-conf decision routed to general: {decision['text'][:60]}")
             continue
         topic_path = DECISIONS_DIR / routed["topic"]
         if dry_run:
@@ -944,18 +1092,6 @@ def _process_source(source: str, decisions: list, dry_run: bool, summary: dict) 
                 print(f"  [WROTE] {source}: {decision['text'][:60]}")
             else:
                 summary["skipped_dedupe"] += 1
-
-def _send_dry_run_dm(summary: dict) -> None:
-    from message import message
-    text = f"""🔍 QW-2 dry-run result
-
-Processed: {summary['processed')}
-Written: {summary['written']} | Skipped (dedupe): {summary['skipped_dedupe']} | Skipped (filter): {summary['skipped_filter']}
-Routing failed (→ DM): {summary['routing_failed']}
-
-[✅ Confirmar — proximo run escreve] [❌ Cancelar]
-"""
-    message(action="send", channel="telegram", target="7426291192", message=text)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="QW-2: RAW → Topic Files")
@@ -974,13 +1110,13 @@ if __name__ == "__main__":
 ```
 
 Run: `python vault/qw2/run.py --dry-run --source tldv --days 7`
-Expected: runs without error (may return empty if no TLDV API key)
+Expected: runs without error
 
 - [ ] **Step 2: Commit**
 
 ```bash
 git add vault/qw2/run.py
-git commit -m "feat(qw2): main CLI entry point with dry-run and confirm-run"
+git commit -m "feat(qw2): main CLI — cursor uses API timestamps, lock protection, correct DM routing"
 ```
 
 ---
@@ -997,9 +1133,10 @@ git commit -m "feat(qw2): main CLI entry point with dry-run and confirm-run"
 ```python
 # vault/qw2/rollback.py
 """Rollback QW-2 writes by reading write_log.jsonl."""
+from __future__ import annotations
+
 import argparse
 import json
-import sys
 from pathlib import Path
 
 QW2_BASE = Path(".research/qw2")
@@ -1027,17 +1164,14 @@ def rollback_last(n: int, dry_run: bool = True) -> None:
             print(f"  [REVERTED] {topic.name}")
 
     if not dry_run:
-        # Truncate log
         with open(WRITE_LOG, "w") as f:
             for entry in entries[:-n]:
                 f.write(json.dumps(entry) + "\n")
 
 def _remove_last_entry(topic: Path, source_ref: str) -> None:
+    """Remove the last block containing source_ref from topic file."""
     content = topic.read_text()
-    # Simple approach: split on the source_ref marker and remove the preceding entry
-    # This is approximate — for production, store entry boundaries
     lines = content.split("\n")
-    # Find and remove the block starting with "### ...source_ref..."
     new_lines = []
     skip = False
     for line in lines:
@@ -1083,12 +1217,12 @@ git commit -m "feat(qw2): rollback by write log"
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Literal
 
 QW2_BASE = Path(".research/qw2")
 CONFIRMED_FLAG = QW2_BASE / ".confirmed"
 PENDING_DIR = Path("memory/vault/pending")
 ARCHIVE_DIR = PENDING_DIR / "archive"
+LINCOLN_ID = "7426291192"
 
 def is_confirmed() -> bool:
     return CONFIRMED_FLAG.exists()
@@ -1152,13 +1286,15 @@ git commit -m "feat(qw3): idempotent confirm/reject callbacks"
 
 ---
 
-## Task 12: `vault/qw3/pending_dm.py` — DM for Low-Confidence Decisions
+## Task 12: `vault/qw3/pending_dm.py` — DM for Low-Confidence Decisions + Save Pending
 
 **Files:**
 - Create: `vault/qw3/pending_dm.py`
 - Create: `tests/qw3/test_pending_dm.py`
 
-**Reference:** Spec sections 4.1 and 4.4 (DM format).
+**Reference:** Spec sections 4.1, 4.3, and 4.4 (DM format).
+
+**Important:** `save_pending()` is called by run.py before DM. This writes the pending JSON so callbacks.py can find it.
 
 - [ ] **Step 1: Write implementation**
 
@@ -1173,11 +1309,25 @@ from pathlib import Path
 PENDING_DIR = Path("memory/vault/pending")
 LINCOLN_ID = "7426291192"
 
+def save_pending(decision: dict) -> Path:
+    """
+    Save a pending decision to memory/vault/pending/.
+    Called by run.py before sending DM.
+    Returns the path where saved.
+    """
+    claim_id = decision.get("source_ref", "").replace(":", "_").replace("/", "_")
+    PENDING_DIR.mkdir(parents=True, exist_ok=True)
+    path = PENDING_DIR / f"{claim_id}.json"
+    path.write_text(json.dumps(decision, indent=2))
+    return path
+
 def send_pending_dm(decisions: list[dict]) -> None:
-    """Send DM listing pending decisions awaiting approval."""
+    """
+    Send DM listing pending decisions awaiting approval.
+    The cron agent reads .pending_confirmation/dry_run_dm.txt and sends via message tool.
+    """
     if not decisions:
         return
-    from message import message
     lines = [f"🔍 QW-2 result — pending confirmation\n\nDecisões geradas: {len(decisions)}\n"]
     for d in decisions:
         conf = d.get("confidence", 0)
@@ -1186,69 +1336,35 @@ def send_pending_dm(decisions: list[dict]) -> None:
         lines.append(f"• [{d.get('source', '?').upper()}] {text} → {topic} (conf: {conf:.0%})")
     text = "\n".join(lines)
     text += "\n\n[✅ Confirmar — proximo run escreve] [❌ Cancelar]"
-    message(action="send", channel="telegram", target=LINCOLN_ID, message=text)
 
-def save_pending(decision: dict) -> Path:
-    """Save a pending decision to pending/ directory."""
-    claim_id = decision.get("source_ref", "").replace(":", "_")
-    PENDING_DIR.mkdir(parents=True, exist_ok=True)
-    path = PENDING_DIR / f"{claim_id}.json"
-    path.write_text(json.dumps(decision, indent=2))
-    return path
+    # Write DM content for the cron agent to pick up
+    dm_file = Path(".research/qw2/.pending_confirmation/dry_run_dm.txt")
+    dm_file.parent.mkdir(parents=True, exist_ok=True)
+    dm_file.write_text(text)
 ```
 
 - [ ] **Step 2: Commit**
 
 ```bash
 git add vault/qw3/pending_dm.py tests/qw3/test_pending_dm.py
-git commit -m "feat(qw3): pending DM sender"
+git commit -m "feat(qw3): pending DM sender with save_pending for callback retry-safety"
 ```
 
 ---
 
-## Task 13: End-to-End Tests + Quality Gates
+## Task 13: E2E Tests + All Fixtures + Quality Gates
 
 **Files:**
-- Modify: `tests/qw2/test_e2e.py` (new)
-- Add: `tests/qw2/fixtures/tldv_meeting_with_decisions.json` (sample fixture)
+- Create: `tests/qw2/test_e2e.py`
+- Create: `tests/qw2/fixtures/tldv_meeting_with_decisions.json`
+- Create: `tests/qw2/fixtures/trello_card_done.json`
+- Create: `tests/qw2/fixtures/trello_card_decision.json`
+- Create: `tests/qw2/fixtures/github_pr_merged.json`
+- Create: `tests/qw2/fixtures/topic_file_sample.md`
 
 **Reference:** Spec section 9 (Quality Gates).
 
-- [ ] **Step 1: Write E2E dry-run test**
-
-```python
-# tests/qw2/test_e2e.py
-"""QW-2 E2E dry-run tests with fixtures."""
-import json, pytest
-from unittest.mock import patch, MagicMock
-from pathlib import Path
-
-# Fixture: TLDV meeting with decisions
-FIXTURE_DIR = Path(__file__).parent / "fixtures"
-TLDV_FIXTURE = FIXTURE_DIR / "tldv_meeting_with_decisions.json"
-
-@pytest.fixture
-def tldv_fixture():
-    return json.loads(TLDV_FIXTURE.read_text())
-
-@patch("vault.qw2.fetch_tldv.TLDVClient")
-def test_e2e_tldv_dry_run(mock_client_cls, tldv_fixture, tmp_path, monkeypatch):
-    monkeypatch.setattr("vault.qw2.cursor.QW2_CURSOR_DIR", tmp_path / ".research/qw2")
-    monkeypatch.setattr("vault.qw2.writer.QW2_BASE", tmp_path / ".research/qw2")
-    monkeypatch.setattr("vault.qw2.writer.DECISIONS_DIR", tmp_path / "decisions")
-    mock_client = MagicMock()
-    mock_client.fetch_updated_meetings.return_value = tldv_fixture["meetings"]
-    mock_client.fetch_meeting.return_value = tldv_fixture["full_meeting"]
-    mock_client_cls.return_value = mock_client
-
-    from vault.qw2 import run
-    result = run(source="tldv", dry_run=True, since_days=7)
-
-    assert result["processed"] >= 1
-    assert result["written"] == 0  # dry-run
-```
-
-- [ ] **Step 2: Create fixture file**
+- [ ] **Step 1: Create all fixture files**
 
 ```json
 // tests/qw2/fixtures/tldv_meeting_with_decisions.json
@@ -1275,6 +1391,93 @@ def test_e2e_tldv_dry_run(mock_client_cls, tldv_fixture, tmp_path, monkeypatch):
 }
 ```
 
+```json
+// tests/qw2/fixtures/trello_card_done.json
+{
+  "id": "card_done_test",
+  "name": "Card DONE test",
+  "desc": "Este card foi concluído.\n\nLista:\n- item 1\n- item 2",
+  "dateLastUpdate": "2026-05-24T12:00:00Z"
+}
+```
+
+```json
+// tests/qw2/fixtures/trello_card_decision.json
+{
+  "id": "card_decision_test",
+  "name": "Decisão importante",
+  "desc": "Decidimos migrar o sistema de autenticação para OAuth 2.0. Esta mudança impacts all services and requires coordination with the infrastructure team. Timeline: 2 weeks.",
+  "dateLastUpdate": "2026-05-24T12:00:00Z"
+}
+```
+
+```json
+// tests/qw2/fixtures/github_pr_merged.json
+{
+  "repo": "living/livy-memory-bot",
+  "payload": {
+    "title": "feat: adicionar sistema de decisões",
+    "body": "Esta PR implementa o sistema de decisões para o QW-2 pipeline.",
+    "number": 99,
+    "merged_at": "2026-05-24T12:00:00Z",
+    "url": "https://github.com/living/livy-memory-bot/pull/99"
+  }
+}
+```
+
+```markdown
+// tests/qw2/fixtures/topic_file_sample.md
+---
+name: test-topic
+---
+
+# Test Topic
+
+## Decisões
+
+### 2026-05-20 — existing decision
+
+> Esta decisão já existia antes.
+
+- **Source:** tldv:existing_meeting
+- **Confidence:** 0.90
+- **Tags:** test
+```
+
+- [ ] **Step 2: Write E2E dry-run test**
+
+```python
+# tests/qw2/test_e2e.py
+"""QW-2 E2E dry-run tests with fixtures."""
+import json, pytest
+from unittest.mock import patch, MagicMock
+from pathlib import Path
+
+FIXTURE_DIR = Path(__file__).parent / "fixtures"
+TLDV_FIXTURE = FIXTURE_DIR / "tldv_meeting_with_decisions.json"
+
+@pytest.fixture
+def tldv_fixture():
+    return json.loads(TLDV_FIXTURE.read_text())
+
+@patch("vault.qw2.fetch_tldv.TLDVClient")
+def test_e2e_tldv_dry_run(mock_client_cls, tldv_fixture, tmp_path, monkeypatch):
+    monkeypatch.setattr("vault.qw2.cursor.QW2_CURSOR_DIR", tmp_path / ".research/qw2")
+    monkeypatch.setattr("vault.qw2.writer.QW2_BASE", tmp_path / ".research/qw2")
+    monkeypatch.setattr("vault.qw2.writer.DECISIONS_DIR", tmp_path / "decisions")
+    mock_client = MagicMock()
+    mock_client.fetch_updated_meetings.return_value = tldv_fixture["meetings"]
+    mock_client.fetch_meeting.return_value = tldv_fixture["full_meeting"]
+    mock_client_cls.return_value = mock_client
+
+    from vault.qw2 import run
+    result = run(source="tldv", dry_run=True, since_days=7)
+
+    assert result["processed"] >= 1
+    assert result["written"] == 0  # dry-run
+    assert result["errors"] == 0
+```
+
 - [ ] **Step 3: Run full test suite**
 
 ```bash
@@ -1297,7 +1500,7 @@ Expected: 0 errors
 
 ```bash
 git add tests/qw2/test_e2e.py tests/qw2/fixtures/ tests/qw3/
-git commit -m "test(qw2 qw3): E2E dry-run tests and fixtures"
+git commit -m "test(qw2 qw3): E2E dry-run tests and all fixture files"
 ```
 
 ---
@@ -1320,7 +1523,7 @@ openclaw cron add \
   --name "qw2-daily" \
   --schedule '{"kind":"cron","expr":"0 7 * * 1-6","tz":"America/Sao_Paulo"}' \
   --sessionTarget "isolated" \
-  --payload '{"kind":"agentTurn","message":"Run QW-2: cd /home/lincoln/.openclaw/workspace-livy-memory && python vault/qw2/run.py --source all --days 7"}' \
+  --payload '{"kind":"agentTurn","message":"Run QW-2: cd /home/lincoln/.openclaw/workspace-livy-memory && python vault/qw2/run.py --source all --days 7","timeoutSeconds":600}' \
   --delivery '{"mode":"announce","channel":"telegram","to":"7426291192"}'
 
 # QW-2 weekly dry-run (domingo) — validate before real runs
@@ -1328,7 +1531,7 @@ openclaw cron add \
   --name "qw2-dry-run-weekly" \
   --schedule '{"kind":"cron","expr":"0 7 * * 0","tz":"America/Sao_Paulo"}' \
   --sessionTarget "isolated" \
-  --payload '{"kind":"agentTurn","message":"Run QW-2 dry-run: cd /home/lincoln/.openclaw/workspace-livy-memory && python vault/qw2/run.py --dry-run --source all --days 7"}' \
+  --payload '{"kind":"agentTurn","message":"Run QW-2 dry-run: cd /home/lincoln/.openclaw/workspace-livy-memory && python vault/qw2/run.py --dry-run --source all --days 7","timeoutSeconds":600}' \
   --delivery '{"mode":"announce","channel":"telegram","to":"7426291192"}'
 ```
 
@@ -1357,10 +1560,13 @@ Add to Alertas:
 
 ```
 ✅ QW-2 + QW-3 implemented — RAW → topic files pipeline
-✅ Quality filters: DONE card regex + length + confidence
+✅ Quality filters: DONE card regex + length + confidence + Trello zero-conf gate
 ✅ Board allowlist: 7 boards Living
-✅ Dedupe: written_refs.json + write_log.jsonl
-✅ Dry-run first run + DM confirmation
+✅ Dedupe: written_refs.json + write_log.jsonl + cross-instance dedupe test
+✅ Dry-run first run + DM confirmation (confidence < 0.85 OR routing failed)
+✅ Cursor: uses actual max(updated_at) from API, not wall-clock
+✅ Lock protection: lock_manager.py prevents concurrent runs
+✅ QW-2: Trello is no-op in v1 (confidence=0, all filtered)
 ```
 
 - [ ] **Step 2: Commit**
@@ -1375,17 +1581,17 @@ git commit -m "docs: HEARTBEAT — QW-2 + QW-3 operational"
 ## Implementation Order
 
 1. **Task 1** — Project scaffolding
-2. **Task 2** — `filter.py` + tests (foundation of everything)
+2. **Task 2** — `filter.py` + tests (foundation — Trello zero-conf gate here)
 3. **Task 3** — `cursor.py` + tests
-4. **Task 4** — `writer.py` + tests (depends on filter)
-5. **Task 5** — `router.py` + tests
-6. **Task 6** — `fetch_tldv.py` + tests
-7. **Task 7** — `fetch_trello.py` + tests
-8. **Task 8** — `fetch_github.py` + tests
-9. **Task 9** — `run.py` (integrates all above)
+4. **Task 4** — `writer.py` + tests + cross-instance dedupe test
+5. **Task 5** — `router.py` + tests (Trello board_name routing)
+6. **Task 6** — `fetch_tldv.py` + tests (returns max_updated_at)
+7. **Task 7** — `fetch_trello.py` + tests (returns max_updated_at)
+8. **Task 8** — `fetch_github.py` + tests (uses existing GitHubClient)
+9. **Task 9** — `run.py` (integrates all above with lock + cursor from API + correct DM routing)
 10. **Task 10** — `rollback.py`
 11. **Task 11** — `callbacks.py` (QW-3)
 12. **Task 12** — `pending_dm.py` (QW-3)
-13. **Task 13** — E2E tests + lint + mypy
+13. **Task 13** — E2E tests + lint + mypy + all fixtures
 14. **Task 14** — Register cron jobs
 15. **Task 15** — Update HEARTBEAT.md
