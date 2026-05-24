@@ -21,11 +21,13 @@ DECISIONS_DIR = _WS / "memory" / "vault" / "decisions"
 
 # Entry regex: capture date, source, text, source_ref, confidence
 # Handles both buggy format (**Source:e**) and correct format (**Source:**)
+
 _ENTRY_RE_RAW = re.compile(
-    r"\n### (\d{4}-\d{2}-\d{2}) [—-] (\w+)\n> ([^\n]+)\n\n- \*\*(\w+(?:\s+\w+)*):\*\* (.+)\n- \*\*(\w+(?:\s+\w+)*):\*\* (.+)\n(?:- \*\*(\w+(?:\s+\w+)*):\*\* (.+)\n)?"
+    r"(?:\n|^)### (\d{4}-\d{2}-\d{2}) [—-] (\w+)\n> ([^\n]+)\n\n- \*\*(\w+(?:\s+\w+)*):\*\* (.+)\n- \*\*(\w+(?:\s+\w+)*):\*\* (.+)\n(?:- \*\*(\w+(?:\s+\w+)*):\*\* (.+)\n)?"
 )
 
-FRONTMATTER_RE = re.compile(r"^---\n(.*?)\n---\n", re.DOTALL)
+# Matches frontmatter and consumes 1-3 trailing newlines before entries
+FRONTMATTER_RE = re.compile(r"^---\n(.*?)\n---\n{1,3}", re.DOTALL)
 
 
 class ParsedEntry(TypedDict):
@@ -61,13 +63,18 @@ def parse_topic_file(path: Path) -> list[ParsedEntry]:
             source_ref, confidence = value1, value2
         else:
             source_ref, confidence = value2, value1
+        # Extract confidence_level from **Confidence Level:** line after the entry block
+        entry_start = match.end()
+        entry_block = body[entry_start:entry_start + 300]
+        cl_match = re.search(r"- \*\*Confidence Level:\*\* ([^\n]+)", entry_block)
+        confidence_level: str | None = cl_match.group(1).strip() if cl_match else None
         entry: ParsedEntry = {
             "date": match.group(1),
             "source": match.group(2),
             "text": match.group(3).strip(),
             "source_ref": source_ref.strip(),
             "confidence": confidence.strip(),
-            "confidence_level": frontmatter.get("confidence_level"),
+            "confidence_level": confidence_level,
         }
         entries.append(entry)
 
