@@ -54,8 +54,7 @@ tests/qw2/
   test_e2e.py            # Dry-run E2E with fixtures
   fixtures/
     tldv_meeting_with_decisions.json
-    trello_card_done.json
-    trello_card_decision.json
+    trello_cards.py  # dataclass fixtures, nao JSON
     github_pr_merged.json
     topic_file_sample.md
 
@@ -676,23 +675,30 @@ git commit -m "feat(qw2): TLDV decision fetcher with max_updated_at cursor"
 
 **Reference:** Spec sections 3.1 (Trello as operational data) and 5 (Trello cursor per board).
 
-**IMPORTANT:** Sem board allowlist — todos os 28 boards. Sem confidence gate. Trello cards nao passam por `should_skip` — tem filtro proprio `trello_card_passes_filter`.
+**CAMPO CRÍTICO — ParsedTrelloCard é dataclass, não dict:**
 
-**Campos do ParsedTrelloCard (do trello_client existente):**
 ```python
-@dataclass
-class ParsedTrelloCard:
-    card_id: str
-    name: str
-    board_id: str
-    board_name: str
-    list_name: str        # nao listName
-    desc: str
-    labels: list[str]
-    github_pr_url: str | None
-    hours_logged: float | None
-    last_activity: str    # ISO timestamp
+# ❌ ERRADO — ParsedTrelloCard é dataclass, não dict
+card.get("card_id")  # AttributeError
+
+# ✅ CORRETO — acesso por atributo
+card.card_id
+card.card_name
+card.board_id          # NOTE: nao tem board_name no dataclass
+card.list_name
+card.github_links     # list[str], nao str
+card.hours_logged     # float, ja extraido
+card.last_activity    # str | None
 ```
+
+**NOTE:** `ParsedTrelloCard` tem `board_id` mas NAO tem `board_name`. Para obter o nome do board, fazer `GET /1/boards/{board_id}` separadamente, conforme implementado no Step 1 abaixo.
+
+**Plan:**
+- Sem board allowlist — todos os 28 boards
+- Sem confidence gate
+- Trello cards nao passam por `should_skip` — tem filtro proprio `trello_card_passes_filter`
+- `hours_logged` ja existe no dataclass — NAO chamar `extract_hours_plugin` de novo
+- `github_links` e list — pegar `github_links[0]` se existir
 
 - [ ] **Step 1: Write implementation**
 
@@ -705,38 +711,49 @@ import logging
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from vault.research.trello_client import TrelloClient
+import requests
 
-from .intersection import extract_hours_plugin, extract_github_url
+from vault.research.trello_client import TrelloClient, TRELLO_API_BASE
 
 logger = logging.getLogger(__name__)
 
 
-def trello_card_passes_filter(card: dict) -> bool:
+def trello_card_passes_filter(card: "ParsedTrelloCard") -> bool:
     """Retorna True se o card tem dados operacionais uteis.
 
     Regras (spec section 3.1):
-    - Card com nome < 10 chars: skip
+    - Card com card_name < 10 chars: skip
     - Card sem list_name e sem last_activity: skip
-    - Cards em qualquer lista (BACKLOG, doing, done) passam — todos sao dados operacionais
+    - Cards em qualquer lista (BACKLOG, doing, done) passam
     """
-    name = card.get("name", "") or ""
-    list_name = card.get("list_name", "") or ""
-    last_activity = card.get("last_activity", "") or ""
-
-    if len(name) < 10:
+    if len(card.card_name) < 10:
         return False
-    if not list_name and not last_activity:
+    if not card.list_name and not card.last_activity:
         return False
     return True
 
 
-def fetch_trello_snapshots(since_days: int = 30) -> tuple[list[dict[str, Any]], dict[str, str]]:
+def _fetch_board_name(board_id: str, client: TrelloClient) -> str:
+    """Fetch board name from Trello API (ParsedTrelloCard so tem board_id, nao board_name)."""
+    try:
+        url = f"{TRELLO_API_BASE}/boards/{board_id}"
+        params = {"key": client.api_key, "token": client.token, "fields": "name"}
+        r = requests.get(url, params=params, timeout=10)
+        if r.status_code == 200:
+            return r.json().get("name", board_id)
+    except Exception as e:
+        logger.warning("Failed to fetch board name for %s: %s", board_id, e)
+    return board_id
+
+
+def fetch_trello_snapshots(
+    since_days: int = 30
+) -> tuple[list[dict[str, Any]], dict[str, str]]:
     """
     Fetch all Trello cards (no board allowlist) as operational snapshots.
     Returns (snapshots, cursors) where cursors is {board_slug: last_seen_timestamp}.
 
-    Cursor e per-board para evitar re-processar boards ja vistas.
+    ParsedTrelloCard e dataclass — acesso por atributo, nao dict.get().
     """
     try:
         client = TrelloClient()
@@ -744,19 +761,18 @@ def fetch_trello_snapshots(since_days: int = 30) -> tuple[list[dict[str, Any]], 
         logger.warning(f"Trello not configured: {e}")
         return [], {}
 
-    # get_normalized_cards() usa board_ids do config — busca TODOS os boards
-    # sem allowlist. Filtragem por utilidade via trello_card_passes_filter.
     raw_cards = client.get_normalized_cards()
     snapshots = []
     cursors: dict[str, str] = {}
+    board_name_cache: dict[str, str] = {}
 
     for card in raw_cards:
-        # Filtro de utilidade
+        # Filtro de utilidade — ATENCAO: ParsedTrelloCard e dataclass
         if not trello_card_passes_filter(card):
             continue
 
-        # Parse timestamps
-        last_activity = card.get("last_activity", "") or ""
+        # Timestamp filter
+        last_activity = card.last_activity or ""
         try:
             dt = datetime.fromisoformat(last_activity.replace("Z", "+00:00"))
             cutoff = datetime.now(timezone.utc) - timedelta(days=since_days)
@@ -765,26 +781,34 @@ def fetch_trello_snapshots(since_days: int = 30) -> tuple[list[dict[str, Any]], 
         except Exception:
             pass
 
-        # Extrair plugin data (spec section 3.1)
-        desc = card.get("desc", "") or ""
-        hours = card.get("hours_logged") or extract_hours_plugin(desc)
-        github_url = card.get("github_pr_url") or extract_github_url(desc)
+        # board_name: buscar do cache ou API (dataclass nao tem board_name)
+        board_id = card.board_id
+        if board_id not in board_name_cache:
+            board_name_cache[board_id] = _fetch_board_name(board_id, client)
+        board_name = board_name_cache[board_id]
+        board_slug = _slugify(board_name)
 
-        board_slug = _slugify(card.get("board_name", "unknown"))
         if last_activity:
             cursors[board_slug] = last_activity
 
+        # github_links e list — primeiro link
+        github_url = card.github_links[0] if card.github_links else None
+        # hours_logged: ja existe no dataclass, nao redundante
+        hours = card.hours_logged if card.hours_logged > 0 else None
+
         snapshots.append({
-            "source_ref": f"trello:{card.get('card_id', '')}",
-            "board_name": card.get("board_name", ""),
+            "source_ref": f"trello:{card.card_id}",
+            "board_id": board_id,
+            "board_name": board_name,
             "board_slug": board_slug,
-            "list_name": card.get("list_name", ""),
-            "card_name": card.get("name", ""),
-            "desc": desc[:500],
+            "list_name": card.list_name,
+            "card_name": card.card_name,
+            "desc": card.card_url,  # no desc field in dataclass; use card_url
+            "card_url": card.card_url,
             "hours_logged": hours,
             "github_pr_url": github_url,
             "last_activity": last_activity,
-            "labels": card.get("labels", []),
+            "labels": card.labels,
             "source": "trello",
         })
 
@@ -797,35 +821,70 @@ def _slugify(name: str) -> str:
     return re.sub(r"[^a-z0-9-]", "", name.lower())
 ```
 
-**Nota:** `client.get_normalized_cards()` retorna `ParsedTrelloCard` com `list_name` (ja normalizado), `hours_logged` (ja parseado do desc), e `github_pr_url` (ja extraido do desc). Nenhuma dessas fields vem da API diretamente.
+**NOTA:** `ParsedTrelloCard` nao tem campo `desc` — tem `card_url`. O description do card nao e guardado no dataclass. Se precisar do desc, chamar `get_card_comments()` por card.
 
 - [ ] **Step 2: Write tests (mock TrelloClient)**
 
 ```python
 # tests/qw2/test_fetch_trello.py
+"""Tests for fetch_trello_snapshots — uses ParsedTrelloCard dataclass."""
 from unittest.mock import patch, MagicMock
-from vault.qw2.fetch_trello import fetch_trello_decisions, ALLOWED_BOARDS
+from vault.research.trello_parsers import ParsedTrelloCard
+from vault.qw2.fetch_trello import trello_card_passes_filter, fetch_trello_snapshots
+
+def test_trello_card_passes_filter_accepts_dataclass():
+    # TRELLO_CARD_WITH_PLUGIN has card_name >= 10 chars — passes
+    card = ParsedTrelloCard(
+        card_id="c1", card_name="Deploy UAT - Voice RLSE0109469",
+        card_url="https://trello.com/c/ABC", board_id="b1", list_name="Concluído",
+        labels=[], due_date=None,
+        github_links=["https://github.com/living/livy-forge/pull/42"],
+        hours_logged=4.5, last_activity="2026-05-24T12:00:00Z",
+    )
+    assert trello_card_passes_filter(card) is True
+
+def test_trello_card_passes_filter_rejects_short_name():
+    # card_name < 10 chars — filtered
+    card = ParsedTrelloCard(
+        card_id="c2", card_name="Done", card_url="",
+        board_id="b1", list_name="Concluído",
+        labels=[], due_date=None,
+        github_links=[], hours_logged=0.0, last_activity=None,
+    )
+    assert trello_card_passes_filter(card) is False
 
 @patch("vault.qw2.fetch_trello.TrelloClient")
-def test_fetches_only_allowed_boards(mock_client_cls):
+def test_fetches_all_boards_no_allowlist(mock_client_cls):
+    """Sem allowlist — todos os boards sao processados."""
+    from vault.research.trello_parsers import ParsedTrelloCard
     mock_client = MagicMock()
-    mock_client.list_boards.return_value = [
-        {"id": "b1", "name": "BAT"},
-        {"id": "b2", "name": "Alexandre"},  # not allowed
-    ]
-    mock_client.get_board_cards.side_effect = [
-        [{"id": "c1", "name": "Card 1", "desc": "Long desc " * 20,
-          "dateLastUpdate": "2026-05-24T12:00:00Z"}],
-        [],
+    # Retorna ParsedTrelloCard (dataclass), nao dict
+    mock_client.get_normalized_cards.return_value = [
+        ParsedTrelloCard(
+            card_id="c1", card_name="Deploy UAT", card_url="https://trello.com/c/C1",
+            board_id="board_bat", list_name="Concluído",
+            labels=["deploy"], due_date=None,
+            github_links=["https://github.com/living/livy-forge/pull/42"],
+            hours_logged=4.5, last_activity="2026-05-24T12:00:00Z",
+        ),
+        ParsedTrelloCard(
+            card_id="c2", card_name="Bugfix login", card_url="https://trello.com/c/C2",
+            board_id="board_delphos", list_name="Done",
+            labels=["bug"], due_date=None,
+            github_links=[], hours_logged=2.0, last_activity="2026-05-23T12:00:00Z",
+        ),
     ]
     mock_client_cls.return_value = mock_client
 
-    results, max_updated = fetch_trello_decisions(since_days=7)
-    assert len(results) == 1
-    assert results[0]["board_name"] == "BAT"
-    assert results[0]["source_ref"] == "trello:c1"
-    # Trello confidence=0 — will be filtered by should_skip
-    assert results[0]["confidence"] == 0.0
+    with patch("vault.qw2.fetch_trello._fetch_board_name", return_value="BAT"):
+        snapshots, cursors = fetch_trello_snapshots(since_days=30)
+
+    assert len(snapshots) == 2
+    # github_links e list — primeiro e usado
+    assert snapshots[0]["github_pr_url"] == "https://github.com/living/livy-forge/pull/42"
+    assert snapshots[0]["hours_logged"] == 4.5
+    # board_name vem da API
+    assert snapshots[0]["board_name"] == "BAT"
 ```
 
 Run: `pytest tests/qw2/test_fetch_trello.py -v`
@@ -984,6 +1043,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+from datetime import datetime, timezone
 import subprocess
 from pathlib import Path
 
@@ -1249,15 +1309,21 @@ def is_rejected(claim_id: str) -> bool:
     return (ARCHIVE_DIR / f"{claim_id}.json").exists()
 
 def handle_confirm(claim_id: str | None = None) -> str:
-    """Mark run as confirmed. Idempotent. Seta QW2_AUTO_WRITE=true."""
+    """Mark run as confirmed. Idempotent. Writes flag to file for cross-process persistence."""
     if is_confirmed():
         return "already_confirmed"
-    # QW2_AUTO_WRITE: setado aqui, lido em run.py para permitir writes
-    import os
-    os.environ["QW2_AUTO_WRITE"] = "true"
+    # QW2_AUTO_WRITE: escrito em ficheiro para persistir entre processos (cron agent → run.py)
+    AUTO_WRITE_FLAG = QW2_BASE / ".auto_write_enabled"
+    AUTO_WRITE_FLAG.parent.mkdir(parents=True, exist_ok=True)
+    AUTO_WRITE_FLAG.write_text(datetime.now(timezone.utc).isoformat())
     CONFIRMED_FLAG.parent.mkdir(parents=True, exist_ok=True)
     CONFIRMED_FLAG.touch()
     return "confirmed"
+
+
+def is_auto_write_enabled() -> bool:
+    """Check if auto-write is enabled (read from file, not env var)."""
+    return (QW2_BASE / ".auto_write_enabled").exists()
 
 def handle_reject(claim_id: str) -> str:
     """Archive a pending claim. Idempotent."""
@@ -1413,40 +1479,49 @@ git commit -m "feat(qw3): pending DM sender with save_pending for callback retry
 ```
 
 ```json
-// tests/qw2/fixtures/trello_card_done.json
-{
-  "id": "card_done_test",
-  "name": "Card DONE test",
-  "desc": "Este card foi concluído.\n\nLista:\n- item 1\n- item 2",
-  "dateLastUpdate": "2026-05-24T12:00:00Z"
-}
-```
+# tests/qw2/fixtures/trello_cards.py
+# ParsedTrelloCard is a dataclass — fixtures must be dataclass instances
+from vault.research.trello_parsers import ParsedTrelloCard
 
-```json
-// tests/qw2/fixtures/trello_card_decision.json
-{
-  "id": "card_decision_test",
-  "name": "Decisão importante",
-  "desc": "Decidimos migrar o sistema de autenticação para OAuth 2.0. Esta mudança impacts all services and requires coordination with the infrastructure team. Timeline: 2 weeks.",
-  "dateLastUpdate": "2026-05-24T12:00:00Z"
-}
-```
+TRELLO_CARD_WITH_PLUGIN = ParsedTrelloCard(
+    card_id="card_plugin_test",
+    card_name="Deploy UAT - Voice RLSE0109469",
+    card_url="https://trello.com/c/ABC123",
+    board_id="board_bat",
+    list_name="Concluído 🎉",
+    labels=["deploy", "voice"],
+    due_date=None,
+    github_links=["https://github.com/living/livy-forge/pull/42"],
+    hours_logged=4.5,
+    last_activity="2026-05-24T12:00:00Z",
+)
 
-```json
-// tests/qw2/fixtures/github_pr_merged.json
-{
-  "repo": "living/livy-memory-bot",
-  "payload": {
-    "title": "feat: adicionar sistema de decisões",
-    "body": "Esta PR implementa o sistema de decisões para o QW-2 pipeline.",
-    "number": 99,
-    "merged_at": "2026-05-24T12:00:00Z",
-    "url": "https://github.com/living/livy-memory-bot/pull/99"
-  }
-}
-```
+TRELLO_CARD_SHORT_NAME = ParsedTrelloCard(
+    card_id="card_short_test",
+    card_name="Done",
+    card_url="https://trello.com/c/DEF456",
+    board_id="board_bat",
+    list_name="Concluído 🎉",
+    labels=[],
+    due_date=None,
+    github_links=[],
+    hours_logged=0.0,
+    last_activity="2026-05-24T12:00:00Z",
+)
 
-```markdown
+TRELLO_CARD_NO_USEFUL_DATA = ParsedTrelloCard(
+    card_id="card_empty_test",
+    card_name="x" * 5,
+    card_url="https://trello.com/c/GHI789",
+    board_id="board_bat",
+    list_name="",
+    labels=[],
+    due_date=None,
+    github_links=[],
+    hours_logged=0.0,
+    last_activity=None,
+)
+
 // tests/qw2/fixtures/topic_file_sample.md
 ---
 name: test-topic
