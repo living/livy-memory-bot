@@ -161,20 +161,19 @@ payload = {
   "conclusions": [{
     "content": "DECISION | {date} | {text[:200]} | {source_ref} | confidence:{level} | tags:{tags}[ | supersedes: {id}]",
     "observer_id": "agent-memory-agent",   // required by API
-    "observed_id": "agent-main"            // required by API — use agent-main for all
+    "observed_id": "{source_type}"        // tldv | github | trello — use agent-main for all
   }]
 }
 ```
 
-**GET `/conclusions/query`** — Requires `filters` with `observer_id` + `observed_id` (not pure semantic):
+**GET `/conclusions/list`** — Lista conclusões com filtro por `observed_id` (source_type):
 ```json
-{
-  "query": "source_ref:tldv:abc123",
-  "top_k": 3,
-  "filters": {"observer_id": "agent-memory-agent", "observed_id": "agent-main"}
-}
+POST /v3/workspaces/{id}/conclusions/list
+{"filters": {"observed_id": "tldv"}}  // tldv | github | trello
 ```
-Pure semantic query without filters → `422 {"detail":"observer and observed must be specified for semantic search"}`.
+Retorna todas as conclusões para o source type. Buscar no campo `content` por `source_ref:{ref}` para encontrar matches.
+
+**Nota:** `/conclusions/query` semântico **não é usado** — requer `observer_id` + `observed_id` simultaneamente e não escala para dedupe linear. Usa-se `/conclusions/list` + busca em content.
 
 **Content format:**
 ```
@@ -183,9 +182,10 @@ DECISION | {date} | {text[:200]} | {source_ref} | confidence:{level} | tags:{tag
 
 **Flags:**
 ```
---all         Indexa todos os topic files
---since DATE  Indexa só entries desde DATE (ISO format)
---dry-run     Não faz POST, só mostra o que faria
+--all              Indexa todos os topic files
+--since DATE       Indexa só entries desde DATE (ISO format)
+--dry-run          Não faz POST, só mostra o que faria
+--honcho-cleanup   Quando activo: DELETE conclusions removidas pelo dedupe (default: off)
 ```
 
 **Return dict:**
@@ -371,7 +371,7 @@ def test_reset_cursors_keeps_dedupe():
 | R2 | Consolidação reescreve e perde entries | 🔴 Baixa | Critical | `--dry-run` obrigatório antes de `--all` |
 | R3 | `--reset` limpa dedupe e duplica | 🟡 Média | Alto | Consolidação dedupe corre após reset (cron) |
 | R6 | Dedupe regex não captura entries com frontmatter multilinha | 🟢 Baixa | Baixo | Regex com re.DOTALL treat frontmatter como optional group |
-| R7 | Honcho conclusions crescem sem cleanup (dedupe só no topic file) | 🟡 Média | Médio | Adicionar `DELETE /conclusions/{id}` para entries removidas pelo dedupe |
+| R7 | Honcho conclusions crescem sem cleanup (dedupe só no topic file) | 🟡 Média | Médio | Quando dedupe remove uma entry: (1) buscar `source_ref` da entry removida no Honcho via `/conclusions/list`; (2) POST DELETE `/conclusions/{id}` para cada match. Só executa se `--honcho-cleanup` flag presente (default: off — safety first). |
 | R4 | Fact-check lento em topic files grandes | 🟡 Média | Médio | Skip entries com `confidence_level` já calculado |
 | R5 | QW-2 demorar > 1h e overlap com consolidate | 🟡 Média | Médio | Lock com TTL 600s + gap de 1h assume QW-2 < 1h |
 
