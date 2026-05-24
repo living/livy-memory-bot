@@ -1,4 +1,4 @@
-# QW-2 — Consolidação Incremental + Honcho Indexing + Fact-Check
+# QW-2 - Consolidação Incremental + Honcho Indexing + Fact-Check
 
 **Data:** 2026-05-24
 **Status:** Design approved
@@ -10,20 +10,20 @@
 
 QW-2 extrai decisões de TLDV + GitHub + Trello para topic files em `memory/vault/decisions/`. Este design adiciona três capacidades:
 
-1. **Consolidação incremental** — dedupe intra-file por `source_ref`, correção de duplicados
-2. **Honcho indexing** — decisões indexadas como conclusões no Honcho com supersedes chain
-3. **Fact-check enrichment** — `confidence_level` calculado via `vault/fact_check.py`
+1. **Consolidação incremental** - dedupe intra-file por `source_ref`, correção de duplicados
+2. **Honcho indexing** - decisões indexadas como conclusões no Honcho com supersedes chain
+3. **Fact-check enrichment** - `confidence_level` calculado via `vault/fact_check.py`
 
-**Padrão arquitectural:** Eventually consistent — QW-2 escreve para topic files → consolidação deduplica + enricha + adiciona frontmatter → Honcho indexing.
+**Padrão arquitectural:** Eventually consistent - QW-2 escreve para topic files → consolidação deduplica + enricha + adiciona frontmatter → Honcho indexing.
 
 **Topic file format real (existente):**
 ```markdown
-### YYYY-MM-DD — source
+### YYYY-MM-DD - source
 
 > Decision text
 
 - **Source:** source_ref
-- **Confidence:** 0.92        ← numeric, 0.0–1.0 (QW-2 original)
+- **Confidence:** 0.92        ← numeric, 0.0-1.0 (QW-2 original)
 - **Tags:** tag1, tag2
 ```
 
@@ -34,7 +34,7 @@ name: topic-name
 confidence_level: high        ← string: high/medium/low/unverified (fact-check output)
 ---
 
-### YYYY-MM-DD — source
+### YYYY-MM-DD - source
 ...
 ```
 
@@ -102,7 +102,7 @@ confidence_level: high        ← string: high/medium/low/unverified (fact-check
 **Input:** `memory/vault/decisions/*.md`
 
 **Processamento por topic file:**
-1. Parse todas as entries (regex `\n### (\d{4}-\d{2}-\d{2}) — (\w+)\n> (.+?)\n- \*\*Source\*\*: (.+?)\n- \*\*Confidence\*\*: (.+?)\n`)
+1. Parse todas as entries (regex `\n### (\d{4}-\d{2}-\d{2}) - (\w+)\n> (.+?)\n- \*\*Source\*\*: (.+?)\n- \*\*Confidence\*\*: (.+?)\n`)
 2. Dedupe: se `source_ref` aparecer mais de uma vez, mantém só a mais recente (por data)
 3. Fact-check: para cada entry, invoca `fact_check.py` wrapper → obtém `confidence_level`
 4. Reescreve topic file com entries deduplicadas + `confidence_level` no frontmatter
@@ -144,36 +144,37 @@ payload = {
     "observed_id": source_type,             # tldv | github | trello
 }
 ```
-- `observer_id`: quem cria a conclusão — fixo `"agent-memory-agent"`
-- `observed_id`: fonte dos dados — extraído do prefixo do `source_ref` (`tldv:`, `github:`, `trello:`)
+- `observer_id`: quem cria a conclusão - fixo `"agent-memory-agent"`
+- `observed_id`: fonte dos dados - extraído do prefixo do `source_ref` (`tldv:`, `github:`, `trello:`)
 
 **Processamento por decision entry:**
 1. Extrai `source_ref` e `source_type` do frontmatter
-2. Search Honcho: `honcho_search_conclusions(query=source_ref, topK=5, maxDistance=0.1)`
-3. Exact match confirmation: `source_ref` presente no `content` E `observed_id` igual ao da entry
+2. GET `/conclusions/list` com `filters={"observed_id": source_type}` → filtra conclusões do source
+3. Busca linear no `content` de cada conclusão por `source_ref:{ref}` (exact substring match)
+4. Exact match: `source_ref` presente no `content` E `observed_id` = source_type da entry
 4. Se existe: constrói content com `supersedes: <old_id>`
 5. Se não existe: constrói content sem supersedes
 6. POST para `POST /v3/workspaces/{workspace}/conclusions`
 
-**POST `/v3/workspaces/{workspace_id}/conclusions`** — Required fields (API schema):
+**POST `/v3/workspaces/{workspace_id}/conclusions`** - Required fields (API schema):
 ```json
 {
   "conclusions": [{
     "content": "DECISION | {date} | {text[:200]} | {source_ref} | confidence:{level} | tags:{tags}[ | supersedes: {id}]",
     "observer_id": "agent-memory-agent",   // required by API
-    "observed_id": "{source_type}"        // tldv | github | trello — use agent-main for all
+    "observed_id": "{source_type}"        // tldv | github | trello - extracted from source_ref prefix
   }]
 }
 ```
 
-**GET `/conclusions/list`** — Lista conclusões com filtro por `observed_id` (source_type):
+**GET `/conclusions/list`** - Lista conclusões com filtro por `observed_id` (source_type):
 ```json
 POST /v3/workspaces/{id}/conclusions/list
 {"filters": {"observed_id": "tldv"}}  // tldv | github | trello
 ```
 Retorna todas as conclusões para o source type. Buscar no campo `content` por `source_ref:{ref}` para encontrar matches.
 
-**Nota:** `/conclusions/query` semântico **não é usado** — requer `observer_id` + `observed_id` simultaneamente e não escala para dedupe linear. Usa-se `/conclusions/list` + busca em content.
+**Nota:** `/conclusions/query` semântico **não é usado** - requer `observer_id` + `observed_id` simultaneamente e não escala para dedupe linear. Usa-se `/conclusions/list` + busca em content.
 
 **Content format:**
 ```
@@ -223,13 +224,25 @@ def enrich_decisions(decisions: list[dict]) -> list[dict]:
 ```
 
 **Notas de implementação:**
-- Para TLDV: source="tldv" → `official+=1`
-- Para GitHub: source="github" → `official+=1`
-- Para Trello: source="trello" → `indirect+=1`
+- source="tldv"  → `official+=1`
+- source="github" → `official+=1`
+- source="trello" → `indirect+=1`
+- Se `decision.get("corroborated_sources")` existe: `corroborated += len(corroborated_sources)`
 - Se frontmatter já tem `confidence_level`, skip (não recalcula)
-- Usa `score_confidence(official, corroborated, indirect)` → high/medium/low/unverified
+- `score_confidence(official, corroborated, indirect)` → high/medium/low/unverified
 
-### 3.4 `vault/qw2/run.py` — Flags de Reset
+**Tabela de níveis atingíveis:**
+
+| Fontes | official | corroborated | indirect | Nível |
+|---|---|---|---|---|
+| TLDV só | 1 | 0 | 0 | medium |
+| GitHub só | 1 | 0 | 0 | medium |
+| Trello só | 0 | 0 | 1 | low |
+| TLDV + corroborated_sources ≥1 | 1 | ≥1 | 0 | **high** ✅ |
+| GitHub + corroborated_sources ≥1 | 1 | ≥1 | 0 | **high** ✅ |
+| Trello + 2+ related_refs (mesmo topic) | 0 | 0 | ≥2 | medium |
+
+**Trello ceiling:** Trello só contribui `indirect`, nunca `official`. Para `high` é necessário `official>=1 + corroborated>=1` — impossível com só Trello. Máximo Trello = `medium` (indirect>=2, e.g. 2+ trello cards com mesmo topic).
 
 Extensão dos flags existentes:
 
@@ -284,11 +297,11 @@ def is_locked() -> bool:
 - Importado de `vault.qw2.lock` (módulo partilhado)
 
 **QW-2 + Consolidação em paralelo:**
-- Cron QW-2 às 07h BRT, consolidate às 08h BRT — 1h de gap (suposição: QW-2 termina em < 1h)
+- Cron QW-2 às 07h BRT, consolidate às 08h BRT - 1h de gap (suposição: QW-2 termina em < 1h)
 - Lock em todos os módulos previne concurrent runs mesmo em runs manuais
-- Se QW-2 demorar > 1h, race condition possível — mitigate: lock com TTL
+- Se QW-2 demorar > 1h, race condition possível - mitigate: lock com TTL
 
-**Nota sobre --reset e consolidate:** após `--reset`, QW-2 re-escreve entries sem `confidence_level`. A próxima consolidação vai recalcular — comportamento desejado. Não há `--reset-consolidate` porque consolidate opera por source_ref e não por timestamp.
+**Nota sobre --reset e consolidate:** após `--reset`, QW-2 re-escreve entries sem `confidence_level`. A próxima consolidação vai recalcular - comportamento desejado. Não há `--reset-consolidate` porque consolidate opera por source_ref e não por timestamp.
 
 ---
 
@@ -371,7 +384,7 @@ def test_reset_cursors_keeps_dedupe():
 | R2 | Consolidação reescreve e perde entries | 🔴 Baixa | Critical | `--dry-run` obrigatório antes de `--all` |
 | R3 | `--reset` limpa dedupe e duplica | 🟡 Média | Alto | Consolidação dedupe corre após reset (cron) |
 | R6 | Dedupe regex não captura entries com frontmatter multilinha | 🟢 Baixa | Baixo | Regex com re.DOTALL treat frontmatter como optional group |
-| R7 | Honcho conclusions crescem sem cleanup (dedupe só no topic file) | 🟡 Média | Médio | Quando dedupe remove uma entry: (1) buscar `source_ref` da entry removida no Honcho via `/conclusions/list`; (2) POST DELETE `/conclusions/{id}` para cada match. Só executa se `--honcho-cleanup` flag presente (default: off — safety first). |
+| R7 | Honcho conclusions crescem sem cleanup (dedupe só no topic file) | 🟡 Média | Médio | Quando dedupe remove uma entry: (1) buscar `source_ref` da entry removida no Honcho via `/conclusions/list`; (2) DELETE `/conclusions/{id}` para cada match. Só executa se `--honcho-cleanup` flag presente (default: off - safety first). |
 | R4 | Fact-check lento em topic files grandes | 🟡 Média | Médio | Skip entries com `confidence_level` já calculado |
 | R5 | QW-2 demorar > 1h e overlap com consolidate | 🟡 Média | Médio | Lock com TTL 600s + gap de 1h assume QW-2 < 1h |
 
@@ -379,10 +392,10 @@ def test_reset_cursors_keeps_dedupe():
 
 ## 7. Quick Wins Identificados
 
-1. **Consolidate dedupe** — remove ~30% entries duplicadas nos topic files existentes
-2. **Honcho indexer** — primeiras conclusões no Honcho (vai populando o knowledge base)
-3. **Lock file** — segurança mínima para concorrência
-4. **--dry-run em tudo** — permite validar antes de executar
+1. **Consolidate dedupe** - remove ~30% entries duplicadas nos topic files existentes
+2. **Honcho indexer** - primeiras conclusões no Honcho (vai populando o knowledge base)
+3. **Lock file** - segurança mínima para concorrência
+4. **--dry-run em tudo** - permite validar antes de executar
 
 ---
 
