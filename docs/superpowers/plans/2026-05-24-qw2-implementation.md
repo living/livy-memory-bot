@@ -131,8 +131,9 @@ from vault.qw2.filter import should_skip, DONE_CARD_RE
     ({"text": "x" * 51, "confidence": 0, "source": "trello"}, True, "Trello confidence=0 — no LLM extraction"),
     # Trello: confidence=0.8 but no LLM extraction → still skip
     ({"text": "x" * 51, "confidence": 0.80, "source": "trello"}, True, "Trello confidence < 0.75"),
-    # Status meeting override (confidence >= 0.90 survives filter even if is_status_meeting)
-    ({"text": "x" * 51, "confidence": 0.92, "_is_status_meeting": True}, False, "Status meeting with high confidence"),
+    # Status meeting override: high confidence (>=0.90) survives filter
+    ({"text": "x" * 51, "confidence": 0.92, "_is_status_meeting": True}, False, "Status meeting with high confidence survives"),
+    ({"text": "x" * 51, "confidence": 0.89, "_is_status_meeting": True}, True, "Status meeting with low confidence still filtered"),
 ])
 def test_should_skip(text, expected_skip, reason):
     if isinstance(text, dict):
@@ -170,19 +171,24 @@ def should_skip(claim: dict[str, Any]) -> tuple[bool, str]:
     if DONE_CARD_RE.search(text):
         return True, "Trello DONE card"
 
-    # 2. Trello: no LLM confidence available — skip until extraction exists
+    # 2. Status meeting override: high-confidence decisions survive even in filler meetings
+    is_status = claim.get("_is_status_meeting", False)
+    if is_status and confidence >= 0.90:
+        return False, ""  # override — status meeting but high confidence
+
+    # 3. Trello: no LLM confidence available — skip until extraction exists
     if source == "trello" and confidence < 0.75:
         return True, f"Trello: confidence={confidence} — no LLM extraction"
 
-    # 3. Texto curto demais
+    # 4. Texto curto demais
     if len(text) < 50:
         return True, f"text too short ({len(text)} chars)"
 
-    # 4. Confiança baixa
+    # 5. Confiança baixa
     if confidence < 0.75:
         return True, f"low confidence {confidence}"
 
-    # 5. TLDV sem decisões registradas
+    # 6. TLDV sem decisões registradas
     if "sem decisões registradas" in text.lower():
         return True, "no decisions in transcript"
 
@@ -336,7 +342,7 @@ from datetime import datetime, timezone
 QW2_BASE = Path(".research/qw2")
 WRITTEN_REFS = QW2_BASE / "written_refs.json"
 WRITE_LOG = QW2_BASE / "write_log.jsonl"
-DECISIONS_DIR = Path("memory/curated")
+DECISIONS_DIR = Path("memory/vault/decisions")
 
 def load_written_refs() -> set[str]:
     if not WRITTEN_REFS.exists():
@@ -516,6 +522,9 @@ TRELLO_BOARD_ROUTING: dict[str, str] = {
     "hydra": "hydra-evolution.md",
     "living": "general.md",
 }
+
+# Keys must match TRELLO_BOARD_ROUTING exactly
+ALLOWED_BOARDS_KEYS = set(TRELLO_BOARD_ROUTING.keys())
 
 def route_decision(decision: dict[str, Any]) -> dict[str, Any]:
     """Route a decision to a topic file. Returns dict with topic, routing_failed."""
@@ -709,8 +718,9 @@ from vault.research.trello_client import TrelloClient
 
 logger = logging.getLogger(__name__)
 
+# Must match TRELLO_BOARD_ROUTING keys exactly (case-sensitive)
 ALLOWED_BOARDS = {
-    "BAT", "Delphos", "Forge", "KABA", "4D Imobi", "Hydra", "Living",
+    "bat", "delphos", "forge", "kaba", "4d imobi", "hydra", "living",
 }
 
 def fetch_trello_decisions(since_days: int = 7) -> tuple[list[dict[str, Any]], str | None]:
@@ -731,7 +741,7 @@ def fetch_trello_decisions(since_days: int = 7) -> tuple[list[dict[str, Any]], s
 
     for board in client.list_boards():
         board_name = board.get("name", "")
-        if board_name not in ALLOWED_BOARDS:
+        if board_name not in ALLOWED_BOARDS_KEYS:
             continue
         try:
             cards = client.get_board_cards(board["id"])
@@ -981,7 +991,7 @@ from vault.research.lock_manager import acquire_lock, release_lock
 
 QW2_BASE = Path(".research/qw2")
 QW2_BASE.mkdir(parents=True, exist_ok=True)
-DECISIONS_DIR = Path("memory/curated")
+DECISIONS_DIR = Path("memory/vault/decisions")
 CONFIRMED_FLAG = QW2_BASE / ".confirmed"
 LOCK_FILE = QW2_BASE / "lock"
 
@@ -1141,7 +1151,7 @@ from pathlib import Path
 
 QW2_BASE = Path(".research/qw2")
 WRITE_LOG = QW2_BASE / "write_log.jsonl"
-DECISIONS_DIR = Path("memory/curated")
+DECISIONS_DIR = Path("memory/vault/decisions")
 
 def rollback_last(n: int, dry_run: bool = True) -> None:
     if not WRITE_LOG.exists():
