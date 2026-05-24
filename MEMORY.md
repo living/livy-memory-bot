@@ -408,3 +408,24 @@ Extensão do backfill W1-W5 para o período Mai 7–23 via `honcho_capture.py` c
 Commit: `0659bf1` | Topic file: `memory/curated/livy-memory-agent.md`
 
 _Last updated: 2026-05-24_
+
+---
+---
+## QW-2 Topic Files (auto-updated 2026-05-24 22:02 UTC)
+
+| Topic | Entries | Latest | Sources |
+|---|---|---|---|
+| `bat-conectabot-observability` | 2 | 2026-05-22 | github |
+| `delphos-video-vistoria` | 11 | 2026-05-22 | github |
+| `livy-memory-agent` | 2 | 2026-05-21 | tldv |
+| `general` | 5 | 2026-05-21 | github |
+
+---
+## QW-2 Topic Files (auto-updated 2026-05-24 22:02 UTC)
+
+| Topic | Entries | Latest | Sources |
+|---|---|---|---|
+| `bat-conectabot-observability` | 2 | 2026-05-22 | github |
+| `delphos-video-vistoria` | 11 | 2026-05-22 | github |
+| `livy-memory-agent` | 2 | 2026-05-21 | tldv |
+| `general` | 7 | 2026-05-21 | github, trello |

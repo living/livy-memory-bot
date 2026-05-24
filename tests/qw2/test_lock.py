@@ -21,7 +21,7 @@ def test_acquire_lock_fails_when_fresh_lock_exists():
 
 def test_acquire_lock_succeeds_when_stale_lock():
     acquire_lock()
-    LOCK_FILE.write_text(f"9999|{time.time() - 700}")
+    LOCK_FILE.write_text(f"9999|deadbeef12345678|{time.time() - 700}")
     result = acquire_lock()
     assert result is True
     release_lock()

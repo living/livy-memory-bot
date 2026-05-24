@@ -56,14 +56,17 @@ class QWWriter:
 
         topic_path.parent.mkdir(parents=True, exist_ok=True)
 
+        tags_str = ', '.join(decision.get('tags', []))
+        # Trello uses last_activity; others use date
+        date_val = decision.get('date') or decision.get('last_activity', '')[:10]
         entry = f"""
-### {decision['date']} — {decision.get('source', 'unknown')}
+### {date_val} — {decision.get('source', 'unknown')}
 
-> {decision['text']}
+> {decision.get('text', decision.get('card_name', 'No description'))}
 
 - **Source:** {decision.get('source_ref')}
-- **Confidence:** {decision['confidence']}
-- **Tags:** {', '.join(decision.get('tags', []))}
+- **Confidence:** {decision.get('confidence', 'N/A')}
+- **Tags:** {tags_str}
 """
         with open(topic_path, "a") as f:
             f.write(entry)
