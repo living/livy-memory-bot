@@ -100,8 +100,6 @@ git commit -m "feat(qw2): project scaffolding"
 
 **Reference:** Spec section 3.1.
 
-**IMPORTANT — Trello zero-conf gate:** Per spec section 3.1, Trello cards have no LLM confidence (always 0). The spec says they should be skipped until LLM extraction is available. This is implemented as an explicit gate in `should_skip`.
-
 - [ ] **Step 1: Write failing test**
 
 ```python
@@ -123,10 +121,6 @@ from vault.qw2.filter import should_skip
     # No decisions
     ("Sem decisões registradas", True, "TLDV no-decisions placeholder"),
     ("sem decisões registradas", True, "lowercase variant"),
-    # Trello: confidence=0 → always skip (until LLM extraction available)
-    ({"text": "x" * 51, "confidence": 0, "source": "trello"}, True, "Trello confidence=0 — no LLM extraction"),
-    # Trello: confidence=0.8 but no LLM extraction → still skip
-    ({"text": "x" * 51, "confidence": 0.80, "source": "trello"}, True, "Trello confidence < 0.75"),
     # Status meeting override: high confidence (>=0.90) survives filter
     ({"text": "x" * 51, "confidence": 0.92, "_is_status_meeting": True}, False, "Status meeting with high confidence survives"),
     ({"text": "x" * 51, "confidence": 0.89, "_is_status_meeting": True}, True, "Status meeting with low confidence still filtered"),
@@ -673,22 +667,38 @@ git commit -m "feat(qw2): TLDV decision fetcher with max_updated_at cursor"
 
 ---
 
-## Task 7: `vault/qw2/fetch_trello.py` — Trello Decision Extraction
+## Task 7: `vault/qw2/fetch_trello.py` — Trello Operational Snapshots
 
 **Files:**
 - Create: `vault/qw2/fetch_trello.py`
 - Create: `tests/qw2/test_fetch_trello.py`
-- Reference: `vault/research/trello_client.py`
+- Reference: `vault/research/trello_client.py` (usa `get_normalized_cards`)
 
-**Reference:** Spec sections 3.2 (Trello board allowlist) and 6 (Trello cursor per board).
+**Reference:** Spec sections 3.1 (Trello as operational data) and 5 (Trello cursor per board).
 
-**Important:** Return `max_updated_at` for cursor update. Note: Trello decisions have `confidence=0` and will be filtered by `should_skip` — this is correct per spec. Trello is a no-op in v1.
+**IMPORTANT:** Sem board allowlist — todos os 28 boards. Sem confidence gate. Trello cards nao passam por `should_skip` — tem filtro proprio `trello_card_passes_filter`.
+
+**Campos do ParsedTrelloCard (do trello_client existente):**
+```python
+@dataclass
+class ParsedTrelloCard:
+    card_id: str
+    name: str
+    board_id: str
+    board_name: str
+    list_name: str        # nao listName
+    desc: str
+    labels: list[str]
+    github_pr_url: str | None
+    hours_logged: float | None
+    last_activity: str    # ISO timestamp
+```
 
 - [ ] **Step 1: Write implementation**
 
 ```python
 # vault/qw2/fetch_trello.py
-"""Fetch decisions from Trello cards."""
+"""Fetch Trello cards as operational snapshots — not decisions."""
 from __future__ import annotations
 
 import logging
@@ -697,80 +707,97 @@ from typing import Any
 
 from vault.research.trello_client import TrelloClient
 
+from .intersection import extract_hours_plugin, extract_github_url
+
 logger = logging.getLogger(__name__)
 
-# Must match TRELLO_BOARD_ROUTING keys exactly (case-sensitive)
-ALLOWED_BOARDS = {
-    "bat", "delphos", "forge", "kaba", "4d imobi", "hydra", "living",
-}
 
-def fetch_trello_decisions(since_days: int = 7) -> tuple[list[dict[str, Any]], str | None]:
+def trello_card_passes_filter(card: dict) -> bool:
+    """Retorna True se o card tem dados operacionais uteis.
+
+    Regras (spec section 3.1):
+    - Card com nome < 10 chars: skip
+    - Card sem list_name e sem last_activity: skip
+    - Cards em qualquer lista (BACKLOG, doing, done) passam — todos sao dados operacionais
     """
-    Fetch cards from allowed boards updated in last N days.
-    Returns (decisions, max_updated_at) for cursor update.
-    Note: confidence=0 for all Trello cards — they will be filtered by should_skip
-    until LLM extraction is available (spec section 3.1).
+    name = card.get("name", "") or ""
+    list_name = card.get("list_name", "") or ""
+    last_activity = card.get("last_activity", "") or ""
+
+    if len(name) < 10:
+        return False
+    if not list_name and not last_activity:
+        return False
+    return True
+
+
+def fetch_trello_snapshots(since_days: int = 30) -> tuple[list[dict[str, Any]], dict[str, str]]:
+    """
+    Fetch all Trello cards (no board allowlist) as operational snapshots.
+    Returns (snapshots, cursors) where cursors is {board_slug: last_seen_timestamp}.
+
+    Cursor e per-board para evitar re-processar boards ja vistas.
     """
     try:
         client = TrelloClient()
     except EnvironmentError as e:
         logger.warning(f"Trello not configured: {e}")
-        return [], None
+        return [], {}
 
-    all_cards = []
-    max_updated: str | None = None
+    # get_normalized_cards() usa board_ids do config — busca TODOS os boards
+    # sem allowlist. Filtragem por utilidade via trello_card_passes_filter.
+    raw_cards = client.get_normalized_cards()
+    snapshots = []
+    cursors: dict[str, str] = {}
 
-    for board in client.list_boards():
-        board_name = board.get("name", "")
-        if board_name not in ALLOWED_BOARDS_KEYS:
+    for card in raw_cards:
+        # Filtro de utilidade
+        if not trello_card_passes_filter(card):
             continue
+
+        # Parse timestamps
+        last_activity = card.get("last_activity", "") or ""
         try:
-            cards = client.get_board_cards(board["id"])
-        except Exception as e:
-            logger.warning(f"Error fetching board {board_name}: {e}")
-            continue
-
-        cutoff = datetime.now(timezone.utc) - timedelta(days=since_days)
-        for card in cards:
-            try:
-                updated = datetime.fromisoformat(
-                    card.get("dateLastUpdate", "").replace("Z", "+00:00")
-                )
-                if updated < cutoff:
-                    continue
-                updated_str = card.get("dateLastUpdate", "")
-                if updated_str and (max_updated is None or updated_str > max_updated):
-                    max_updated = updated_str
-            except Exception:
+            dt = datetime.fromisoformat(last_activity.replace("Z", "+00:00"))
+            cutoff = datetime.now(timezone.utc) - timedelta(days=since_days)
+            if last_activity and dt < cutoff:
                 continue
+        except Exception:
+            pass
 
-            card["_board_name"] = board_name
-            all_cards.append(card)
-
-    decisions = []
-    for card in all_cards:
+        # Extrair plugin data (spec section 3.1)
         desc = card.get("desc", "") or ""
-        if not desc or len(desc) < 50:
-            continue
-        decisions.append({
-            "text": desc[:500],
-            "source_ref": f"trello:{card.get('id', '')}",
-            "confidence": 0.0,  # Trello: no LLM confidence — filtered until extraction exists
-            "date": _card_date(card),
-            "source": "trello",
-            "card_name": card.get("name", ""),
-            "board_name": card.get("_board_name", ""),
-            "tags": [],
-        })
-    return decisions, max_updated
+        hours = card.get("hours_logged") or extract_hours_plugin(desc)
+        github_url = card.get("github_pr_url") or extract_github_url(desc)
 
-def _card_date(card: dict) -> str:
-    try:
-        dt = datetime.fromisoformat(card.get("dateLastUpdate", "").replace("Z", "+00:00"))
-        return (dt - timedelta(hours=3)).strftime("%Y-%m-%d")
-    except Exception:
-        return datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        board_slug = _slugify(card.get("board_name", "unknown"))
+        if last_activity:
+            cursors[board_slug] = last_activity
+
+        snapshots.append({
+            "source_ref": f"trello:{card.get('card_id', '')}",
+            "board_name": card.get("board_name", ""),
+            "board_slug": board_slug,
+            "list_name": card.get("list_name", ""),
+            "card_name": card.get("name", ""),
+            "desc": desc[:500],
+            "hours_logged": hours,
+            "github_pr_url": github_url,
+            "last_activity": last_activity,
+            "labels": card.get("labels", []),
+            "source": "trello",
+        })
+
+    return snapshots, cursors
+
+
+def _slugify(name: str) -> str:
+    """Slugify board name for cursor key."""
+    import re
+    return re.sub(r"[^a-z0-9-]", "", name.lower())
 ```
+
+**Nota:** `client.get_normalized_cards()` retorna `ParsedTrelloCard` com `list_name` (ja normalizado), `hours_logged` (ja parseado do desc), e `github_pr_url` (ja extraido do desc). Nenhuma dessas fields vem da API diretamente.
 
 - [ ] **Step 2: Write tests (mock TrelloClient)**
 
@@ -808,7 +835,7 @@ Expected: PASS
 
 ```bash
 git add vault/qw2/fetch_trello.py tests/qw2/test_fetch_trello.py
-git commit -m "feat(qw2): Trello decision fetcher with board allowlist (confidence=0, filtered)"
+git commit -m "feat(qw2): Trello operational snapshots — all boards, plugin data, no confidence gate"
 ```
 
 ---
@@ -1025,8 +1052,8 @@ def run(source: str = "all", dry_run: bool = True, since_days: int = 7) -> dict:
                 summary["cursors"]["tldv"] = max_ts
 
         if source in ("trello", "all"):
-            decisions, max_ts = fetch_trello.fetch_trello_decisions(since_days)
-            _process_source("trello", decisions, actual_dry_run, summary)
+            snapshots, cursors = fetch_trello.fetch_trello_snapshots(since_days)
+            _process_trello_snapshots(snapshots, cursors, actual_dry_run, summary)
             if max_ts:
                 summary["cursors"]["trello"] = max_ts
 
@@ -1222,9 +1249,12 @@ def is_rejected(claim_id: str) -> bool:
     return (ARCHIVE_DIR / f"{claim_id}.json").exists()
 
 def handle_confirm(claim_id: str | None = None) -> str:
-    """Mark run as confirmed. Idempotent."""
+    """Mark run as confirmed. Idempotent. Seta QW2_AUTO_WRITE=true."""
     if is_confirmed():
         return "already_confirmed"
+    # QW2_AUTO_WRITE: setado aqui, lido em run.py para permitir writes
+    import os
+    os.environ["QW2_AUTO_WRITE"] = "true"
     CONFIRMED_FLAG.parent.mkdir(parents=True, exist_ok=True)
     CONFIRMED_FLAG.touch()
     return "confirmed"
@@ -1569,6 +1599,221 @@ git commit -m "docs: HEARTBEAT — QW-2 + QW-3 operational"
 
 ---
 
+
+## Task 16: `vault/qw2/intersection.py` — Cross-Platform Deduplication
+
+**Files:**
+- Create: `vault/qw2/intersection.py`
+- Create: `tests/qw2/test_intersection.py`
+
+**Reference:** Spec section 3.4.
+
+**Schema das funcoes de extracao:**
+
+```python
+import re
+from urllib.parse import urlparse
+
+def extract_hours_plugin(desc: str) -> float | None:
+    """Extrai horas logadas do plugin de horas no desc do card Trello.
+
+    Patterns aceitos:
+      - "Horas:"
+      - "hours:"
+      - "Logged:"
+      - "h:"
+    """
+    patterns = [
+        r"(?:horas|hours|logged|h)[:\s]+(\d+(?:[.,]\d+)?)\s*h?",
+        r"(\d+(?:[.,]\d+)?)\s*horas?\s*trabalhadas?",
+    ]
+    for p in patterns:
+        m = re.search(p, desc, re.IGNORECASE)
+        if m:
+            val = m.group(1).replace(",", ".")
+            return float(val)
+    return None
+
+def extract_github_url(desc: str) -> str | None:
+    """Extrai URL de PR/issue do GitHub no desc do card Trello.
+
+    Aceita: https://github.com/owner/repo/pull/123
+           https://github.com/owner/repo/issues/456
+           github.com/owner/repo/pull/123
+    """
+    GH_RE = re.compile(
+        r"(?:https?://)?github\.com/([\w.-]+)/([\w.-]+)/(?:pull|issues)/(\d+)",
+        re.IGNORECASE
+    )
+    m = GH_RE.search(desc)
+    if m:
+        return f"https://github.com/{m.group(1)}/{m.group(2)}/pull/{m.group(3)}"
+    return None
+
+def extract_trello_url(desc: str) -> str | None:
+    """Extrai URL de card Trello no desc de um PR/issue GitHub.
+
+    Aceita: https://trello.com/c/ABC123
+           trello.com/c/ABC123
+    """
+    TR_RE = re.compile(r"(?:https?://)?trello\.com/c/([a-zA-Z0-9]+)", re.IGNORECASE)
+    m = TR_RE.search(desc)
+    if m:
+        return f"https://trello.com/c/{m.group(1)}"
+    return None
+```
+
+**IMPORTANT:** `list_name` vs `listName` — usar `card.list_name` do `ParsedTrelloCard` (ja normalizado pelo `trello_client.py` existente). Nao usar `listName` diretamente da API (retorna NONE).
+
+- [ ] **Step 1: Write failing test**
+
+```python
+# tests/qw2/test_intersection.py
+from vault.qw2.intersection import find_intersections, extract_hours_plugin, extract_github_url, extract_trello_url
+
+def test_extract_hours():
+    assert extract_hours_plugin("Horas: 4.5h trabalhadas") == 4.5
+    assert extract_hours_plugin("Logged: 2 horas") == 2.0
+    assert extract_hours_plugin("h: 1.5") == 1.5
+    assert extract_hours_plugin("sem horas") is None
+
+def test_extract_github_url():
+    assert extract_github_url("Veja https://github.com/living/livy-forge/pull/42") == "https://github.com/living/livy-forge/pull/42"
+    assert extract_github_url("github.com/living/livy-bot/issues/10") == "https://github.com/living/livy-bot/pull/10"
+    assert extract_github_url("nada a ver") is None
+
+def test_extract_trello_url():
+    assert extract_trello_url("Card: https://trello.com/c/ABC123") == "https://trello.com/c/ABC123"
+    assert extract_trello_url("nada") is None
+
+def test_find_intersections():
+    items = [
+        {"source": "trello", "card_name": "Deploy UAT", "github_pr_url": "https://github.com/living/livy-forge/pull/42"},
+        {"source": "github", "pr_title": "Deploy UAT to UAT", "trello_card_url": "https://trello.com/c/ABC123"},
+        {"source": "tldv", "decisions": ["Validamos o deploy UAT"]},
+    ]
+    result = find_intersections(items, items, items)
+    assert len(result) >= 1
+    # Trello + GitHub intersection
+    cross = [r for r in result if "github" in r.get("cross_platform", []) and "trello" in r.get("cross_platform", [])]
+    assert len(cross) >= 1
+```
+
+Run: `pytest tests/qw2/test_intersection.py -v`
+Expected: FAIL
+
+- [ ] **Step 2: Write implementation**
+
+```python
+# vault/qw2/intersection.py
+"""Cross-platform deduplication and intersection finding."""
+from __future__ import annotations
+
+import re
+from urllib.parse import urlparse
+from typing import Any
+
+GH_RE = re.compile(
+    r"(?:https?://)?github\.com/([\w.-]+)/([\w.-]+)/(?:pull|issues)/(\d+)",
+    re.IGNORECASE
+)
+TR_RE = re.compile(r"(?:https?://)?trello\.com/c/([a-zA-Z0-9]+)", re.IGNORECASE)
+
+
+def extract_hours_plugin(desc: str) -> float | None:
+    patterns = [
+        r"(?:horas|hours|logged|h)[:\s]+(\d+(?:[.,]\d+)?)\s*h?",
+        r"(\d+(?:[.,]\d+)?)\s*horas?\s*trabalhadas?",
+    ]
+    for p in patterns:
+        m = re.search(p, desc, re.IGNORECASE)
+        if m:
+            return float(m.group(1).replace(",", "."))
+    return None
+
+
+def extract_github_url(desc: str) -> str | None:
+    m = GH_RE.search(desc)
+    if m:
+        return f"https://github.com/{m.group(1)}/{m.group(2)}/pull/{m.group(3)}"
+    return None
+
+
+def extract_trello_url(desc: str) -> str | None:
+    m = TR_RE.search(desc)
+    if m:
+        return f"https://trello.com/c/{m.group(1)}"
+    return None
+
+
+def find_intersections(
+    trello_items: list[dict[str, Any]],
+    github_items: list[dict[str, Any]],
+    tldv_items: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Find items that appear across multiple platforms."""
+    intersections: list[dict[str, Any]] = []
+    seen_github_urls: set[str] = set()
+    seen_trello_urls: set[str] = set()
+
+    def mark_intersection(item: dict, platforms: list[str]) -> dict:
+        item = dict(item)
+        item["cross_platform"] = sorted(set(platforms))
+        return item
+
+    # Index GitHub items by PR URL
+    for g in github_items:
+        url = g.get("github_pr_url") or extract_github_url(g.get("pr_body", ""))
+        if url:
+            seen_github_urls.add(url)
+            g["_github_url_key"] = url
+
+    # Index Trello items by PR URL (from plugin)
+    for t in trello_items:
+        url = t.get("_github_pr_url") or extract_github_url(t.get("desc", ""))
+        if url:
+            seen_trello_urls.add(url)
+            t["_github_pr_url"] = url
+
+    # Find Trello ↔ GitHub intersections
+    common_urls = seen_github_urls & seen_trello_urls
+    for t in trello_items:
+        if t.get("_github_pr_url") in common_urls:
+            for g in github_items:
+                if g.get("_github_url_key") == t.get("_github_pr_url"):
+                    intersections.append(mark_intersection(t, ["trello", "github"]))
+                    break
+
+    # Find Trello ↔ TLDV intersections (by card name vs decision text similarity)
+    for t in trello_items:
+        card_name = t.get("card_name", "").lower()
+        if len(card_name) < 5:
+            continue
+        for d in tldv_items:
+            decision_text = " ".join(d.get("decisions", []))
+            if len(decision_text) < 5:
+                continue
+            # Simple overlap check
+            overlap = set(card_name.split()) & set(decision_text.lower().split())
+            if len(overlap) >= 2:
+                intersections.append(mark_intersection(t, ["trello", "tldv"]))
+                break
+
+    return intersections
+```
+
+Run: `pytest tests/qw2/test_intersection.py -v`
+Expected: PASS
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add vault/qw2/intersection.py tests/qw2/test_intersection.py
+git commit -m "feat(qw2): intersection cross-platform deduplication + extraction helpers"
+```
+
+---
+
 ## Implementation Order
 
 1. **Task 1** — Project scaffolding
@@ -1583,6 +1828,7 @@ git commit -m "docs: HEARTBEAT — QW-2 + QW-3 operational"
 10. **Task 10** — `rollback.py`
 11. **Task 11** — `callbacks.py` (QW-3)
 12. **Task 12** — `pending_dm.py` (QW-3)
-13. **Task 13** — E2E tests + lint + mypy + all fixtures
+13. **Task 13** — E2E tests + lint + mypy
+14. **Task 16** — `intersection.py` + `test_intersection.py` + all fixtures
 14. **Task 14** — Register cron jobs
 15. **Task 15** — Update HEARTBEAT.md
