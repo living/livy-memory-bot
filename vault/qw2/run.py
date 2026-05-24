@@ -13,13 +13,33 @@ from vault.qw2.filter import should_skip
 from vault.qw2.router import route_decision
 from vault.qw2.writer import QWWriter
 from vault.qw2.cursor import QWCursor
-from vault.research.lock_manager import acquire_lock, release_lock
+from vault.qw2.lock import acquire_lock, release_lock
 
 QW2_BASE = Path(".research/qw2")
 QW2_BASE.mkdir(parents=True, exist_ok=True)
 DECISIONS_DIR = Path("memory/vault/decisions")
 CONFIRMED_FLAG = QW2_BASE / ".confirmed"
-LOCK_FILE = QW2_BASE / "lock"
+
+CURSOR_FILES = {
+    "tldv": QW2_BASE / "last_seen_tldv.json",
+    "github": QW2_BASE / "last_seen_github.json",
+    "trello": QW2_BASE / "last_seen_trello.json",
+}
+WRITTEN_REFS = QW2_BASE / "written_refs.json"
+WRITE_LOG = QW2_BASE / "write_log.jsonl"
+
+def do_reset(which: set[str]) -> None:
+    """Reset cursor files and/or dedupe files."""
+    if "all" in which or "tldv" in which:
+        CURSOR_FILES["tldv"].unlink(missing_ok=True)
+    if "all" in which or "github" in which:
+        CURSOR_FILES["github"].unlink(missing_ok=True)
+    if "all" in which or "trello" in which:
+        CURSOR_FILES["trello"].unlink(missing_ok=True)
+    if "all" in which or "dedupe" in which:
+        WRITTEN_REFS.unlink(missing_ok=True)
+        WRITE_LOG.unlink(missing_ok=True)
+
 
 def is_confirmed() -> bool:
     return CONFIRMED_FLAG.exists()
@@ -48,8 +68,8 @@ Routing failed (→ DM): {summary['routing_failed']}
     print(f"[QW-2] Dry-run DM saved to {dm_file}")
 
 def run(source: str = "all", dry_run: bool = True, since_days: int = 7) -> dict:
-    # Acquire lock
-    if not acquire_lock(str(LOCK_FILE), ttl=10):
+    # Acquire lock (using vault.qw2.lock module)
+    if not acquire_lock():
         print("[QW-2] Already running, skipping.")
         return {"error": "already_running"}
 
@@ -102,7 +122,7 @@ def run(source: str = "all", dry_run: bool = True, since_days: int = 7) -> dict:
 
         return summary
     finally:
-        release_lock(str(LOCK_FILE))
+        release_lock()
 
 def _process_source(source: str, decisions: list, dry_run: bool, summary: dict) -> None:
     writer = QWWriter()
@@ -134,9 +154,19 @@ def _process_source(source: str, decisions: list, dry_run: bool, summary: dict) 
 
 def _process_trello_snapshots(snapshots: list, dry_run: bool, summary: dict) -> None:
     """Process Trello snapshots — no should_skip, routing via board_name."""
+    from datetime import datetime, timezone
     writer = QWWriter()
     for snap in snapshots:
         summary["processed"] += 1
+        # Enrich with fields required by writer
+        if "date" not in snap:
+            snap["date"] = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        if "confidence" not in snap:
+            snap["confidence"] = 0
+        if "text" not in snap:
+            snap["text"] = snap.get("card_name", "")
+        if "tags" not in snap:
+            snap["tags"] = []
         routed = route_decision(snap)
         snap["topic"] = routed["topic"]
         if routed.get("routing_failed"):
@@ -159,7 +189,33 @@ if __name__ == "__main__":
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--confirm-run", action="store_true", help="Acknowledge first-run confirmation")
     parser.add_argument("--days", type=int, default=7)
+    parser.add_argument("--reset", action="store_true", help="Hard reset: clears cursors + written_refs + dedupe refs")
+    parser.add_argument("--reset-cursors", action="store_true", help="Clear only cursors (keep dedupe)")
+    parser.add_argument("--reset-dedupe", action="store_true", help="Clear only dedupe refs (keep cursors)")
+    parser.add_argument("--reset-tldv", action="store_true", help="Clear only TLDV cursor + dedupe refs")
+    parser.add_argument("--reset-github", action="store_true", help="Clear only GitHub cursor + dedupe refs")
+    parser.add_argument("--reset-trello", action="store_true", help="Clear only Trello cursor + dedupe refs")
     args = parser.parse_args()
+
+    # Handle reset flags
+    if args.reset:
+        do_reset({"all"})
+        print("Reset: cleared all cursors + written_refs + write_log")
+    elif args.reset_cursors:
+        do_reset({"tldv", "github", "trello"})
+        print("Reset: cleared all cursors")
+    elif args.reset_dedupe:
+        do_reset({"dedupe"})
+        print("Reset: cleared dedupe refs")
+    elif args.reset_tldv:
+        do_reset({"tldv", "dedupe"})
+        print("Reset: cleared TLDV cursor + dedupe")
+    elif args.reset_github:
+        do_reset({"github", "dedupe"})
+        print("Reset: cleared GitHub cursor + dedupe")
+    elif args.reset_trello:
+        do_reset({"trello", "dedupe"})
+        print("Reset: cleared Trello cursor + dedupe")
 
     if args.confirm_run:
         confirm_run()
