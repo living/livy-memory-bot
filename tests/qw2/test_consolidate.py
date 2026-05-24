@@ -9,24 +9,27 @@ from vault.qw2.consolidate import parse_topic_file, dedupe_entries, consolidate_
 
 @pytest.fixture
 def sample_topic_file(tmp_path):
-    # Note: content must have \n before first ### for regex to match
+    # Format: blank line between header and blockquote (QW-2 writer format)
     content = """---
 name: test-topic
 ---
 
 ### 2026-05-07 — tldv
+
 > SVD e Hidra seguem com integração via fila
 
 - **Source:** tldv:abc123
 - **Confidence:** 0.92
 
 ### 2026-05-07 — tldv
+
 > SVD e Hidra seguem com integração via fila
 
 - **Source:** tldv:abc123
 - **Confidence:** 0.92
 
 ### 2026-05-06 — github
+
 > Deploy de todos os serviços no Azure
 
 - **Source:** github:xyz789

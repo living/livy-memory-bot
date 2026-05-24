@@ -111,6 +111,7 @@ def rewrite_topic_file(path: Path, entries: list[ParsedEntry], topic_name: str) 
         level = e.get("confidence_level") or ""
         entry_lines = [
             f"### {e['date']} — {e['source']}",
+            "",  # blank line before blockquote
             f"> {e['text']}",
             "",
             f"- **Source:** {e['source_ref']}",
