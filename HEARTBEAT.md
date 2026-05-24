@@ -24,11 +24,13 @@ _Atualizado: 2026-05-23 22:45 UTC (19:45 BRT)_
 | **vault-lint** | 21h | ✅ ok | 0 | delivery telegram ativo |
 | **vault-insights-weekly-validate** | seg 06:30 | ✅ ok | 0 | sintaxe + imports |
 | **vault-insights-weekly-generate** | seg 07h | ✅ ok | 0 | geração + envio resumo |
+| `qw2-daily` | seg-sex 07h | ✅ ok | 0 | RAW → topic files; dry-run until confirmed |
+| `qw2-dry-run-weekly` | dom 07h | ✅ ok | 0 | Validação antes de confirmar |
 | ~~agenda-trello-0930~~ | 09:30 | ❌ removido | — | job do Victor (neo); removido da memória-agent |
 | ~~agenda-trello-1230~~ | 12:30 | ❌ removido | — | job do Victor (neo); removido da memória-agent |
 | ~~agenda-trello-1700~~ | 17h | ❌ removido | — | job do Victor (neo); removido da memória-agent |
 
-**Resumo:** 18/21 ok, 3 removidos (Victor/neo)
+**Resumo:** 20/23 ok, 3 removidos (Victor/neo)
 
 ## Alertas
 
@@ -44,6 +46,10 @@ _Atualizado: 2026-05-23 22:45 UTC (19:45 BRT)_
 | ✅ | **PR #17 mergeada — Evo Wiki Research Phase 2** | merge `842852c` squash; 15 commits; 321 testes; 2 bloqueantes corrigidos (namespace event_key + untrack metrics) |
 | ✅ | **PR #23 mergeada — Self-Healing Apply V2** | merge `cea58c8` squash; apply_decision v2 + apply_merge_to_ssot + circuit breaker v2 + rollback append-only; 50 testes passando; E2E validado |
 | ✅ | **Hotfix `e645c42` — GitHub search cross-repo noise** | `repo:` + `org:` no search vazava PRs de outros repos; filtro defensivo por `repository_url` normalizado; suíte research 476 passing |
+| ✅ | **QW-2 + QW-3 implemented — RAW → topic files pipeline** | Trello/GitHub → topic files via memory-assistant + curated; quality filters (length + confidence); board allowlist: none |
+| ✅ | **QW-2 + QW-3 quality + dedupe** | Confidence filter (Trello plugin data); written_refs.json + write_log.jsonl; cross-instance dedupe test |
+| ✅ | **QW-2 + QW-3 safety gates** | Dry-run first run + DM confirmation (confidence < 0.85 OR routing failed); cursor uses actual max(updated_at) from API |
+| ✅ | **QW-2 + QW-3 operational safeguards** | lock_manager.py prevents concurrent runs; cross-platform Trello ↔ GitHub intersection deduplication |
 | ✅ | **PR #24 mergeada — Enriched Claims Rollout** | merge `fd0f9ac` squash; tasks 1–9 entregues (needs_review/review_reason, semantic keys, quality guardrails); validação: 545 tests/research + 140 tests/vault |
 
 ## Qualidade de Claims (Enriched Claims)
