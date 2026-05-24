@@ -25,9 +25,7 @@ import json
 import os
 import re
 import subprocess
-import sys
 from datetime import datetime, timedelta, timezone
-from pathlib import Path
 
 import httpx
 
@@ -525,8 +523,7 @@ def extract_tldv_lessons(since_days: int, model: str, dry_run: bool = False,
     from vault.research.tldv_client import TLDVClient
     from vault.capture.azure_blob_client import load_transcript_segments
 
-    effective_days = max(since_days, 90)
-    client = TLDVClient(lookback_days=effective_days)
+    client = TLDVClient(lookback_days=since_days)
 
     try:
         meetings = client.fetch_events_since(None)
@@ -584,17 +581,22 @@ def extract_tldv_lessons(since_days: int, model: str, dry_run: bool = False,
         project = extract_project_tag(name) or "general"
 
         print(f"  [PROC] TLDV: {name[:50]} ({date_str})")
-        lesson = extract_tldv_lesson_via_llm(
-            meeting_id=meeting_id,
-            meeting_name=name,
-            meeting_date=date_str,
-            project=project,
-            transcript=transcript[:8000],  # generous but bounded
-            model=model,
-        )
+        if dry_run:
+            # In dry-run, skip LLM calls and record a placeholder
+            lesson = f"[DRY-RUN] Would extract lesson for TLDV meeting {meeting_id} — {name}"
+        else:
+            lesson = extract_tldv_lesson_via_llm(
+                meeting_id=meeting_id,
+                meeting_name=name,
+                meeting_date=date_str,
+                project=project,
+                transcript=transcript[:8000],  # generous but bounded
+                model=model,
+            )
         if lesson:
             # Inject frontmatter (LLM often skips it)
-            lesson = inject_tldv_frontmatter(lesson, meeting_id, name, date_str, project)
+            if not dry_run:
+                lesson = inject_tldv_frontmatter(lesson, meeting_id, name, date_str, project)
             lessons.append((meeting_id, name, date_str, project, lesson))
     return lessons
 
