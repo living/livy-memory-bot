@@ -24,22 +24,22 @@ def fetch_tldv_decisions(since_days: int = 7) -> tuple[list[dict[str, Any]], str
         logger.warning(f"TLDV not configured: {e}")
         return [], None
 
-    meetings = client.fetch_updated_meetings()
+    meetings = client.fetch_events_since(None)
     decisions = []
     max_updated: str | None = None
 
     for meeting in meetings:
         name = meeting.get("name", "")
-        meeting_id = meeting.get("id", "")
-        updated_at = meeting.get("updated_at") or meeting.get("created_at", "")
+        meeting_id = meeting.get("meeting_id", "")
+        created_at = meeting.get("created_at", "")
+        updated_at = meeting.get("updated_at") or created_at
 
         if updated_at and (max_updated is None or updated_at > max_updated):
             max_updated = updated_at
 
         is_status_meeting = bool(STATUS_MEETING_RE.match(name))
 
-        full = client.fetch_meeting(meeting_id)
-        summaries = full.get("summaries", []) or []
+        summaries = client.fetch_summaries(meeting_id) or []
 
         for summary in summaries:
             summary_decisions = summary.get("decisions") or []
