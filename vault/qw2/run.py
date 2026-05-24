@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import argparse
 import sys
-from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
@@ -50,7 +49,7 @@ Routing failed (→ DM): {summary['routing_failed']}
 
 def run(source: str = "all", dry_run: bool = True, since_days: int = 7) -> dict:
     # Acquire lock
-    if not acquire_lock(str(LOCK_FILE), timeout=10):
+    if not acquire_lock(str(LOCK_FILE), ttl=10):
         print("[QW-2] Already running, skipping.")
         return {"error": "already_running"}
 

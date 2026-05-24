@@ -1,0 +1,21 @@
+{
+  "meetings": [
+    {
+      "id": "meeting_test_1",
+      "name": "Daily BAT — decisões técnicas",
+      "created_at": "2026-05-24T10:00:00Z",
+      "updated_at": "2026-05-24T10:00:00Z"
+    }
+  ],
+  "full_meeting": {
+    "summaries": [
+      {
+        "decisions": [
+          "Usar GPT-4 Turbo para decisões de alta confiança",
+          "Manter o pipeline de observabilidade sem alterações"
+        ],
+        "tags": ["llm", "bat"]
+      }
+    ]
+  }
+}
