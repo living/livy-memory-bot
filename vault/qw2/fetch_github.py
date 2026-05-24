@@ -26,29 +26,27 @@ def fetch_github_decisions(since_days: int = 7) -> tuple[list[dict[str, Any]], s
     max_merged: str | None = None
 
     for event in events:
-        pr = event.get("payload", {})
-        title = pr.get("title", "")
-        body = pr.get("body", "") or ""
-        merged_at = pr.get("merged_at", "")
-        url = pr.get("url", "")
-        repo = event.get("repo", "")
+        # GitHubClient returns normalized events directly (no 'payload' wrapper)
+        title = event.get("title", "") or ""
+        merged_at = event.get("merged_at", "") or ""
+        repo = event.get("repo", "") or ""
+        pr_number = event.get("pr_number")
 
         if merged_at and (max_merged is None or merged_at > max_merged):
             max_merged = merged_at
 
-        combined = f"{title} {body}".strip()
-        if len(combined) < 50:
+        if not title or len(title) < 10:
             continue
 
         decisions.append({
-            "text": combined[:500],
-            "source_ref": f"github:{repo}#{pr.get('number', '')}",
+            "text": title[:500],
+            "source_ref": f"github:{repo}#{pr_number}" if pr_number else f"github:{repo}",
             "confidence": 0.85,
             "date": _pr_date(merged_at),
             "source": "github",
             "pr_title": title,
             "tags": [repo.split("/")[-1]] if repo else [],
-            "url": url,
+            "url": f"https://github.com/{repo}/pull/{pr_number}" if repo and pr_number else "",
         })
 
     return decisions, max_merged
