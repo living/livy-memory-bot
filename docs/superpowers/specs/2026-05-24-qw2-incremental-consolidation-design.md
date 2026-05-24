@@ -110,12 +110,24 @@ QW-2 extrai decisões de TLDV + GitHub + Trello para topic files em `memory/vaul
 
 **Input:** `memory/vault/decisions/*.md` (só entries com `source_ref` e `confidence_level`)
 
+**Honcho API payload (campos required):**
+```python
+payload = {
+    "content": "DECISION | {date} | {text[:200]} | {source_ref} | confidence:{level} | tags:{tags}[ | supersedes: {id}]",
+    "observer_id": "agent-memory-agent",  # quem indexa (fixed)
+    "observed_id": source_type,             # tldv | github | trello
+}
+```
+- `observer_id`: quem cria a conclusão — fixo `"agent-memory-agent"`
+- `observed_id`: fonte dos dados — extraído do prefixo do `source_ref` (`tldv:`, `github:`, `trello:`)
+
 **Processamento por decision entry:**
-1. Extrai `source_ref` do frontmatter
-2. Search Honcho por conclusão existente com mesmo `source_ref` (usando `honcho_search_conclusions` com query `source_ref:<ref>`)
-3. Se existe: constrói content com `supersedes: <old_id>`
-4. Se não existe: constrói content sem supersedes
-5. POST para `POST /v3/workspaces/{workspace}/conclusions`
+1. Extrai `source_ref` e `source_type` do frontmatter
+2. Search Honcho: `honcho_search_conclusions(query=source_ref, topK=5, maxDistance=0.1)`
+3. Exact match confirmation: `source_ref` presente no `content` E `observed_id` igual ao da entry
+4. Se existe: constrói content com `supersedes: <old_id>`
+5. Se não existe: constrói content sem supersedes
+6. POST para `POST /v3/workspaces/{workspace}/conclusions`
 
 **Content format:**
 ```
@@ -194,13 +206,41 @@ Extensão dos flags existentes:
 
 ## 4. Locking e Concorrência
 
-**Lock file:** `.research/qw2/.consolidate.lock`
-- Criado no início de `consolidate.py` e `honcho_indexer.py`
+### 4.1 Módulo Partilhado `vault/qw2/lock.py`
+
+```python
+# vault/qw2/lock.py
+LOCK_FILE = Path(".research/qw2/.qw2.lock")
+LOCK_TTL_SECONDS = 600
+
+def acquire_lock() -> bool:
+    """Cria lock file. Retorna True se adquirido, False se lock existe e é fresco."""
+    ...
+
+def release_lock() -> None:
+    """Remove lock file. Só remove se for o lock actual (mesmo PID)."""
+    ...
+
+def is_locked() -> bool:
+    """Check se lock existe e não é stale."""
+    ...
+```
+
+**Importado por:** `run.py`, `consolidate.py`, `honcho_indexer.py`
+
+**Lock file:** `.research/qw2/.qw2.lock` (compartilhado por todos os módulos)
+- Criado no início de `run.py`, `consolidate.py` e `honcho_indexer.py`
 - TTL: 600s (10 min)
 - Se lock existe e é stale (>600s), sobrescreve
 - No fim: remove lock file
+- Importado de `vault.qw2.lock` (módulo partilhado)
 
-**QW-2 + Consolidação em paralelo:** evitado pelo lock.
+**QW-2 + Consolidação em paralelo:**
+- Cron QW-2 às 07h BRT, consolidate às 08h BRT — 1h de gap (suposição: QW-2 termina em < 1h)
+- Lock em todos os módulos previne concurrent runs mesmo em runs manuais
+- Se QW-2 demorar > 1h, race condition possível — mitigate: lock com TTL
+
+**Nota sobre --reset e consolidate:** após `--reset`, QW-2 re-escreve entries sem `confidence_level`. A próxima consolidação vai recalcular — comportamento desejado. Não há `--reset-consolidate` porque consolidate opera por source_ref e não por timestamp.
 
 ---
 
@@ -243,6 +283,11 @@ def test_existing_decision_posts_with_supersedes():
     """source_ref já existe: POST com supersedes: <old_id>."""
     ...
 
+def test_honcho_dedupe_exact_match():
+    """Search por source_ref retorna só exact match (mesmo observed_id)."""
+    # source_ref="tldv:abc123" não conflita com "tldv:abc123_extra"
+    # Verifica observed_id para confirmar match
+
 def test_dry_run_no_post():
     """--dry-run: nenhum POST feito."""
     ...
@@ -278,7 +323,7 @@ def test_reset_cursors_keeps_dedupe():
 | R2 | Consolidação reescreve e perde entries | 🔴 Baixa | Critical | `--dry-run` obrigatório antes de `--all` |
 | R3 | `--reset` limpa dedupe e duplica | 🟡 Média | Alto | Consolidação dedupe corre após reset (cron) |
 | R4 | Fact-check lento em topic files grandes | 🟡 Média | Médio | Skip entries com `confidence_level` já calculado |
-| R5 | Consolidação || QW-2 escrevem mesmo topic | 🟢 Baixa | Médio | Lock file com TTL 600s |
+| R5 | QW-2 demorar > 1h e overlap com consolidate | 🟡 Média | Médio | Lock com TTL 600s + gap de 1h assume QW-2 < 1h |
 
 ---
 
