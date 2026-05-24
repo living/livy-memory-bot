@@ -152,9 +152,9 @@ payload = {
 2. GET `/conclusions/list` com `filters={"observed_id": source_type}` → filtra conclusões do source
 3. Busca linear no `content` de cada conclusão por `source_ref:{ref}` (exact substring match)
 4. Exact match: `source_ref` presente no `content` E `observed_id` = source_type da entry
-4. Se existe: constrói content com `supersedes: <old_id>`
-5. Se não existe: constrói content sem supersedes
-6. POST para `POST /v3/workspaces/{workspace}/conclusions`
+5. Se existe: constrói content com `supersedes: <old_id>`
+6. Se não existe: constrói content sem supersedes
+7. POST para `POST /v3/workspaces/{workspace}/conclusions`
 
 **POST `/v3/workspaces/{workspace_id}/conclusions`** - Required fields (API schema):
 ```json
@@ -174,6 +174,8 @@ POST /v3/workspaces/{id}/conclusions/list
 ```
 Retorna todas as conclusões para o source type. Buscar no campo `content` por `source_ref:{ref}` para encontrar matches.
 
+**LIMITATION:** Busca linear em todas as conclusões do source_type é O(N). Com milhares de conclusions no Honcho, isto pode ficar lento. Solução futura: manter índice local `source_ref → conclusion_id` em `.research/qw2/honcho_index.json` e actualizar incrementalmente.
+
 **Nota:** `/conclusions/query` semântico **não é usado** - requer `observer_id` + `observed_id` simultaneamente e não escala para dedupe linear. Usa-se `/conclusions/list` + busca em content.
 
 **Content format:**
@@ -187,7 +189,10 @@ DECISION | {date} | {text[:200]} | {source_ref} | confidence:{level} | tags:{tag
 --since DATE       Indexa só entries desde DATE (ISO format)
 --dry-run          Não faz POST, só mostra o que faria
 --honcho-cleanup   Quando activo: DELETE conclusions removidas pelo dedupe (default: off)
+--reset            Limpa índice local honcho_index.json (force full re-index)
 ```
+
+**LIMITATION:** Sem `--reset`, não há forma de forçar re-index completo a não ser limpar `.research/qw2/honcho_index.json` manualmente. O Honcho não tem endpoint de bulk delete.
 
 **Return dict:**
 ```python
@@ -351,6 +356,13 @@ def test_honcho_dedupe_exact_match():
 
 def test_dry_run_no_post():
     """--dry-run: nenhum POST feito."""
+    ...
+
+def test_honcho_cleanup_deletes_removed_entries():
+    """--honcho-cleanup: entries removidas pelo dedupe são apagadas do Honcho."""
+    # topic file tinha entries [A, B, C]
+    # após dedupe: só [A, C] (B foi removida)
+    # com --honcho-cleanup: DELETE /conclusions/{id_B}
     ...
 
 def test_content_format():
