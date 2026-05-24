@@ -135,11 +135,10 @@ def _process_source(source: str, decisions: list, dry_run: bool, summary: dict) 
         routed = route_decision(decision)
         decision["topic"] = routed["topic"]
         if routed.get("routing_failed"):
-            if decision.get("confidence", 0) < 0.85:
-                summary["routing_failed"] += 1
-                summary["dm_candidates"].append(decision)
-            else:
-                print(f"  [WARN] {source}: high-conf decision routed to general: {decision['text'][:60]}")
+            summary["routing_failed"] += 1
+            summary["dm_candidates"].append(decision)
+            if not dry_run:
+                print(f"  [DM] {source}: {decision['text'][:60]} → review pending")
             continue
         topic_path = DECISIONS_DIR / routed["topic"]
         if dry_run:
