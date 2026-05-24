@@ -4,7 +4,7 @@
 
 **Goal:** Implement QW-2 (RAW → Topic Files) and QW-3 (DM review for low-confidence decisions) per spec `docs/superpowers/specs/2026-05-24-qw2-design-v2.md`.
 
-**Architecture:** QW-2 fetches directly from TLDV/Trello/GitHub RAW APIs, applies quality filters (DONE cards, low confidence, short text), runs inference routing to topic files, and writes decisions directly with dedupe + write-log rollback. QW-3 handles DM review for ambiguous decisions (confidence < 0.85) and routing failures. First run is always dry-run requiring explicit confirmation.
+**Architecture:** QW-2 fetches directly from TLDV/Trello/GitHub RAW APIs, applies quality filters (length, confidence), extracts Trello plugin data, runs inference routing to topic files, and writes decisions directly with dedupe + write-log rollback. QW-3 handles DM review for ambiguous decisions (confidence < 0.85) and routing failures. First run is always dry-run requiring explicit confirmation.
 
 **Tech Stack:** Python 3, existing `vault/research/{tldv_client,trello_client,github_client}.py`, `vault/research/retry_policy.py`, `vault/research/lock_manager.py`, Telegram API via OpenClaw `message` tool, `ruff`+`mypy`+`pytest`.
 
@@ -20,7 +20,7 @@ vault/qw2/
   fetch_tldv.py       # Fetch decisions from TLDV meetings
   fetch_trello.py     # Fetch decisions from Trello cards
   fetch_github.py     # Fetch decisions from GitHub PRs
-  filter.py           # Quality filters (DONE, length, confidence, Trello zero-conf)
+  filter.py           # Quality filters (length, confidence) for TLDV/GitHub
   router.py           # Inference pass → topic file mapping
   writer.py           # Append decision to topic file + dedupe + write log
   cursor.py           # Per-source cursor management
@@ -46,7 +46,7 @@ memory/vault/pending/archive/     # Rejected
   .pending_confirmation/ # dry-run output awaiting confirm
 
 tests/qw2/
-  test_filter.py         # Parametrize table: DONE variants, length, confidence, Trello zero-conf
+  test_filter.py         # Parametrize table: length + confidence
   test_router.py         # Routing rules (Trello board_name + text)
   test_writer.py         # Append + dedupe + write log
   test_dedupe_cross_instance.py  # Two separate QWWriter instances dedupe correctly
@@ -107,16 +107,12 @@ git commit -m "feat(qw2): project scaffolding"
 ```python
 # tests/qw2/test_filter.py
 import pytest
-from vault.qw2.filter import should_skip, DONE_CARD_RE
+from vault.qw2.filter import should_skip
 
 @pytest.mark.parametrize("text,expected_skip,reason", [
-    # DONE card variants
-    ("Card 'X' foi concluído.\n\nLista: DONE", True, "standard DONE pattern"),
-    ("Card 'X' foi concluída.\n\nLista: Done", True, "capitalisation variant"),
-    ("foi concluído.\n\nLista:", True, "minimal DONE pattern"),
-    ("Card 'X' foi concluído.\n\nLista:;", True, "semicolon variant"),
-    ("Card 'X' foi concluído.\nLista:", False, "no newline before lista — not DONE format"),
-    ("foi decidido que...", False, "real decision — not DONE"),
+    # Trello: DONE cards sao dados operacionais — nenhum filtro DONE_CARD_RE
+    # Trello filtra no fetch (card utilidade), nao no should_skip
+    ("foi decidido que...", False, "real decision"),
     # Length
     ("x" * 49, True, "49 chars — too short"),
     ("x" * 50, False, "50 chars — exact threshold"),
@@ -153,13 +149,7 @@ Expected: FAIL — `should_skip` not defined
 """Quality filters for QW-2 RAW → Topic File pipeline."""
 from __future__ import annotations
 
-import re
 from typing import Any
-
-DONE_CARD_RE = re.compile(
-    r"foi conclu[ií]d[oa].*\nlista\s*:",
-    re.IGNORECASE | re.DOTALL
-)
 
 def should_skip(claim: dict[str, Any]) -> tuple[bool, str]:
     """Return (skip, reason). False = process this claim."""
@@ -167,28 +157,20 @@ def should_skip(claim: dict[str, Any]) -> tuple[bool, str]:
     source = claim.get("source", "")
     confidence = claim.get("confidence", 0)
 
-    # 1. DONE card notifications
-    if DONE_CARD_RE.search(text):
-        return True, "Trello DONE card"
-
-    # 2. Status meeting override: high-confidence decisions survive even in filler meetings
+    # 1. Status meeting override: high-confidence decisions survive even in filler meetings
     is_status = claim.get("_is_status_meeting", False)
     if is_status and confidence >= 0.90:
         return False, ""  # override — status meeting but high confidence
 
-    # 3. Trello: no LLM confidence available — skip until extraction exists
-    if source == "trello" and confidence < 0.75:
-        return True, f"Trello: confidence={confidence} — no LLM extraction"
-
-    # 4. Texto curto demais
+    # 2. Texto curto demais (TLDV + GitHub)
     if len(text) < 50:
         return True, f"text too short ({len(text)} chars)"
 
-    # 5. Confiança baixa
+    # 3. Confiança baixa (TLDV + GitHub — Trello não tem confidence)
     if confidence < 0.75:
         return True, f"low confidence {confidence}"
 
-    # 6. TLDV sem decisões registradas
+    # 4. TLDV sem decisões registradas
     if "sem decisões registradas" in text.lower():
         return True, "no decisions in transcript"
 
@@ -202,7 +184,7 @@ Expected: PASS
 
 ```bash
 git add vault/qw2/filter.py tests/qw2/test_filter.py
-git commit -m "feat(qw2): quality filters — DONE regex, length, confidence, Trello zero-conf gate"
+git commit -m "feat(qw2): quality filters — length + confidence, Trello plugin data"
 ```
 
 ---
@@ -513,18 +495,17 @@ ROUTING_RULES: list[tuple[list[str], str]] = [
 ]
 
 # Trello board name → topic file (explicit mapping)
-TRELLO_BOARD_ROUTING: dict[str, str] = {
-    "bat": "bat-conectabot-observability.md",
-    "delphos": "delphos-video-vistoria.md",
-    "forge": "forge-platform.md",
-    "kaba": "bat-conectabot-observability.md",
-    "4d imobi": "4d-imobi.md",
-    "hydra": "hydra-evolution.md",
-    "living": "general.md",
-}
-
-# Keys must match TRELLO_BOARD_ROUTING exactly
-ALLOWED_BOARDS_KEYS = set(TRELLO_BOARD_ROUTING.keys())
+ROUTING_RULES = [
+    (["bat", "kaba", "bot"], "bat-conectabot-observability.md"),
+    (["tldv", "memory", "livy", "openclaw", "gateway"], "livy-memory-agent.md"),
+    (["delphos", "vistoria"], "delphos-video-vistoria.md"),
+    (["forge"], "forge-platform.md"),
+    (["evo", "evolution"], "livy-evo.md"),
+    (["4d", "imobi"], "4d-imobi.md"),
+    (["hydra"], "hydra-evolution.md"),
+    (["b3", "balc", "balcao"], "bat-conectabot-observability.md"),
+    (["cerc", "interop"], "delphos-video-vistoria.md"),
+]
 
 def route_decision(decision: dict[str, Any]) -> dict[str, Any]:
     """Route a decision to a topic file. Returns dict with topic, routing_failed."""
@@ -1570,7 +1551,7 @@ Add to Alertas:
 
 ```
 ✅ QW-2 + QW-3 implemented — RAW → topic files pipeline
-✅ Quality filters: DONE card regex + length + confidence + Trello zero-conf gate
+✅ Quality filters: length + confidence (Trello uses plugin data filter)
 ✅ Board allowlist: 7 boards Living
 ✅ Dedupe: written_refs.json + write_log.jsonl + cross-instance dedupe test
 ✅ Dry-run first run + DM confirmation (confidence < 0.85 OR routing failed)
