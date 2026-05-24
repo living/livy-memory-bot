@@ -53,15 +53,31 @@ def is_auto_write_enabled() -> bool:
     return (QW2_BASE / ".auto_write_enabled").exists()
 
 def _send_dry_run_dm(summary: dict) -> None:
-    """Send DM via OpenClaw message tool using subprocess."""
-    text = f"""🔍 QW-2 dry-run result
+    """Write DM content listing all pending decisions for Lincoln's review."""
+    lines = [
+        f"🔍 QW-2 dry-run — {summary['processed']} decisões processadas\n",
+        f"📝 Escritas: {summary['written']} | Duplicadas: {summary['skipped_dedupe']} | Filtradas: {summary['skipped_filter']}\n",
+        f"⚠️ Routings falhados (→ revisão): {summary['routing_failed']}\n",
+        "---",
+        "**Decisões pendentes de revisão:**",
+    ]
+    for d in summary.get("dm_candidates", []):
+        conf = d.get("confidence", 0)
+        text = d.get("text", "")[:80]
+        source = d.get("source", "?").upper()
+        topic = d.get("topic", "unknown")
+        lines.append(f"• [{source}] {text}")
+        lines.append(f"  → {topic} (conf: {conf:.0%})")
 
-Processed: {summary['processed']}
-Written: {summary['written']} | Skipped (dedupe): {summary['skipped_dedupe']} | Skipped (filter): {summary['skipped_filter']}
-Routing failed (→ DM): {summary['routing_failed']}
+    lines.append("---")
+    lines.append("**[✅ Confirmar — próximo run escreve]** | **[❌ Cancelar]**")
 
-[✅ Confirmar — proximo run escreve] [❌ Cancelar]
-"""
+    text = "\n".join(lines)
+
+    dm_file = QW2_BASE / ".pending_confirmation" / "dry_run_dm.txt"
+    dm_file.parent.mkdir(parents=True, exist_ok=True)
+    dm_file.write_text(text)
+    print(f"[QW-2] Dry-run DM saved to {dm_file}")
     dm_file = QW2_BASE / ".pending_confirmation" / "dry_run_dm.txt"
     dm_file.parent.mkdir(parents=True, exist_ok=True)
     dm_file.write_text(text)
