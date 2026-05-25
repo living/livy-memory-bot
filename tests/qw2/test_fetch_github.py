@@ -1,19 +1,18 @@
+"""Tests for GitHub decision fetching."""
 from unittest.mock import patch, MagicMock
 from vault.qw2.fetch_github import fetch_github_decisions
 
+
 @patch("vault.qw2.fetch_github.GitHubClient")
 def test_fetches_merged_prs(mock_client_cls):
+    """GitHubClient returns normalized events directly (no 'payload' wrapper)."""
     mock_client = MagicMock()
     mock_client.fetch_events_since.return_value = [
         {
             "repo": "living/livy-memory-bot",
-            "payload": {
-                "title": "feat: adicionar nova feature",
-                "body": "Esta PR implementa o sistema de decisions.",
-                "number": 42,
-                "merged_at": "2026-05-24T12:00:00Z",
-                "url": "https://github.com/living/livy-memory-bot/pull/42",
-            }
+            "title": "feat: adicionar nova feature",
+            "pr_number": 42,
+            "merged_at": "2026-05-24T12:00:00Z",
         }
     ]
     mock_client_cls.return_value = mock_client
