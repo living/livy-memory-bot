@@ -143,18 +143,35 @@ def send_telegram_summary() -> bool:
         return False
 
 
-def process_callback(callback_data: str) -> dict:
-    """Main entry point for processing a callback."""
-    action = callback_data.strip()
+def normalize_command(text: str) -> str | None:
+    """Normalize a command string to action name."""
+    text = text.strip().lower()
+    # Handle /slash commands
+    if text.startswith("/"):
+        text = text.lstrip("/")
+    # Map variations to canonical actions
+    if text in ("qw2approve", "qw2_confirm", "approve", "aprovar", "sim", "yes"):
+        return "qw2_approve"
+    if text in ("qw2reject", "qw2_cancel", "reject", "rejeitar", "nao", "no"):
+        return "qw2_reject"
+    if text in ("qw2list", "qw2_list", "list"):
+        return "qw2_list"
+    return None
 
-    if action in ("qw2_confirm", "qw2_approve"):
+
+def process_callback(callback_data: str) -> dict:
+    """Main entry point for processing a callback or command."""
+    action = normalize_command(callback_data)
+    if not action:
+        return {"error": f"unknown_callback: {callback_data}"}
+
+    if action == "qw2_approve":
         result = confirm_pending()
         return result
-    elif action in ("qw2_cancel", "qw2_reject"):
+    elif action == "qw2_reject":
         result = cancel_pending()
         return result
     elif action == "qw2_list":
-        # Just send summary without processing
         send_telegram_summary()
         return {"action": "listed"}
     else:
