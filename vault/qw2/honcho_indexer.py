@@ -19,7 +19,7 @@ from vault.qw2.consolidate import parse_topic_file
 
 DECISIONS_DIR = _WS / "memory" / "vault" / "decisions"
 HONCHO_BASE = "http://100.121.74.111:8000"
-HONCHO_WORKSPACE = "openclaw"
+HONCHO_WORKSPACE = os.environ.get("HONCHO_WORKSPACE_ID", "living")
 HONCHO_AGENT_PEER = "agent-memory-agent"
 
 
