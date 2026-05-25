@@ -33,7 +33,7 @@ import httpx
 
 HONCHO_BASE = os.environ.get("HONCHO_BASE", "http://100.121.74.111:8000")
 HONCHO_API_KEY = os.environ.get("HONCHO_API_KEY", "")
-HONCHO_WORKSPACE = os.environ.get("HONCHO_WORKSPACE_ID", "openclaw")
+HONCHO_WORKSPACE = os.environ.get("HONCHO_WORKSPACE_ID", "living")
 HONCHO_AGENT_PEER = os.environ.get("HONCHO_AGENT_PEER", "agent-memory-agent")
 
 
