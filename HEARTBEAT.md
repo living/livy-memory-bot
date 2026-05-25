@@ -24,8 +24,8 @@ _Atualizado: 2026-05-23 22:45 UTC (19:45 BRT)_
 | **vault-lint** | 21h | ✅ ok | 0 | delivery telegram ativo |
 | **vault-insights-weekly-validate** | seg 06:30 | ✅ ok | 0 | sintaxe + imports |
 | **vault-insights-weekly-generate** | seg 07h | ✅ ok | 0 | geração + envio resumo |
-| `qw2-daily` | seg-sex 07h | ✅ ok | 0 | RAW → topic files; dry-run until confirmed |
-| `qw2-dry-run-weekly` | dom 07h | ✅ ok | 0 | Validação antes de confirmar |
+| `qw2-daily` | seg-sex 07h | ✅ ok | 0 | RAW → topic files; REAL mode since 2026-05-25 |
+| `qw2-dry-run-weekly` | dom 07h | ✅ ok | 0 | Validado; superseded by real mode |
 | ~~agenda-trello-0930~~ | 09:30 | ❌ removido | — | job do Victor (neo); removido da memória-agent |
 | ~~agenda-trello-1230~~ | 12:30 | ❌ removido | — | job do Victor (neo); removido da memória-agent |
 | ~~agenda-trello-1700~~ | 17h | ❌ removido | — | job do Victor (neo); removido da memória-agent |
@@ -39,7 +39,7 @@ _Atualizado: 2026-05-23 22:45 UTC (19:45 BRT)_
 | 🟡 | Jobs legados desabilitados (openclaw-health, sonhar, signal-curation, daily-memory-save) | Manter desabilitados ou replanejar com configuração nova |
 | 🟢 | Vault insights semanal operacional | Manter monitoramento das segundas 06:30/07:00 |
 | 🟢 | Loop de research v1 (TLDV/GitHub/Trello/Consolidation) ativo | Manter observabilidade de lock, rebuild de estado e retry policy |
-| ✅ | **Honcho retrieval smoke test — QW-6** | daemon reachable; skill operational; 0 results (expected, no peer memory yet) |
+| ✅ | **Honcho indexed — 73 decisions** | 64 consolidated (May 18-24) + 16 April backfill (40 TLDV extraídas, 24 dedupe); observed_id bug corrigido em honcho_indexer |
 | ✅ | **Wiki v2 produção — github + trello + tldv** | commits `30a3b29` + `23e6019`; 3 fontes no caminho `fuse()` + SSOT claims + blob |
 | ✅ | **agenda-trello-* removidos da memória-agent** | 3 jobs eram do Victor/neo e foram removidos do gateway |
 | ✅ | **PR #18 mergeada — batch-first research clients + cadence wiring** | merge `08672fd` squash; 958 inserções; 6 correções de review implementadas; 343 testes research passando |
@@ -69,7 +69,7 @@ _Atualizado: 2026-05-23 22:45 UTC (19:45 BRT)_
 
 | Mudança | Impacto |
 |---|---|
-| ✅ **QW-2 E2E validado** — 134 decisions, 45 escritas, 0 falhas | Fix: `fetch_tldv` usava `fetch_meeting()` em vez de `fetch_summaries()`; GitHub 1 query org-wide vs per-repo rate limit; `fetch_github` lia `event[payload]` inexistente |
+| ✅ **QW-2 real mode activated (2026-05-25)** | auto-write enabled; qw2-daily executes real pipeline; QW-3 callback crons configured and running |
 | ✅ PR #14 mergeada (`a8f3626`) — envio real Telegram no `envia_resumo.py` | Resumo semanal automatizado com dedupe |
 | ✅ PR #15 mergeada (`6ea8005`) — fallback `TELEGRAM_TOKEN` | Compatibilidade com ambiente de produção atual |
 | 🆕 Cron `vault-insights-weekly-validate` | Validação preventiva semanal antes da geração |
@@ -77,7 +77,7 @@ _Atualizado: 2026-05-23 22:45 UTC (19:45 BRT)_
 | ✅ Weekly insights claims-first + fallback por cobertura temporal | Novos módulos `vault/insights/claim_inspector.py` + `renderers.py`; grupo recebe HTML como documento em `-5158607302` |
 | 🆕 Crons `research-tldv`, `research-github` e `research-trello` | Polling por fonte com lock distribuído e rebuild de estado derivado |
 | 🆕 Cron `research-consolidation` | Consolidação diária 07h BRT substituindo `dream-memory-consolidation` |
-| ✅ Smoke test manual dos crons de research | `research-trello` processed=390, `research-github`/`research-tldv` ok, `research-consolidation` sem alertas |
+| ✅ Backfill Abril TLDV via Supabase (2026-05-25) | 28 meetings Abril 1-26; 40 decisions extraídas via Supabase; 16 escritas; +11 entries livy-memory-agent, +1 bat-conectabot; honcho indexed |
 | ✅ **PR #18 mergeada — batch-first research pipeline** | merge `08672fd` squash; github_client two-step (search→pulls), tldv_client cutoff always applied, cadence wired in pipeline, global cadence documented; sanity: 343 tests, smoke OK |
 | ✅ **Hotfix `8e1bc76` — gh search GET** | `gh api search/issues` precisa `-X GET` senão usa POST → 404 em todos os repos; 370 tests passing; 11 PRs processados (inclui #19) |
 | ✅ **PR #20 mergeada — Wiki v2 Phase 1 Foundation** | merge `a1c0dd3` squash; Memory Core + Fusion Engine + Azure-first capture + dual-key idempotency + ops (shadow/rollback/replay); validação pós-merge: 439 tests research + 90 tests vault |
