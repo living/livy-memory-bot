@@ -12,6 +12,11 @@ ROUTING_RULES: list[tuple[list[str], str]] = [
     (["evo", "evolution"], "livy-evo.md"),
     (["4d", "imobi"], "4d-imobi.md"),
     (["hydra"], "hydra-evolution.md"),
+    # Repos sem topic próprio → infra.md
+    (["insight-funds", "bot-ai-api", "bot-ai-app", "RetailAuditRulesDashboard", "RetailAuditInfraDashboard", "llm-rag-api", "elcano-robo-ocr"], "infra.md"),
+    # Infra / CI-CD / DevOps — cross-repo engineering decisions
+    (["ci/cd", "deploy pipeline", "github-actions", "github actions workflow", "infrastructure", "blob storage", "cdn", "docker-compose", "dockerfile"], "infra.md"),
+    (["cronjob", "deploy", "workflow", "docker", "container", "pipeline", "blob_url", "blobname"], "infra.md"),
 ]
 
 # Trello: explicit board_name → topic routing
@@ -43,11 +48,15 @@ def route_decision(decision: dict[str, Any]) -> dict[str, Any]:
                 return {"topic": topic, "routing_failed": False, "match": f"board:{board_key}"}
 
     # Combined text + source_ref for keyword matching
+    # Use word-boundary matching to avoid substring false positives (e.g. "conectabot" matches "bat")
+    import re
     combined = f"{text_lower} {source_ref}"
 
     for keywords, topic in ROUTING_RULES:
         for kw in keywords:
-            if kw in combined:
+            # Word boundary: kw must be surrounded by non-alphanumeric or start/end
+            pattern = r'(?<![a-z0-9])' + re.escape(kw) + r'(?![a-z0-9])'
+            if re.search(pattern, combined):
                 return {"topic": topic, "routing_failed": False, "match": kw}
 
     # Fallback: general.md + routing failed → DM
