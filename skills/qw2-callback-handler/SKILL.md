@@ -1,80 +1,59 @@
 # QW-2 Callback Handler Skill
 
-Handles Telegram inline button callbacks for QW-2 pending decisions workflow.
+Handles Telegram inline button callbacks and text replies for QW-2 pending decisions workflow.
 
 ## Trigger
 
-When a Telegram message contains callback_data starting with `qw2_` (qw2_confirm, qw2_cancel, qw2_approve, qw2_reject).
+When a Telegram message from Lincoln (7426291192) contains:
+- callback_data starting with `qw2_` (qw2_confirm, qw2_cancel, qw2_approve, qw2_reject)
+- Text matching: `approve`, `reject`, `/qw2approve`, `/qw2reject`
 
-## Workflow
+## Flow
 
-### qw2_confirm / qw2_approve
-1. Read pending decisions from `memory/vault/pending/`
-2. Send Telegram message listing decisions with approve/reject buttons
-3. Wait for user confirmation
-4. On approve: write decisions to appropriate topic files → consolidate → update MEMORY.md
-5. On reject: archive pending files without writing
-6. Send confirmation message to Telegram
+### Via button callback (qw2_approve / qw2_reject)
+Buttons are sent with the pending decisions DM. When Lincoln taps a button, the callback data is sent to the bot.
 
-### qw2_cancel / qw2_reject
-1. Archive all pending decisions
-2. Send cancellation message to Telegram
+### Via text reply
+1. DM sent to Lincoln listing pending decisions
+2. Lincoln replies with "approve" or "reject"
+3. This agent session receives the message and processes the command
+
+## Processing
+
+```
+if "approve" in text.lower():
+    → confirm_pending() → write decisions → consolidate → update MEMORY.md
+    → Send confirmation DM to Lincoln
+    
+if "reject" in text.lower():
+    → cancel_pending() → archive pending files
+    → Send cancellation DM to Lincoln
+```
 
 ## Implementation
 
 ```python
-# vault/qw2/callback_handler.py
-from pathlib import Path
-from vault.qw2.writer import QWWriter
-from vault.qw2.lock import acquire_lock, release_lock
-import json
+# In agent's message handler:
+from vault.qw2.callback_handler import process_callback, confirm_pending, cancel_pending
 
-PENDING_DIR = Path("memory/vault/pending")
-DECISIONS_DIR = Path("memory/vault/decisions")
-
-def process_callback(action: str) -> dict:
-    if action in ("qw2_confirm", "qw2_approve"):
-        return confirm_pending()
-    elif action in ("qw2_cancel", "qw2_reject"):
-        return cancel_pending()
-
-def confirm_pending() -> dict:
-    if not acquire_lock():
-        return {"error": "lock_failed"}
-    try:
-        writer = QWWriter()
-        pending = list(PENDING_DIR.glob("*.json"))
-        written = 0
-        for pf in pending:
-            d = json.loads(pf.read_text())
-            topic = d.get("topic", "general.md")
-            path = DECISIONS_DIR / topic
-            if writer.write(path, d):
-                written += 1
-            # Archive
-            archive_dir = PENDING_DIR / "archive"
-            archive_dir.mkdir(exist_ok=True)
-            pf.rename(archive_dir / pf.name)
-        return {"written": written, "action": "confirmed"}
-    finally:
-        release_lock()
-
-def cancel_pending() -> dict:
-    archive_dir = PENDING_DIR / "archive"
-    archive_dir.mkdir(exist_ok=True)
-    for pf in PENDING_DIR.glob("*.json"):
-        pf.rename(archive_dir / pf.name)
-    return {"action": "cancelled", "count": len(list(archive_dir.glob("*.json")))}
+def handle_message(text):
+    text = text.strip().lower()
+    if text in ("approve", "aprovar", "sim", "yes", "/qw2approve"):
+        result = confirm_pending()
+        send_confirmation_dm(result)
+    elif text in ("reject", "rejeitar", "nao", "no", "/qw2reject"):
+        result = cancel_pending()
+        send_cancellation_dm(result)
 ```
 
-## Send Confirmation Telegram
+## DM Poller (backup)
 
-Use message tool with inline buttons:
+When direct message handling isn't available, a polling mechanism checks for commands:
+
+```bash
+# Cron: qw2-dm-poller (every 15 min during work hours)
+cd /home/lincoln/.openclaw/workspace-livy-memory
+PYTHONPATH=. TELEGRAM_MEMORY_BOT_TOKEN=<token> python3 vault/qw2/dm_poller.py --poll
 ```
-action: send
-channel: telegram
-target: 7426291192
-accountId: memory
-message: "🔍 X decisões pendentes:\n\n• ...\n\nConfirmar?"
-buttons: [[{"text": "✅ Aprovar tudo", "callback_data": "qw2_approve", "style": "success"}, {"text": "❌ Rejeitar", "callback_data": "qw2_reject", "style": "danger"}]]
-```
+
+The poller uses getUpdates API to find messages from Lincoln containing approve/reject commands.
