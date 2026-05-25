@@ -89,6 +89,19 @@ def _segments_to_text(segments: list[dict], max_chars: int = 12000) -> str:
     return text
 
 
+def _get_meeting_tags(meeting_id: str, tldv_client) -> list[str]:
+    """Fetch meeting tags from Supabase summaries."""
+    try:
+        summaries = tldv_client.fetch_summaries(meeting_id) or []
+        for summary in summaries:
+            tags = summary.get("tags")
+            if isinstance(tags, list) and tags:
+                return [str(t).strip() for t in tags if str(t).strip()]
+    except Exception:
+        pass
+    return []
+
+
 def extract_decisions_from_transcript(
     meeting_id: str,
     meeting_name: str = "",
@@ -99,7 +112,8 @@ def extract_decisions_from_transcript(
     Extract structured decisions from a meeting transcript using LLM.
 
     Fetches segments from Azure/Supabase, formats to readable text, sends to LLM.
-    Returns list of decision dicts with keys: text, confidence, responsible.
+    Also fetches meeting tags from Supabase summaries.
+    Returns list of decision dicts with keys: text, confidence, responsible, tags.
     """
     if tldv_client is None:
         os.environ.setdefault("SUPABASE_URL", "https://supabase.living.locaweb.com.br")
@@ -110,13 +124,16 @@ def extract_decisions_from_transcript(
 
         tldv_client = TLDVClient(lookback_days=60)
 
+    # Fetch tags from Supabase (lightweight call)
+    tags = _get_meeting_tags(meeting_id, tldv_client)
+
     segments = tldv_client.load_transcript_segments(meeting_id)
     if not segments:
         logger.debug(f"No segments for meeting {meeting_id}")
         return []
 
     transcript = _segments_to_text(segments)
-    logger.debug(f"Transcript text for meeting {meeting_id}: {len(transcript)} chars")
+    logger.debug(f"Transcript text for meeting {meeting_id}: {len(transcript)} chars, tags={tags}")
 
     messages = [
         {"role": "system", "content": _SYSTEM_PROMPT},
@@ -135,6 +152,9 @@ def extract_decisions_from_transcript(
             json_str = re.sub(r"\s*```$", "", json_str)
         data = json.loads(json_str)
         decisions = data.get("decisions", [])
+        # Add tags to each decision
+        for d in decisions:
+            d["tags"] = tags
         logger.debug(f"Extracted {len(decisions)} decisions from meeting {meeting_id}")
         return decisions
     except json.JSONDecodeError as e:
