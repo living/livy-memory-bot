@@ -39,7 +39,7 @@ _Atualizado: 2026-05-23 22:45 UTC (19:45 BRT)_
 | 🟡 | Jobs legados desabilitados (openclaw-health, sonhar, signal-curation, daily-memory-save) | Manter desabilitados ou replanejar com configuração nova |
 | 🟢 | Vault insights semanal operacional | Manter monitoramento das segundas 06:30/07:00 |
 | 🟢 | Loop de research v1 (TLDV/GitHub/Trello/Consolidation) ativo | Manter observabilidade de lock, rebuild de estado e retry policy |
-| ✅ | **Honcho — 650 conclusions (2026-03-06 → 2026-05-25)** | github:416 / tldv:195 / trello:39; vault has 79 unique entries (all indexed); LLM extraction from transcripts (fastest model) active since 2026-05-25 |
+| ✅ | **Honcho — 84 conclusions (replay 2026-05-25)** | workspace `living`; vault 84 entries replayed after server reset; QW-2 crons active; tags extraction integrated |
 | ✅ | **Wiki v2 produção — github + trello + tldv** | commits `30a3b29` + `23e6019`; 3 fontes no caminho `fuse()` + SSOT claims + blob |
 | ✅ | **agenda-trello-* removidos da memória-agent** | 3 jobs eram do Victor/neo e foram removidos do gateway |
 | ✅ | **PR #18 mergeada — batch-first research clients + cadence wiring** | merge `08672fd` squash; 958 inserções; 6 correções de review implementadas; 343 testes research passando |
