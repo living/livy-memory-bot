@@ -39,9 +39,16 @@ class ParsedEntry(TypedDict):
     confidence_level: str | None
 
 
-def parse_topic_file(path: Path) -> list[ParsedEntry]:
-    """Parse all entries from a topic file. Returns list of ParsedEntry."""
-    content = path.read_text()
+def parse_topic_file(path: Path, content: str | None = None) -> list[ParsedEntry]:
+    """Parse all entries from a topic file. Returns list of ParsedEntry.
+    
+    Parameters
+    ----------
+    path : Path — file to read (ignored if content is provided)
+    content : str | None — if provided, parse this string instead of reading from path
+    """
+    if content is None:
+        content = path.read_text()
     entries: list[ParsedEntry] = []
 
     # Extract frontmatter if present
