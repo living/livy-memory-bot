@@ -97,7 +97,7 @@ def index_decision(entry: dict[str, Any], dry_run: bool = False) -> dict[str, st
         "conclusions": [{
             "content": content,
             "observer_id": HONCHO_AGENT_PEER,
-            "observed_id": source_type,
+            "observed_id": HONCHO_AGENT_PEER,
         }]
     }
 
