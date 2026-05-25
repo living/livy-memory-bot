@@ -40,20 +40,29 @@
 
 ## 🗂️ Decisões Registradas
 
-### 2026-05-24 — QW-2 Pipeline: RAW → Topic Files (E2E validado)
+### 2026-05-25 — QW-2 Pipeline: Real Mode + April Backfill
 
-QW-2 é o pipeline de decisões que extrai de TLDV + GitHub + Trello para topic files em `memory/vault/decisions/`.
+**Status:** Real mode activo desde 2026-05-25. Pipeline extrai de TLDV + GitHub + Trello para topic files em `memory/vault/decisions/`.
+
+**QW-2 real mode:**
+- `qw2-daily` cron (seg-sex 07h BRT) executa pipeline real com consolidate + MEMORY + Honcho index
+- `qw3-callback` cron ( */15 9-18 * * 1-5) processa approve/reject via polling Telegram
+- `qw3-dm-poller` backup para comandos /qw2approve /qw2reject
 
 **Bugs corrigidos durante validação E2E:**
 - `fetch_tldv`: `fetch_meeting()` retorna `{}` para meetings sem transcript — o campo `decisions`/`topics` está em `fetch_summaries(meeting_id)`
 - `fetch_tldv`: usava campo `id` em vez de `meeting_id` no objeto meeting
 - `fetch_tgithub` (QW-2): lia `event["payload"]` inexistente — GitHubClient retorna eventos normalizados diretamente
 - GitHubClient: tinha 4 repos hardcoded + 1 query/repo (rate limit) — refeito para 1 query org-wide com `is:pr merged:>DATE org:living --paginate`
+- `honcho_indexer`: `observed_id` deve ser `HONCHO_AGENT_PEER` ('agent-memory-agent'), não `source_type` ('github'/'trello'/'tldv') — 404 'Peer not found'
 
-**Resultado E2E (30 dias):** 134 processados → 45 escritos (TLDV 63 + GitHub 69 + Trello 2), 0 routing failures.
+**April backfill (2026-05-25):**
+- Script: `vault/qw2/backfill_tldv_april.py` — usa Supabase directamente para绕过 TLDV API timeout
+- 28 meetings Abril 1-26; 40 decisions extraídas; 16 escritas; 24 dedupe (já existiam de runs anteriores)
+- Topic files: +11 entries `livy-memory-agent.md` (Abr 1,6,7,8,9,10,13,15,16,22,24), +1 `bat-conectabot-observability.md` (Abr 8)
+- Honcho indexed: 73 decisions totais (20 delphos + 6 infra + 13 bat + 34 livy + 7 general)
 
-**Arquitetura:** `vault/qw2/run.py` + `fetchers/` (tldv/trello/github) + `router.py` + `writer.py` + `cursor.py` + `filter.py` + `callbacks.py`
-**Commits:** `e5cd05d` (fetch_tldv) → `2c63c8e` (trello) → `5abcb1b` (github org-wide)
+**Scripts:** `vault/qw2/run.py` + `router.py` + `writer.py` + `honcho_indexer.py` + `consolidate.py` + `update_memory_index.py` + crons (`qw2_daily_cron.py`, `qw3_callback_cron.py`, `qw3_dm_poller_cron.py`)
 
 Topic file: `memory/curated/livy-memory-agent.md`
 
@@ -411,21 +420,32 @@ _Last updated: 2026-05-24_
 
 ---
 ---
-## QW-2 Topic Files (auto-updated 2026-05-24 22:02 UTC)
+---
+---
+---
+---
+---
+---
+---
+---
+---
+## QW-2 Topic Files (auto-updated 2026-05-25 02:23 UTC)
 
 | Topic | Entries | Latest | Sources |
 |---|---|---|---|
-| `bat-conectabot-observability` | 2 | 2026-05-22 | github |
-| `delphos-video-vistoria` | 11 | 2026-05-22 | github |
-| `livy-memory-agent` | 2 | 2026-05-21 | tldv |
-| `general` | 5 | 2026-05-21 | github |
+| `bat-conectabot-observability` | 12 | 2026-05-25 | trello, github |
+| `general` | 8 | 2026-05-25 | trello, github, test |
+| `infra` | 6 | 2026-05-25 | github |
+| `delphos-video-vistoria` | 20 | 2026-05-22 | github |
+| `livy-memory-agent` | 19 | 2026-05-21 | tldv |
 
 ---
-## QW-2 Topic Files (auto-updated 2026-05-24 22:02 UTC)
+## QW-2 Topic Files (auto-updated 2026-05-25 02:37 UTC)
 
 | Topic | Entries | Latest | Sources |
 |---|---|---|---|
-| `bat-conectabot-observability` | 2 | 2026-05-22 | github |
-| `delphos-video-vistoria` | 11 | 2026-05-22 | github |
-| `livy-memory-agent` | 2 | 2026-05-21 | tldv |
-| `general` | 7 | 2026-05-21 | github, trello |
+| `bat-conectabot-observability` | 13 | 2026-05-25 | github, trello, tldv |
+| `general` | 8 | 2026-05-25 | github, test, trello |
+| `infra` | 6 | 2026-05-25 | github |
+| `delphos-video-vistoria` | 20 | 2026-05-22 | github |
+| `livy-memory-agent` | 34 | 2026-05-21 | tldv |
