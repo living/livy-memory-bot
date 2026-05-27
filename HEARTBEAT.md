@@ -1,6 +1,6 @@
 # HEARTBEAT — Livy Memory Agent
 
-_Atualizado: 2026-05-23 22:45 UTC (19:45 BRT)_
+_Atualizado: 2026-05-27 20:19 UTC (17:19 BRT)_
 
 ## Jobs Ativos — 21 crons
 
@@ -69,6 +69,7 @@ _Atualizado: 2026-05-23 22:45 UTC (19:45 BRT)_
 
 | Mudança | Impacto |
 |---|---|
+| ✅ **vault_search_transcripts — Azure Blob full transcript search (2026-05-27)** | New MCP tool searches all 125 Azure Blob transcripts (~0.5s); skills/vault-query/azure_transcript_search.py + vault_mcp_server.py updated; 5 tools now: vault_search, vault_search_by_tag, vault_list_tags, vault_stats, vault_search_transcripts |
 | ✅ **QW-2 real mode + LLM extraction (2026-05-25)** | auto-write enabled; extract_decisions_from_transcript.py uses fastest LLM on Azure/Supabase segments; QW-3 callback crons active; 28 vault entries re-indexed to Honcho |
 | ✅ PR #14 mergeada (`a8f3626`) — envio real Telegram no `envia_resumo.py` | Resumo semanal automatizado com dedupe |
 | ✅ PR #15 mergeada (`6ea8005`) — fallback `TELEGRAM_TOKEN` | Compatibilidade com ambiente de produção atual |
@@ -157,10 +158,10 @@ gh api graphql -f query='{ marketplacePurchases(first:5) { nodes { plan { name }
 
 ## Última Consolidação
 
-- Sessão de consolidação: 2026-05-22 03:05 UTC (00:05 BRT)
-- Alterações: stale thresholds 60d/90d (347 stale → 0); 6 person variants quarentenados+arquivados; .archive exclusion em vault-lint
-- Commits: 9f57022 (stale thresholds) + 38c12c3 (archive exclusion)
-- Próxima consolidação: 2026-05-23 07:00 BRT
+- Sessão de consolidação: 2026-05-27 20:19 UTC (17:19 BRT)
+- Alterações: MEMORY.md consolidado (duplicados PR#20/21/23/24 removidos, azure_transcript_search adicionado); HEARTBEAT.md atualizado
+- Commits: fba06ec + 9e35b5e + c17e1d3
+- Próxima consolidação: 2026-05-28 07:00 BRT
 
 ## Mudanças desde Último HEARTBEAT (2026-04-22 00:31 UTC)
 
