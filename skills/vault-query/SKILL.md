@@ -33,6 +33,39 @@ Determine query complexity before executing:
 - "compare X across sources"
 → Use: Full protocol (search → fetch → cross-ref → synthesize)
 
+## Result Limits
+
+To prevent timeout and manage token usage:
+
+| Query Type | Max Results | Behavior |
+|---|---|---|
+| Simple keyword | 20 | Early exit, no cross-ref |
+| Entity lookup | 10 | Limit to top 10 by recency |
+| Concept trace | 15 | Limit to 5 most recent per source |
+| Decision history | 30 | Limit by date range |
+| Complex/synthesis | 20 | Paginate, agent decides |
+
+### Complexity budget
+- Maximum 5 files to cross-reference per query
+- Maximum 3 relationship hops
+- If exceeded: return top-N by relevance score, signal pagination
+
+## Relevancy Scoring
+
+Each result is scored before being returned to the agent:
+
+| Signal | Score | Notes |
+|---|---|---|
+| Exact keyword match in text | +10 | Case-insensitive |
+| Keyword in tags | +5 | |
+| Keyword in source_ref | +3 | |
+| Recency (last 30 days) | +2 | |
+| Keyword in title/header | +8 | |
+| Multiple keyword occurrences | +1 per extra | Max +5 |
+
+Results are sorted by score descending before being returned.
+Results with score < 3 are excluded.
+
 ## Vault Structure
 
 ```
