@@ -10,7 +10,6 @@ name: bat-conectabot-observability
 - **Source:** trello:69f0c26457a5542167ef4302
 - **Confidence:** trello
 - **Confidence Level:** medium
-- **Tags:** trello
 
 ### 2026-05-25 — github
 
@@ -19,7 +18,6 @@ name: bat-conectabot-observability
 - **Source:** github:living/RetailAuditRulesDashboard#139
 - **Confidence:** RetailAuditRulesDashboard
 - **Confidence Level:** medium
-- **Tags:** RetailAuditRulesDashboard
 
 ### 2026-05-25 — github
 
@@ -28,7 +26,6 @@ name: bat-conectabot-observability
 - **Source:** github:living/RetailAuditInfraDashboard#53
 - **Confidence:** RetailAuditInfraDashboard
 - **Confidence Level:** medium
-- **Tags:** RetailAuditInfraDashboard
 
 ### 2026-05-25 — github
 
@@ -37,7 +34,6 @@ name: bat-conectabot-observability
 - **Source:** github:living/RetailAuditInfraDashboard#54
 - **Confidence:** RetailAuditInfraDashboard
 - **Confidence Level:** medium
-- **Tags:** RetailAuditInfraDashboard
 
 ### 2026-05-25 — github
 
@@ -46,7 +42,6 @@ name: bat-conectabot-observability
 - **Source:** github:living/RetailAuditInfraDashboard#56
 - **Confidence:** RetailAuditInfraDashboard
 - **Confidence Level:** medium
-- **Tags:** RetailAuditInfraDashboard
 
 ### 2026-05-25 — github
 
@@ -55,7 +50,6 @@ name: bat-conectabot-observability
 - **Source:** github:living/RetailAuditRulesDashboard#142
 - **Confidence:** RetailAuditRulesDashboard
 - **Confidence Level:** medium
-- **Tags:** RetailAuditRulesDashboard
 
 ### 2026-05-25 — github
 
@@ -64,7 +58,6 @@ name: bat-conectabot-observability
 - **Source:** github:living/RetailAuditRulesDashboard#143
 - **Confidence:** RetailAuditRulesDashboard
 - **Confidence Level:** medium
-- **Tags:** RetailAuditRulesDashboard
 
 ### 2026-05-25 — github
 
@@ -73,7 +66,6 @@ name: bat-conectabot-observability
 - **Source:** github:living/RetailAuditRulesDashboard#145
 - **Confidence:** RetailAuditRulesDashboard
 - **Confidence Level:** medium
-- **Tags:** RetailAuditRulesDashboard
 
 ### 2026-05-22 — github
 
@@ -82,7 +74,6 @@ name: bat-conectabot-observability
 - **Source:** github:living/bot-ai-app#97
 - **Confidence:** bot-ai-app
 - **Confidence Level:** medium
-- **Tags:** bot-ai-app
 
 ### 2026-05-22 — github
 
@@ -91,7 +82,6 @@ name: bat-conectabot-observability
 - **Source:** github:living/bot-ai-api#133
 - **Confidence:** bot-ai-api
 - **Confidence Level:** medium
-- **Tags:** bot-ai-api
 
 ### 2026-05-08 — github
 
@@ -100,7 +90,6 @@ name: bat-conectabot-observability
 - **Source:** github:living/bot-ai-app#91
 - **Confidence:** bot-ai-app
 - **Confidence Level:** medium
-- **Tags:** bot-ai-app
 
 ### 2026-05-08 — github
 
@@ -109,17 +98,11 @@ name: bat-conectabot-observability
 - **Source:** github:living/bot-ai-app#92
 - **Confidence:** bot-ai-app
 - **Confidence Level:** medium
-- **Tags:** bot-ai-app
 
 ### 2026-04-08 — tldv
 
 > Adicionar botão "Estou ciente" no fluxo de consentimento do chatbot para tornar clara a ação necessária do usuário
 
 - **Source:** tldv:69d69795e7360000134d3296
-- **Tags:** 4d, chatbot, cindy, whatsapp, hangfire, parquet, bug-critico, indicadoresapp, fs-memory, azure, blob-storage, srt
-- **Confidence:** 0.92
+- **Confidence:** 4d, chatbot, cindy, whatsapp, hangfire, parquet, bug-critico, indicadoresapp, fs-memory, azure, blob-storage, srt
 - **Confidence Level:** medium
-
-
-
-
