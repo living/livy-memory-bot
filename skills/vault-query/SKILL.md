@@ -131,3 +131,58 @@ When a query generates a new insight:
 2. Include `provenance` frontmatter with `source`, `source_key`, `fetched_at`, `run_id`
 3. Add entry to `index.md`
 4. Log the creation in `log.md`
+
+## Structured Decision Lookup
+
+The `decisions/*.md` files have a structured format enabling O(1) tag lookups instead of O(n) text grep.
+
+### Decision block format
+```
+### YYYY-MM-DD — source
+
+> decision text here
+
+- **Source:** github:org/repo#N  |  tldv:meeting_id  |  trello:card_id
+- **Confidence:** 0.92
+- **Tags:** tag1, tag2, tag3
+```
+
+### Lookup strategies
+
+| Strategy | Method | Speed |
+|---|---|---|
+| By tag | Pre-built tag index | O(1) |
+| By date range | Sorted blocks by date | O(log n) |
+| By source_ref | Exact match on Source field | O(n) |
+| By text content | Full text search | O(n) |
+
+### Usage in query protocol
+1. For "decisions about X": build tag index first, lookup by tag
+2. For "decisions from GitHub": filter by source_ref prefix
+3. For "recent decisions": binary search by date
+
+## Optional Cross-Reference
+
+Cross-referencing the relationships graph is expensive (loads 36KB of edges). It should only be done when needed.
+
+### When to cross-reference
+- Entity queries: always (need to find person across Trello/GitHub/TLDV)
+- Concept traces: optional (helps find related entities)
+- Simple keyword queries: **never** (direct search sufficient)
+- Decision history: optional (only if result count < 5)
+
+### Cross-reference budget
+- Maximum 5 files cross-referenced per query (ComplexityBudget)
+- Maximum 3 relationship hops
+- If budget exhausted: return direct search results only
+
+### How to skip cross-reference
+```
+if is_simple_keyword_query(query):
+    return direct_search_results  # No cross-ref
+elif is_entity_query(query) or budget.can_cross_ref():
+    results = direct_search_results
+    if budget.can_cross_ref():
+        results += cross_reference(budget)
+    return results
+```

@@ -808,3 +808,187 @@ QUALITY_GUARDRAIL_CONSECUTIVE_TRIGGER = 3   # era 2
 **Commits:** `7026794` (cycle_time+effort+pr_refs), `a98a9fc` (lessons W3)
 
 **Meta:** backfill Mai 7+ (continuar na próxima sessão)
+
+
+## Consolidation 2026-05-25T10:06:13.274491+00:00
+{
+  "run_at": "2026-05-25T10:06:13.274467+00:00",
+  "tldv": {
+    "events_processed": 0,
+    "events_skipped": 0,
+    "status": "success"
+  },
+  "github": {
+    "events_processed": 0,
+    "events_skipped": 0,
+    "status": "success"
+  },
+  "metrics": {
+    "tldv": {
+      "key_count": 88,
+      "size_bytes": 8280,
+      "content_key_count": 41,
+      "content_size_bytes": 6355,
+      "decision_key_count": 0,
+      "decision_size_bytes": 2,
+      "linkage_key_count": 0,
+      "linkage_size_bytes": 2
+    },
+    "github": {
+      "key_count": 33,
+      "size_bytes": 3483,
+      "content_key_count": 33,
+      "content_size_bytes": 4461,
+      "decision_key_count": 0,
+      "decision_size_bytes": 2,
+      "linkage_key_count": 0,
+      "linkage_size_bytes": 2
+    },
+    "trello": {
+      "key_count": 179,
+      "size_bytes": 16468,
+      "content_key_count": 179,
+      "content_size_bytes": 28103,
+      "decision_key_count": 0,
+      "decision_size_bytes": 2,
+      "linkage_key_count": 0,
+      "linkage_size_bytes": 2
+    }
+  },
+  "snapshot_created": false,
+  "watchdog_alerts": [],
+  "quality": {
+    "total_claims": 2273,
+    "pct_decision": 23.625164980202374,
+    "pct_linkage": 11.702595688517379,
+    "pct_status": 46.50241970963484,
+    "pct_needs_review": 0.0,
+    "pct_with_evidence": 99.86801583809942,
+    "passed": true,
+    "failed_kpis": [],
+    "consecutive_bad_cycles": 0,
+    "alert_emitted": false
+  }
+}
+
+## Consolidation 2026-05-26T10:02:02.972899+00:00
+{
+  "run_at": "2026-05-26T10:02:02.972880+00:00",
+  "tldv": {
+    "events_processed": 0,
+    "events_skipped": 0,
+    "status": "success"
+  },
+  "github": {
+    "events_processed": 0,
+    "events_skipped": 0,
+    "status": "success"
+  },
+  "metrics": {
+    "trello": {
+      "key_count": 179,
+      "size_bytes": 16468,
+      "content_key_count": 179,
+      "content_size_bytes": 28103,
+      "decision_key_count": 0,
+      "decision_size_bytes": 2,
+      "linkage_key_count": 0,
+      "linkage_size_bytes": 2
+    },
+    "github": {
+      "key_count": 34,
+      "size_bytes": 3582,
+      "content_key_count": 34,
+      "content_size_bytes": 4596,
+      "decision_key_count": 0,
+      "decision_size_bytes": 2,
+      "linkage_key_count": 0,
+      "linkage_size_bytes": 2
+    },
+    "tldv": {
+      "key_count": 88,
+      "size_bytes": 8280,
+      "content_key_count": 41,
+      "content_size_bytes": 6355,
+      "decision_key_count": 0,
+      "decision_size_bytes": 2,
+      "linkage_key_count": 0,
+      "linkage_size_bytes": 2
+    }
+  },
+  "snapshot_created": false,
+  "watchdog_alerts": [],
+  "quality": {
+    "total_claims": 2280,
+    "pct_decision": 23.552631578947366,
+    "pct_linkage": 11.710526315789473,
+    "pct_status": 46.40350877192982,
+    "pct_needs_review": 0.0,
+    "pct_with_evidence": 99.86842105263158,
+    "passed": true,
+    "failed_kpis": [],
+    "consecutive_bad_cycles": 0,
+    "alert_emitted": false
+  }
+}
+
+## Consolidation 2026-05-27T10:02:39.869780+00:00
+{
+  "run_at": "2026-05-27T10:02:39.869760+00:00",
+  "tldv": {
+    "events_processed": 0,
+    "events_skipped": 0,
+    "status": "success"
+  },
+  "github": {
+    "events_processed": 0,
+    "events_skipped": 0,
+    "status": "success"
+  },
+  "metrics": {
+    "tldv": {
+      "key_count": 89,
+      "size_bytes": 8376,
+      "content_key_count": 42,
+      "content_size_bytes": 6510,
+      "decision_key_count": 0,
+      "decision_size_bytes": 2,
+      "linkage_key_count": 0,
+      "linkage_size_bytes": 2
+    },
+    "github": {
+      "key_count": 45,
+      "size_bytes": 4684,
+      "content_key_count": 45,
+      "content_size_bytes": 6090,
+      "decision_key_count": 0,
+      "decision_size_bytes": 2,
+      "linkage_key_count": 0,
+      "linkage_size_bytes": 2
+    },
+    "trello": {
+      "key_count": 179,
+      "size_bytes": 16468,
+      "content_key_count": 179,
+      "content_size_bytes": 28103,
+      "decision_key_count": 0,
+      "decision_size_bytes": 2,
+      "linkage_key_count": 0,
+      "linkage_size_bytes": 2
+    }
+  },
+  "snapshot_created": false,
+  "watchdog_alerts": [],
+  "quality": {
+    "total_claims": 2308,
+    "pct_decision": 23.26689774696707,
+    "pct_linkage": 11.871750433275563,
+    "pct_status": 46.36048526863085,
+    "pct_needs_review": 0.0,
+    "pct_with_evidence": 99.87001733102254,
+    "passed": true,
+    "failed_kpis": [],
+    "consecutive_bad_cycles": 0,
+    "alert_emitted": false
+  }
+}

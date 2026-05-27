@@ -2,3 +2,6 @@
 {"timestamp": "2026-04-22T00:28:17.655049+00:00", "event_type": "watchdog_decision", "alerts": [], "breaker_action": "none"}
 {"timestamp": "2026-05-22T10:01:42.980342+00:00", "event_type": "watchdog_decision", "alerts": [], "breaker_action": "none"}
 {"timestamp": "2026-05-23T10:01:47.184135+00:00", "event_type": "watchdog_decision", "alerts": [], "breaker_action": "none"}
+{"timestamp": "2026-05-25T10:06:13.244567+00:00", "event_type": "watchdog_decision", "alerts": [], "breaker_action": "none"}
+{"timestamp": "2026-05-26T10:02:02.945803+00:00", "event_type": "watchdog_decision", "alerts": [], "breaker_action": "none"}
+{"timestamp": "2026-05-27T10:02:39.842278+00:00", "event_type": "watchdog_decision", "alerts": [], "breaker_action": "none"}

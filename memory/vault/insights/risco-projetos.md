@@ -1,11 +1,12 @@
 # Painel de Risco por Projeto
-_Gerado: 2026-04-20 10:02 UTC_
+_Gerado: 2026-05-25 10:04 UTC_
 
 Cálculo por projeto: taxa de cards órfãos + cobertura de reuniões por pessoas do projeto.
 
 | Projeto | Score | Cards | Órfãos | Pessoas | Cobertura reuniões |
 | --- | --- | --- | --- | --- | --- |
 | KE20 Infra | 🔴 CRÍTICO 80.0 | 2 | 1 | 1 | 0.0% |
+| Delphos Integração 2026 | 🔴 CRÍTICO 77.9 | 19 | 12 | 4 | 0.0% |
 | BAT - Conecta Check | 🔴 CRÍTICO 70.0 | 6 | 3 | 1 | 0.0% |
 | BAT - Kaba | 🟡 ATENÇÃO 50.0 | 0 | 0 | 0 | 0% |
 | Elcano - Robôs OCR e Navios | 🟡 ATENÇÃO 50.0 | 0 | 0 | 0 | 0% |
@@ -20,4 +21,3 @@ Cálculo por projeto: taxa de cards órfãos + cobertura de reuniões por pessoa
 | Living - M.I.C.I | 🟡 ATENÇÃO 50.0 | 0 | 0 | 0 | 0% |
 | Nelway | 🟡 ATENÇÃO 50.0 | 0 | 0 | 0 | 0% |
 | Livy Memory | 🟡 ATENÇÃO 50.0 | 0 | 0 | 0 | 0% |
-| Delphos Integração 2026 | 🟡 ATENÇÃO 46.7 | 18 | 2 | 4 | 0.0% |

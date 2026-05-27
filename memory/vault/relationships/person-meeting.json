@@ -1,89 +1,106 @@
 {
   "edges": [
     {
-      "from_id": "person:tldv:tldv:lincoln-quinan-junior",
-      "to_id": "meeting:69e68e93f3efa5001387e5e0",
+      "from_id": "person:tldv:645903ff864f0800133dc9fa",
+      "to_id": "meeting:6a16dccb0277cc0013dc5888",
       "role": "participant",
       "confidence": "high",
       "sources": [
         {
           "source_type": "tldv_api",
-          "source_ref": "tldv:69e68e93f3efa5001387e5e0",
-          "retrieved_at": "2026-04-21T17:01:43Z",
+          "source_ref": "tldv:6a16dccb0277cc0013dc5888",
+          "retrieved_at": "2026-05-27T13:07:58Z",
           "mapper_version": "external-ingest-person-meeting-rel-v1"
         }
       ],
-      "lineage_run_id": "run-2026-04-21T17:01:43Z-external-ingest-person-meeting-rel-v1",
+      "lineage_run_id": "run-2026-05-27T13:07:58Z-external-ingest-person-meeting-rel-v1",
       "until": null,
-      "since": "2026-04-20T20:37:39.59+00:00"
+      "since": "2026-05-27T12:00:11.731+00:00"
     },
     {
-      "from_id": "person:tldv:tldv:victor-hugo",
-      "to_id": "meeting:69e68e93f3efa5001387e5e0",
+      "from_id": "person:tldv:645e7c3236d05500131efcb0",
+      "to_id": "meeting:6a16dccb0277cc0013dc5888",
       "role": "participant",
       "confidence": "high",
       "sources": [
         {
           "source_type": "tldv_api",
-          "source_ref": "tldv:69e68e93f3efa5001387e5e0",
-          "retrieved_at": "2026-04-21T17:01:43Z",
+          "source_ref": "tldv:6a16dccb0277cc0013dc5888",
+          "retrieved_at": "2026-05-27T13:07:58Z",
           "mapper_version": "external-ingest-person-meeting-rel-v1"
         }
       ],
-      "lineage_run_id": "run-2026-04-21T17:01:43Z-external-ingest-person-meeting-rel-v1",
+      "lineage_run_id": "run-2026-05-27T13:07:58Z-external-ingest-person-meeting-rel-v1",
       "until": null,
-      "since": "2026-04-20T20:37:39.59+00:00"
+      "since": "2026-05-27T12:00:11.731+00:00"
     },
     {
-      "from_id": "person:tldv:tldv:robert-urech",
-      "to_id": "meeting:69e68e93f3efa5001387e5e0",
+      "from_id": "person:tldv:6464d732e2506300130656f4",
+      "to_id": "meeting:6a16dccb0277cc0013dc5888",
       "role": "participant",
       "confidence": "high",
       "sources": [
         {
           "source_type": "tldv_api",
-          "source_ref": "tldv:69e68e93f3efa5001387e5e0",
-          "retrieved_at": "2026-04-21T17:01:43Z",
+          "source_ref": "tldv:6a16dccb0277cc0013dc5888",
+          "retrieved_at": "2026-05-27T13:07:58Z",
           "mapper_version": "external-ingest-person-meeting-rel-v1"
         }
       ],
-      "lineage_run_id": "run-2026-04-21T17:01:43Z-external-ingest-person-meeting-rel-v1",
+      "lineage_run_id": "run-2026-05-27T13:07:58Z-external-ingest-person-meeting-rel-v1",
       "until": null,
-      "since": "2026-04-20T20:37:39.59+00:00"
+      "since": "2026-05-27T12:00:11.731+00:00"
     },
     {
-      "from_id": "person:tldv:tldv:marcio-rocha",
-      "to_id": "meeting:69e68e93f3efa5001387e5e0",
+      "from_id": "person:tldv:646e63396f9ede0013960c43",
+      "to_id": "meeting:6a16dccb0277cc0013dc5888",
       "role": "participant",
       "confidence": "high",
       "sources": [
         {
           "source_type": "tldv_api",
-          "source_ref": "tldv:69e68e93f3efa5001387e5e0",
-          "retrieved_at": "2026-04-21T17:01:43Z",
+          "source_ref": "tldv:6a16dccb0277cc0013dc5888",
+          "retrieved_at": "2026-05-27T13:07:58Z",
           "mapper_version": "external-ingest-person-meeting-rel-v1"
         }
       ],
-      "lineage_run_id": "run-2026-04-21T17:01:43Z-external-ingest-person-meeting-rel-v1",
+      "lineage_run_id": "run-2026-05-27T13:07:58Z-external-ingest-person-meeting-rel-v1",
       "until": null,
-      "since": "2026-04-20T20:37:39.59+00:00"
+      "since": "2026-05-27T12:00:11.731+00:00"
     },
     {
-      "from_id": "person:tldv:tldv:esteves-marques",
-      "to_id": "meeting:69e68e93f3efa5001387e5e0",
+      "from_id": "person:tldv:68d44037658d920013b68e52",
+      "to_id": "meeting:6a16dccb0277cc0013dc5888",
       "role": "participant",
       "confidence": "high",
       "sources": [
         {
           "source_type": "tldv_api",
-          "source_ref": "tldv:69e68e93f3efa5001387e5e0",
-          "retrieved_at": "2026-04-21T17:01:43Z",
+          "source_ref": "tldv:6a16dccb0277cc0013dc5888",
+          "retrieved_at": "2026-05-27T13:07:58Z",
           "mapper_version": "external-ingest-person-meeting-rel-v1"
         }
       ],
-      "lineage_run_id": "run-2026-04-21T17:01:43Z-external-ingest-person-meeting-rel-v1",
+      "lineage_run_id": "run-2026-05-27T13:07:58Z-external-ingest-person-meeting-rel-v1",
       "until": null,
-      "since": "2026-04-20T20:37:39.59+00:00"
+      "since": "2026-05-27T12:00:11.731+00:00"
+    },
+    {
+      "from_id": "person:tldv:698c76590947ef0013880914",
+      "to_id": "meeting:6a16dccb0277cc0013dc5888",
+      "role": "participant",
+      "confidence": "high",
+      "sources": [
+        {
+          "source_type": "tldv_api",
+          "source_ref": "tldv:6a16dccb0277cc0013dc5888",
+          "retrieved_at": "2026-05-27T13:07:58Z",
+          "mapper_version": "external-ingest-person-meeting-rel-v1"
+        }
+      ],
+      "lineage_run_id": "run-2026-05-27T13:07:58Z-external-ingest-person-meeting-rel-v1",
+      "until": null,
+      "since": "2026-05-27T12:00:11.731+00:00"
     }
   ]
 }

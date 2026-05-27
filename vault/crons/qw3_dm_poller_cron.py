@@ -74,7 +74,7 @@ def main():
     load_env()
     sys.path.insert(0, str(_WS))
 
-    from vault.qw3_callback_cron import handle_approve, handle_reject
+    from vault.crons.qw3_callback_cron import handle_approve, handle_reject
 
     last_id = get_last_update_id()
     updates = fetch_updates(last_id + 1)
