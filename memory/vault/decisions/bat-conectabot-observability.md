@@ -104,5 +104,6 @@ name: bat-conectabot-observability
 > Adicionar botão "Estou ciente" no fluxo de consentimento do chatbot para tornar clara a ação necessária do usuário
 
 - **Source:** tldv:69d69795e7360000134d3296
-- **Confidence:** 4d, chatbot, cindy, whatsapp, hangfire, parquet, bug-critico, indicadoresapp, fs-memory, azure, blob-storage, srt
+ - **Tags:** 4d, chatbot, cindy, whatsapp, hangfire, parquet, bug-critico, indicadoresapp, fs-memory, azure, blob-storage, srt
+ - **Confidence:** medium
 - **Confidence Level:** medium

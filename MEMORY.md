@@ -452,16 +452,6 @@ _Last updated: 2026-05-24_
 ---
 ---
 ---
-## QW-2 Topic Files (auto-updated 2026-05-27 14:13 UTC)
-
-| Topic | Entries | Latest | Sources |
-|---|---|---|---|
-| `bat-conectabot-observability` | 13 | 2026-05-25 | github, tldv, trello |
-| `infra` | 6 | 2026-05-25 | github |
-| `delphos-video-vistoria` | 20 | 2026-05-22 | github |
-| `livy-memory-agent` | 37 | 2026-05-21 | tldv |
-| `general` | 7 | 2026-05-21 | github, trello |
-
 ---
 ## QW-2 Topic Files (auto-updated 2026-05-27 15:17 UTC)
 
@@ -472,3 +462,14 @@ _Last updated: 2026-05-24_
 | `delphos-video-vistoria` | 20 | 2026-05-22 | github |
 | `livy-memory-agent` | 37 | 2026-05-21 | tldv |
 | `general` | 7 | 2026-05-21 | github, trello |
+
+---
+## QW-2 Topic Files (auto-updated 2026-05-27 15:31 UTC)
+
+| Topic | Entries | Latest | Sources |
+|---|---|---|---|
+| `bat-conectabot-observability` | 13 | 2026-05-25 | trello, tldv, github |
+| `infra` | 6 | 2026-05-25 | github |
+| `delphos-video-vistoria` | 20 | 2026-05-22 | github |
+| `livy-memory-agent` | 37 | 2026-05-21 | tldv |
+| `general` | 7 | 2026-05-21 | trello, github |

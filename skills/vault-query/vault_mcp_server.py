@@ -49,7 +49,8 @@ def _search(query: str, limit: int = 20, tag_filter: str | None = None) -> list[
         query_lower = query.lower()
         results = [b for b in all_blocks
                    if query_lower in b.text.lower() or query_lower in b.source_ref.lower()
-                   or any(query_lower in t for t in b.tags)]
+                   or any(query_lower in t for t in b.tags)
+                   or (b.confidence and query_lower in b.confidence.lower())]
 
     dicts = [_block_to_dict(b) for b in results]
     scored = filter_and_rank(dicts, query, min_score=3)

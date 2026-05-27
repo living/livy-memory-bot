@@ -60,9 +60,9 @@ def search_decisions_simple(query: str, limit: int = 20) -> list[dict]:
     query_lower = query.lower()
     matched = []
     for b in all_blocks:
-        if query_lower in b.text.lower() or query_lower in b.source_ref.lower():
-            matched.append(b)
-        elif any(query_lower in tag for tag in b.tags):
+        if (query_lower in b.text.lower() or query_lower in b.source_ref.lower()
+            or any(query_lower in tag for tag in b.tags)
+            or (b.confidence and query_lower in b.confidence.lower())):
             matched.append(b)
 
     # Convert to dict
