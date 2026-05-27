@@ -27,6 +27,7 @@ from decision_lookup import parse_decision_file, build_tag_index, search_by_tag
 from scoring import filter_and_rank
 from search_limits import search_with_limit
 from vault_cache import VaultCache
+from azure_transcript_search import search_transcripts as search_azure_transcripts, format_transcript_full
 
 # Server instance
 app = Server("vault")
@@ -113,6 +114,19 @@ async def list_tools() -> list[Tool]:
                 "properties": {},
             },
         ),
+        Tool(
+            name="vault_search_transcripts",
+            description="Search full meeting transcripts in Azure Blob (not just decision summaries). Use this to find specific discussions, decisions or topics in actual meeting recordings. Returns speaker labels, timestamps, and transcript excerpts.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string", "description": "Search query (e.g. 'Lincoln', 'compliance', 'deploy')"},
+                    "limit": {"type": "integer", "description": "Max meetings to return (default 5)"},
+                    "full": {"type": "boolean", "description": "Return full transcript instead of preview (default False)"},
+                },
+                "required": ["query"],
+            },
+        ),
     ]
 
 
@@ -169,6 +183,61 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             lines.append(f"  {src}: {count}")
         lines.append(f"")
         lines.append(f"Time: {elapsed:.3f}s")
+        return [TextContent(type="text", text="\n".join(lines))]
+
+    elif name == "vault_search_transcripts":
+        query = arguments["query"]
+        limit = min(arguments.get("limit", 5), 10)
+        full = arguments.get("full", False)
+
+        try:
+            from azure_transcript_search import (
+                search_transcripts as azure_search,
+                format_transcript_full,
+                get_transcript,
+            )
+        except Exception as e:
+            return [TextContent(type="text", text=f"Error loading azure_transcript_search: {e}\nTime: {time.perf_counter()-start:.3f}s")]
+
+        try:
+            transcript_results = azure_search(query, limit=limit)
+        except Exception as e:
+            return [TextContent(type="text", text=f"Azure search error: {e}\nTime: {time.perf_counter()-start:.3f}s")]
+
+        elapsed = time.perf_counter() - start
+
+        if not transcript_results:
+            return [TextContent(type="text", text=f"No transcript matches for '{query}'\nTime: {elapsed:.3f}s")]
+
+        lines = []
+        lines.append(f"Transcript search: {query}")
+        lines.append(f"Meetings found: {len(transcript_results)}")
+        lines.append(f"Time (Azure Blob): {elapsed:.3f}s")
+        lines.append("")
+
+        for r in transcript_results:
+            date = r.get("date", "?")
+            mid = r.get("meeting_id", "?")
+            speakers = r.get("speakers", [])
+            matched = r.get("matched_segments", 0)
+            total = r.get("total_segments", 0)
+            preview = r.get("matched_segment_preview", "")
+
+            lines.append(f"## {date} | {mid[:12]}... | {matched}/{total} segmentos")
+            lines.append(f"Speakers: {', '.join(speakers)}")
+            lines.append(f"Match: {preview}")
+
+            if full:
+                transcript = get_transcript(mid)
+                if transcript:
+                    full_text = format_transcript_full(transcript, query=query)
+                    lines.append("")
+                    lines.append("--- FULL TRANSCRIPT ---")
+                    lines.append(full_text)
+                    lines.append("--- END ---")
+
+            lines.append("")
+
         return [TextContent(type="text", text="\n".join(lines))]
 
     else:
