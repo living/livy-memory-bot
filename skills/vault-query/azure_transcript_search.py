@@ -164,9 +164,9 @@ def search_transcripts(query: str, limit: int = 5,
         # Search in transcript
         matched_segs = []
         for seg in transcript:
-            text = seg.get("text", "")
-            speaker = seg.get("speaker", "")
-            if query_lower in text.lower() or query_lower in speaker.lower():
+            text = seg.get("text", "") or ""
+            speaker = seg.get("speaker", "") or ""
+            if query_lower in text.lower() or (speaker and query_lower in speaker.lower()):
                 matched_segs.append(seg)
 
         if not matched_segs:
